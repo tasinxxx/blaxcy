@@ -130,6 +130,31 @@ class SequenceSettings(_Section):
     speculative_perception: bool = False
 
 
+class InputSettings(_Section):
+    """Physical input behaviour (sections 48-52).
+
+    These are behavioural timings, not safety switches. ``guard_focus`` only
+    *adds* a pre-typing focus check (section 51); setting it false never lets
+    typing reach an unverified target through some other path -- the focus
+    guard is the caller's opt-in, and the executor still owns lease/revalidation.
+    """
+
+    #: Settle delay after moving the pointer and before pressing a button (sec 48).
+    mouse_settle_ms: int = Field(default=40, ge=0)
+    #: Settle delay after a click completes, before perception (section 48).
+    post_click_settle_ms: int = Field(default=120, ge=0)
+    #: How far a pointer readback may differ from the requested point (section 48).
+    pointer_readback_tolerance_px: int = Field(default=4, ge=0)
+    #: Bounded pointer corrections after a move; never an unbounded retry loop.
+    max_pointer_corrections: int = Field(default=1, ge=0, le=3)
+    #: Typing directly with XTEST is used for ASCII text up to this length (sec 50).
+    ascii_direct_max: int = Field(default=200, ge=1)
+    #: Inter-key delay for direct typing (section 50 target band is 8-12 ms).
+    key_interval_ms: int = Field(default=10, ge=0, le=100)
+    #: Enforce the section 51 focus guard before typing into a text-entry target.
+    guard_focus: bool = True
+
+
 class LeaseSettings(_Section):
     """Element lease lifetime (section 44)."""
 
@@ -207,6 +232,7 @@ class Settings(BaseModel):
     resolver: ResolverSettings = Field(default_factory=ResolverSettings)
     resolver_cache: ResolverCacheSettings = Field(default_factory=ResolverCacheSettings)
     sequence: SequenceSettings = Field(default_factory=SequenceSettings)
+    input: InputSettings = Field(default_factory=InputSettings)
     lease: LeaseSettings = Field(default_factory=LeaseSettings)
     verification: VerificationSettings = Field(default_factory=VerificationSettings)
     recovery: RecoverySettings = Field(default_factory=RecoverySettings)

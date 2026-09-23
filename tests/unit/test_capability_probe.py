@@ -45,15 +45,28 @@ def test_unimplemented_capabilities_are_unavailable() -> None:
     session = detect_session()
     settings = Settings()
 
-    browser = probe_browser_accessibility(session)
     visual = probe_visual_grounding(session)
     sequence = probe_sequence_execution(settings)
 
-    for cap in (browser, visual, sequence):
+    for cap in (visual, sequence):
         assert cap.status is CapabilityStatus.UNAVAILABLE
         assert cap.reason
-    assert "Phase 3" in (browser.reason or "")
     assert "Phase 11" in (visual.reason or "")
+
+
+def test_browser_accessibility_reports_unavailable_without_a_bus() -> None:
+    """Browser accessibility depends on AT-SPI; without a bus it is honestly UNAVAILABLE.
+
+    A synthetic session with ``atspi_bus_available=False`` keeps this deterministic
+    regardless of which browsers happen to be open on the host -- the point is the
+    *dependency* is reported, not a fabricated result.
+    """
+    session = SessionInfo(session_type=SessionType.X11, atspi_bus_available=False)
+    cap = probe_browser_accessibility(session)
+    assert cap.status is CapabilityStatus.UNAVAILABLE
+    assert cap.backend == "atspi"
+    assert "AT-SPI bus" in (cap.reason or "")
+    assert cap.fix_hint
 
 
 def test_sequence_probe_reports_configured_limits() -> None:

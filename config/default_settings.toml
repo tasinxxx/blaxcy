@@ -77,6 +77,18 @@ max_sequence_wall_clock_seconds = 60.0
 capture_boost = false
 speculative_perception = false
 
+[input]
+# Physical input timing (sections 48-52). These are behavioural knobs, not
+# safety switches: disabling the focus guard never creates another path to
+# unverified typing, it only removes the extra pre-typing check.
+mouse_settle_ms = 40
+post_click_settle_ms = 120
+pointer_readback_tolerance_px = 4
+max_pointer_corrections = 1
+ascii_direct_max = 200
+key_interval_ms = 10
+guard_focus = true
+
 [lease]
 ttl_ms = 800
 

@@ -17,12 +17,17 @@ from __future__ import annotations
 
 import importlib
 import time
+from contextlib import suppress
 from typing import Any
 
-from config.settings import Settings
+from config.settings import AccessibilitySettings, Settings
+from control.backends.base import BackendProbe
+from core.accessibility import AccessibilityService
+from core.browser_accessibility import BrowserAccessibility
 from core.session_detector import SessionInfo
 from schemas.capability import Capability, CapabilityReport
 from schemas.enums import CapabilityName, CapabilityStatus, SessionType
+from schemas.errors import BlaxcyError
 
 #: Keyring coordinates for the Gemini API key (specification section 69).
 KEYRING_SERVICE = "blaxcy"
@@ -138,27 +143,24 @@ def probe_capture(session: SessionInfo) -> Capability:
     )
 
 
-def probe_accessibility(session: SessionInfo) -> Capability:
-    """Probe AT-SPI by initialising it and counting desktops."""
-    gi = _try_import("gi")
-    if gi is None:
-        return _cap(
-            CapabilityName.ACCESSIBILITY,
-            CapabilityStatus.UNAVAILABLE,
-            reason="PyGObject (gi) is not importable",
-            fix_hint="install python3-gi and gir1.2-atspi-2.0",
-        )
-    try:
-        gi.require_version("Atspi", "2.0")
-        from gi.repository import Atspi
-    except Exception as exc:
-        return _cap(
-            CapabilityName.ACCESSIBILITY,
-            CapabilityStatus.UNAVAILABLE,
-            reason=f"Atspi typelib unavailable: {exc!r}",
-            fix_hint="install gir1.2-atspi-2.0 and at-spi2-core",
-        )
+def probe_accessibility(
+    session: SessionInfo,
+    settings: AccessibilitySettings | None = None,
+    *,
+    service: AccessibilityService | None = None,
+) -> Capability:
+    """Probe AT-SPI perception functionally by observing the live tree.
 
+    This is a real functional probe: it starts the accessibility service and
+    performs one bounded traversal. A probe that merely imported ``gi`` would
+    report ``AVAILABLE`` for an accessibility stack that cannot actually answer
+    a query (section 28).
+
+    Args:
+        session: Detected session facts (the bus check avoids a pointless wait).
+        settings: Accessibility settings; defaults to the packaged defaults.
+        service: An already-started service to reuse (used by :func:`probe_all`).
+    """
     if session.atspi_bus_available is False:
         return _cap(
             CapabilityName.ACCESSIBILITY,
@@ -168,120 +170,89 @@ def probe_accessibility(session: SessionInfo) -> Capability:
             fix_hint="enable accessibility support; ensure at-spi2-core is installed and running",
         )
 
-    started = time.perf_counter()
+    accessibility_settings = settings or AccessibilitySettings()
+    owns_service = service is None
+    active_service = service if service is not None else AccessibilityService(accessibility_settings)
     try:
-        Atspi.init()
-        desktop_count = int(Atspi.get_desktop_count())
-    except Exception as exc:
-        return _cap(
-            CapabilityName.ACCESSIBILITY,
-            CapabilityStatus.DEGRADED,
-            backend="atspi",
-            reason=f"AT-SPI imported but initialisation/desktop enumeration failed: {exc!r}",
-            fix_hint="verify the accessibility bus is running for this session",
-        )
-    latency_ms = (time.perf_counter() - started) * 1000.0
-    if desktop_count < 1:
-        return _cap(
-            CapabilityName.ACCESSIBILITY,
-            CapabilityStatus.DEGRADED,
-            backend="atspi",
-            latency_ms=round(latency_ms, 3),
-            reason="AT-SPI responded but reported no desktops",
-        )
-    return _cap(
-        CapabilityName.ACCESSIBILITY,
-        CapabilityStatus.AVAILABLE,
-        backend="atspi",
-        latency_ms=round(latency_ms, 3),
-        details={"desktop_count": desktop_count},
-    )
+        if not active_service.is_running:
+            active_service.start()
+    except BlaxcyError:
+        # The service records the startup failure; report it rather than guess.
+        return active_service.capability()
+    try:
+        # A failed query still yields an evidence-carrying verdict: capability()
+        # reads the service's own recorded failure rather than guessing.
+        with suppress(BlaxcyError):
+            active_service.refresh()
+        return active_service.capability()
+    finally:
+        if owns_service:
+            active_service.stop()
 
 
-def _probe_xtest() -> tuple[bool, dict[str, Any], str | None]:
-    """Query the XTEST extension without injecting any input.
+def _probe_xtest() -> BackendProbe:
+    """Query the XTEST extension through the Phase 7 backend, injecting nothing.
 
-    Returns ``(available, details, reason)``.
+    The backend owns the probe so the capability report and the input layer can
+    never disagree about what is actually available (section 28 rule 12).
     """
-    if _try_import("Xlib") is None:
-        return False, {}, "python-xlib is not importable"
-    try:
-        from Xlib import display
-        from Xlib.ext import xtest
+    from control.backends import XtestBackend
 
-        conn = display.Display()
-        try:
-            version = xtest.get_version(conn, 2, 2)
-        finally:
-            conn.close()
-    except Exception as exc:
-        return False, {}, f"XTEST query failed: {exc!r}"
-
-    data = getattr(version, "data", None) or {}
-    if isinstance(data, dict) and "major_version" in data:
-        return True, {"xtest_version": f"{data['major_version']}.{data.get('minor_version', 0)}"}, None
-    # A reply without version data still proves the extension answered.
-    return True, {}, None
+    return XtestBackend().probe()
 
 
-def probe_mouse(session: SessionInfo) -> Capability:
-    """Probe pointer-injection capability via XTEST presence (no input injected)."""
+def _input_capability(name: CapabilityName, session: SessionInfo) -> Capability:
+    """Build the mouse/keyboard capability from the shared XTEST probe."""
     if not session.has_x_display:
         return _cap(
-            CapabilityName.MOUSE,
+            name,
             CapabilityStatus.UNAVAILABLE,
             reason=(
                 "no X display available for injection; Wayland input needs the "
                 "RemoteDesktop portal or a verified libei/ydotool path (section 30)"
             ),
-            fix_hint="run under X11/XWayland, or implement the portal backend (Phase 7)",
+            fix_hint="run under X11/XWayland, or implement the portal backend",
         )
-    available, details, reason = _probe_xtest()
-    if available:
+    probe = _probe_xtest()
+    if probe.available:
         return _cap(
-            CapabilityName.MOUSE,
+            name,
             CapabilityStatus.AVAILABLE,
-            backend="xtest",
-            details=details,
+            backend=probe.name,
+            details=probe.details,
         )
-    # XTEST absent: only a *functionally probed* fallback may be reported, and we
-    # cannot functionally probe xdotool without injecting input -- so report the
-    # degraded state honestly rather than assuming xdotool works.
+    # XTEST absent: only a *functionally probed* fallback may be reported, and no
+    # xdotool backend exists yet -- so report the degraded state honestly rather
+    # than assuming the xdotool binary works.
     xdotool = _which("xdotool")
     if xdotool:
         return _cap(
-            CapabilityName.MOUSE,
+            name,
             CapabilityStatus.DEGRADED,
             backend="xdotool",
-            reason=f"XTEST unavailable ({reason}); xdotool is present but unverified",
-            fix_hint="verify xdotool end-to-end in Phase 7 before trusting it",
+            reason=(
+                f"XTEST unavailable ({probe.reason}); xdotool is present but no "
+                "xdotool backend is implemented"
+            ),
+            fix_hint="implement the xdotool fallback backend, or enable the XTEST extension",
             details={"xdotool": xdotool},
         )
     return _cap(
-        CapabilityName.MOUSE,
+        name,
         CapabilityStatus.UNAVAILABLE,
-        reason=f"XTEST unavailable ({reason}) and no xdotool fallback found",
-        fix_hint="install xdotool or enable the XTEST extension",
+        reason=f"XTEST unavailable ({probe.reason}) and no xdotool fallback found",
+        fix_hint="enable the XTEST extension",
     )
+
+
+def probe_mouse(session: SessionInfo) -> Capability:
+    """Probe pointer-injection capability via XTEST presence (no input injected)."""
+    return _input_capability(CapabilityName.MOUSE, session)
 
 
 def probe_keyboard(session: SessionInfo) -> Capability:
-    """Probe keyboard-injection capability via XTEST presence (no input injected)."""
-    # Keyboard uses the same XTEST mechanism as the pointer.
-    capability = probe_mouse(session)
-    status = capability.status
-    backend = capability.backend
-    reason = capability.reason
-    fix_hint = capability.fix_hint
-    details = dict(capability.details)
-    return _cap(
-        CapabilityName.KEYBOARD,
-        status,
-        backend=backend,
-        details=details,
-        reason=reason,
-        fix_hint=fix_hint,
-    )
+    """Probe keyboard-injection capability (the same XTEST mechanism)."""
+    return _input_capability(CapabilityName.KEYBOARD, session)
 
 
 def probe_pointer_readback(session: SessionInfo) -> Capability:
@@ -451,20 +422,50 @@ def probe_window_info(session: SessionInfo) -> Capability:
     )
 
 
-def probe_browser_accessibility(session: SessionInfo) -> Capability:
-    """Report browser accessibility honestly: not implemented until Phase 3."""
+def probe_browser_accessibility(
+    session: SessionInfo,
+    settings: AccessibilitySettings | None = None,
+    *,
+    service: AccessibilityService | None = None,
+) -> Capability:
+    """Probe browser accessibility functionally against the live AT-SPI tree.
+
+    Browser accessibility is only ``AVAILABLE`` when a supported browser is
+    actually exposing an accessibility tree *and* a page URL was discovered.
+    A browser whose tree is visible but whose URL is not discoverable reports
+    ``DEGRADED`` with a reason (section 36 order, section 80 honesty).
+    """
     if session.atspi_bus_available is False:
         return _cap(
             CapabilityName.BROWSER_ACCESSIBILITY,
             CapabilityStatus.UNAVAILABLE,
+            backend="atspi",
             reason="no AT-SPI bus, which browser accessibility depends on",
+            fix_hint="enable accessibility support; ensure at-spi2-core is installed and running",
         )
-    return _cap(
-        CapabilityName.BROWSER_ACCESSIBILITY,
-        CapabilityStatus.UNAVAILABLE,
-        reason="browser accessibility perception is not implemented until Phase 3",
-        fix_hint="implement and functionally test core/browser_accessibility.py in Phase 3",
-    )
+
+    accessibility_settings = settings or AccessibilitySettings()
+    owns_service = service is None
+    active_service = service if service is not None else AccessibilityService(accessibility_settings)
+    if owns_service:
+        try:
+            active_service.start()
+        except BlaxcyError as exc:
+            return _cap(
+                CapabilityName.BROWSER_ACCESSIBILITY,
+                CapabilityStatus.UNAVAILABLE,
+                backend="atspi",
+                reason=(
+                    "browser accessibility requires AT-SPI perception, which is "
+                    f"unavailable: {exc.message}"
+                ),
+                fix_hint="install python3-gi, gir1.2-atspi-2.0 and at-spi2-core",
+            )
+    try:
+        return BrowserAccessibility(active_service).capability()
+    finally:
+        if owns_service:
+            active_service.stop()
 
 
 def probe_visual_grounding(session: SessionInfo) -> Capability:
@@ -585,20 +586,27 @@ def probe_all(
 
         session = detect_session()
 
-    capabilities = (
-        probe_capture(session),
-        probe_accessibility(session),
-        probe_mouse(session),
-        probe_pointer_readback(session),
-        probe_keyboard(session),
-        probe_ocr(session),
-        probe_clipboard(session),
-        probe_window_info(session),
-        probe_browser_accessibility(session),
-        probe_visual_grounding(session),
-        probe_sequence_execution(settings),
-        probe_brain(settings),
-    )
+    # One accessibility service is shared by the accessibility and browser
+    # probes: AT-SPI has a single owner thread (section 35), and starting it
+    # twice would be both slower and less honest about the real state.
+    service = AccessibilityService(settings.accessibility)
+    try:
+        capabilities = (
+            probe_capture(session),
+            probe_accessibility(session, settings.accessibility, service=service),
+            probe_mouse(session),
+            probe_pointer_readback(session),
+            probe_keyboard(session),
+            probe_ocr(session),
+            probe_clipboard(session),
+            probe_window_info(session),
+            probe_browser_accessibility(session, settings.accessibility, service=service),
+            probe_visual_grounding(session),
+            probe_sequence_execution(settings),
+            probe_brain(settings),
+        )
+    finally:
+        service.stop()
     return CapabilityReport(
         capabilities=capabilities,
         generated_at=time.time(),
