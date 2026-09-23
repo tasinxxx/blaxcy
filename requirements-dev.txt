@@ -1,0 +1,9 @@
+-r requirements.txt
+pytest
+pytest-asyncio
+pytest-cov
+pytest-qt
+pytest-benchmark
+mypy
+ruff
+black

@@ -1,0 +1,362 @@
+"""Typed BLAXCY settings (specification sections 72 and 4 rule 25).
+
+Every operational limit is configurable. Security invariants -- terminal
+confirmation, credential-context privacy, and no continuous screen streaming --
+are *not* configurable into an unsafe state: loading a config that attempts to
+disable them fails loudly instead of silently degrading into an unsafe runtime.
+"""
+
+from __future__ import annotations
+
+import tomllib
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any, Final
+
+import tomlkit
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+from schemas.enums import ErrorCode, PolicyMode
+from schemas.errors import BlaxcyError
+
+#: Configuration schema version. Bump only with a migration step in
+#: :mod:`config.migration`.
+SCHEMA_VERSION: Final[int] = 1
+
+#: Default runtime configuration location (created on first save, not shipped
+#: with secrets). Never put API keys here; those live in the OS keyring.
+DEFAULT_CONFIG_PATH: Final[Path] = Path.home() / ".config" / "blaxcy" / "config.toml"
+
+#: Packaged defaults, used as the merge base and as the reference document.
+DEFAULT_SETTINGS_TOML: Final[Path] = Path(__file__).with_name("default_settings.toml")
+
+
+class _Section(BaseModel):
+    """Base for config sections: strict, so typos are errors, never ignored."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class PerformanceSettings(_Section):
+    """Scheduling knobs that must never weaken a safety check (section 32.1)."""
+
+    max_concurrent_readonly_dispatch: int = Field(default=4, ge=1, le=64)
+
+
+class CaptureSettings(_Section):
+    """Frame engine capture profiles (section 33). Targets, not guarantees."""
+
+    idle_fps: float = Field(default=2.0, gt=0.0, le=120.0)
+    normal_fps: float = Field(default=10.0, gt=0.0, le=120.0)
+    active_fps: float = Field(default=30.0, gt=0.0, le=120.0)
+    max_full_frames: int = Field(default=2, ge=1, le=8)
+    max_thumbnails: int = Field(default=8, ge=1, le=64)
+
+
+class PerceptionSettings(_Section):
+    """Change-detector defaults (section 34)."""
+
+    pixel_threshold: int = Field(default=12, ge=0, le=255)
+    meaningful_min_width: int = Field(default=80, ge=1)
+    meaningful_min_height: int = Field(default=24, ge=1)
+    meaningful_area_ratio: float = Field(default=0.015, gt=0.0, le=1.0)
+    major_area_ratio: float = Field(default=0.30, gt=0.0, le=1.0)
+    debounce_short_ms: int = Field(default=120, ge=0)
+    debounce_major_ms: int = Field(default=300, ge=0)
+    max_perception_jobs_per_second: int = Field(default=5, ge=1)
+    animation_recheck_seconds: float = Field(default=3.0, gt=0.0)
+
+
+class AccessibilitySettings(_Section):
+    """AT-SPI timeouts and bounded traversal (section 35)."""
+
+    method_timeout_ms: int = Field(default=250, ge=1)
+    startup_timeout_ms: int = Field(default=1000, ge=1)
+    max_depth: int = Field(default=12, ge=1)
+    max_nodes: int = Field(default=1200, ge=1)
+    deadline_ms: int = Field(default=250, ge=1)
+    cache_ttl_seconds: float = Field(default=2.0, gt=0.0)
+    blacklist_after_failures: int = Field(default=3, ge=1)
+
+
+class OcrSettings(_Section):
+    """OCR is a fallback only (section 40)."""
+
+    minimum_width: int = Field(default=40, ge=1)
+    minimum_height: int = Field(default=14, ge=1)
+    max_regions: int = Field(default=6, ge=1)
+    max_area_ratio: float = Field(default=0.015, gt=0.0, le=1.0)
+    deadline_ms: int = Field(default=300, ge=1)
+
+
+class ResolverSettings(_Section):
+    """Target resolver scoring and ambiguity rule (section 43)."""
+
+    act_threshold: float = Field(default=0.65, ge=0.0, le=1.0)
+    max_candidates: int = Field(default=5, ge=1, le=50)
+    ambiguity_gap: float = Field(default=0.08, ge=0.0, le=1.0)
+    weight_text: float = Field(default=0.40, ge=0.0, le=1.0)
+    weight_source: float = Field(default=0.20, ge=0.0, le=1.0)
+    weight_role: float = Field(default=0.15, ge=0.0, le=1.0)
+    weight_context: float = Field(default=0.15, ge=0.0, le=1.0)
+    weight_geometry: float = Field(default=0.10, ge=0.0, le=1.0)
+
+
+class ResolverCacheSettings(_Section):
+    """Resolver cache (section 43.1).
+
+    Ships **disabled** by default per section 4 rule 31: an optimization that
+    has not been proven safe under concurrent/adversarial conditions must not
+    be on. Disabling it must produce identical (only slower) targeting.
+    """
+
+    enabled: bool = False
+    max_entries: int = Field(default=256, ge=1)
+    ttl_seconds: float = Field(default=10.0, gt=0.0)
+    semantic_match_floor: int = Field(default=70, ge=0, le=100)
+
+
+class SequenceSettings(_Section):
+    """``run_sequence`` limits (sections 66.1, 33.1, 33.2, 32.1).
+
+    The whole batching layer ships disabled until Phase 9's safety gate has
+    passed and its own test list passes (sections 83, 84).
+    """
+
+    enabled: bool = False
+    max_sequence_steps: int = Field(default=12, ge=1, le=256)
+    max_sequence_wall_clock_seconds: float = Field(default=60.0, gt=0.0, le=3600.0)
+    capture_boost: bool = False
+    speculative_perception: bool = False
+
+
+class LeaseSettings(_Section):
+    """Element lease lifetime (section 44)."""
+
+    ttl_ms: int = Field(default=800, ge=1)
+
+
+class VerificationSettings(_Section):
+    """Verification and state-age policy (sections 45, 60, 76)."""
+
+    max_action_state_age_ms: int = Field(default=1500, ge=1)
+    require_verification_for_mutating: bool = True
+
+
+class RecoverySettings(_Section):
+    """Bounded recovery budgets (section 61). Never unbounded."""
+
+    automatic_attempts_per_tool: int = Field(default=2, ge=0, le=10)
+    attempts_per_task_step: int = Field(default=6, ge=0, le=32)
+    identical_call_loop_guard: int = Field(default=3, ge=2, le=10)
+
+
+class SafetySettings(_Section):
+    """Policy mode and session ceilings (sections 56, 63)."""
+
+    mode: PolicyMode = PolicyMode.OBSERVE
+    autonomous_max_session_duration_minutes: int = Field(default=30, ge=1, le=1440)
+    emergency_stop_target_ms: int = Field(default=150, ge=1)
+
+
+class TerminalSettings(_Section):
+    """Terminal safety (section 54). Invariants below forbid disabling these."""
+
+    submit_requires_confirmation: bool = True
+    destructive_always_protected: bool = True
+
+
+class PrivacySettings(_Section):
+    """Privacy and redaction (sections 41, 42, 55)."""
+
+    visual_upload_on_demand_only: bool = True
+    never_upload_credential_context: bool = True
+    never_ocr_password_fields: bool = True
+
+
+class LoggingSettings(_Section):
+    """Structured logging (section 70)."""
+
+    level: str = "INFO"
+    rotation_max_bytes: int = Field(default=10 * 1024 * 1024, ge=1024)
+    rotation_backups: int = Field(default=5, ge=1, le=100)
+    redact_on_root_logger: bool = True
+
+
+class GeminiSettings(_Section):
+    """Brain connection limits (sections 67, 68). Key lives in the keyring."""
+
+    model: str = "gemini-2.5-flash"
+    max_model_turns: int = Field(default=40, ge=1)
+    max_task_wall_clock_seconds: int = Field(default=300, ge=1)
+    context_token_budget: int = Field(default=1200, ge=128)
+
+
+class Settings(BaseModel):
+    """The complete, validated BLAXCY configuration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: int = SCHEMA_VERSION
+
+    performance: PerformanceSettings = Field(default_factory=PerformanceSettings)
+    capture: CaptureSettings = Field(default_factory=CaptureSettings)
+    perception: PerceptionSettings = Field(default_factory=PerceptionSettings)
+    accessibility: AccessibilitySettings = Field(default_factory=AccessibilitySettings)
+    ocr: OcrSettings = Field(default_factory=OcrSettings)
+    resolver: ResolverSettings = Field(default_factory=ResolverSettings)
+    resolver_cache: ResolverCacheSettings = Field(default_factory=ResolverCacheSettings)
+    sequence: SequenceSettings = Field(default_factory=SequenceSettings)
+    lease: LeaseSettings = Field(default_factory=LeaseSettings)
+    verification: VerificationSettings = Field(default_factory=VerificationSettings)
+    recovery: RecoverySettings = Field(default_factory=RecoverySettings)
+    safety: SafetySettings = Field(default_factory=SafetySettings)
+    terminal: TerminalSettings = Field(default_factory=TerminalSettings)
+    privacy: PrivacySettings = Field(default_factory=PrivacySettings)
+    logging: LoggingSettings = Field(default_factory=LoggingSettings)
+    gemini: GeminiSettings = Field(default_factory=GeminiSettings)
+
+
+# ---------------------------------------------------------------------------
+# Security invariants (section 4 rule 25 / section 72).
+# Each entry: (human path, predicate over Settings that must hold, explanation).
+# ---------------------------------------------------------------------------
+Invariant = tuple[str, Callable[[Settings], bool], str]
+
+
+SECURITY_INVARIANTS: Final[tuple[Invariant, ...]] = (
+    (
+        "terminal.submit_requires_confirmation",
+        lambda s: s.terminal.submit_requires_confirmation,
+        "Terminal submission must never bypass confirmation policy (section 54).",
+    ),
+    (
+        "terminal.destructive_always_protected",
+        lambda s: s.terminal.destructive_always_protected,
+        "Destructive terminal commands stay protected in every mode (section 54).",
+    ),
+    (
+        "privacy.never_upload_credential_context",
+        lambda s: s.privacy.never_upload_credential_context,
+        "Protected/password context must never be uploaded to visual AI (section 42).",
+    ),
+    (
+        "privacy.never_ocr_password_fields",
+        lambda s: s.privacy.never_ocr_password_fields,
+        "Password fields must never be OCR'd (section 55).",
+    ),
+    (
+        "privacy.visual_upload_on_demand_only",
+        lambda s: s.privacy.visual_upload_on_demand_only,
+        "No continuous screen streaming; visual upload is on-demand only (section 42).",
+    ),
+)
+
+
+def invariant_violations(settings: Settings) -> list[str]:
+    """Return human-readable descriptions of every violated invariant."""
+    return [explanation for _path, holds, explanation in SECURITY_INVARIANTS if not holds(settings)]
+
+
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge ``override`` onto a copy of ``base``."""
+    merged = dict(base)
+    for key, value in override.items():
+        existing = merged.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            merged[key] = _deep_merge(existing, value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _read_toml(path: Path) -> dict[str, Any]:
+    """Read a TOML file into a mapping, raising a structured error on failure."""
+    try:
+        with path.open("rb") as handle:
+            return tomllib.load(handle)
+    except FileNotFoundError:
+        return {}
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise BlaxcyError(
+            ErrorCode.INTERNAL_ERROR,
+            f"could not read config file {path}: {exc}",
+            details={"path": str(path)},
+        ) from exc
+
+
+def effective_settings_path(explicit: Path | None = None) -> Path:
+    """Resolve which config file is authoritative for this run.
+
+    An explicit path (e.g. ``--config``) wins; otherwise the user config is
+    used when present, else the packaged defaults path is reported so callers
+    can tell the user where a config *would* live.
+    """
+    if explicit is not None:
+        return explicit
+    if DEFAULT_CONFIG_PATH.exists():
+        return DEFAULT_CONFIG_PATH
+    return DEFAULT_SETTINGS_TOML
+
+
+def load_settings(
+    path: Path | None = None,
+    *,
+    validate_invariants: bool = True,
+) -> Settings:
+    """Load, migrate, validate and invariant-check the effective configuration.
+
+    Args:
+        path: Explicit config file. ``None`` uses the effective default path.
+        validate_invariants: When True (always in production), a config that
+            attempts to disable a security invariant raises rather than loads.
+
+    Raises:
+        BlaxcyError: On unreadable config, schema migration failure, validation
+            failure, or violated security invariant.
+    """
+    # Imported lazily to avoid an import cycle at module load time.
+    from config.migration import MigrationError, migrate
+
+    effective = effective_settings_path(path)
+    raw = _read_toml(effective)
+
+    try:
+        migrated = migrate(raw)
+    except MigrationError as exc:
+        raise BlaxcyError(
+            ErrorCode.INTERNAL_ERROR,
+            str(exc),
+            details={"path": str(effective), "origin": "migration"},
+        ) from exc
+
+    merged = _deep_merge(_read_toml(DEFAULT_SETTINGS_TOML), migrated)
+
+    try:
+        settings = Settings.model_validate(merged)
+    except ValidationError as exc:
+        raise BlaxcyError(
+            ErrorCode.INTERNAL_ERROR,
+            f"invalid configuration in {effective}: {exc.error_count()} problem(s)",
+            details={"path": str(effective), "errors": exc.errors(include_url=False)},
+        ) from exc
+
+    if validate_invariants:
+        violations = invariant_violations(settings)
+        if violations:
+            raise BlaxcyError(
+                ErrorCode.INTERNAL_ERROR,
+                "refusing to load configuration that disables a security invariant",
+                details={"path": str(effective), "violations": violations},
+            )
+
+    return settings
+
+
+def save_settings(settings: Settings, path: Path | None = None) -> Path:
+    """Write ``settings`` as TOML, returning the path written."""
+    target = path if path is not None else DEFAULT_CONFIG_PATH
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = settings.model_dump(mode="json", exclude_none=True)
+    target.write_text(tomlkit.dumps(payload), encoding="utf-8")
+    return target

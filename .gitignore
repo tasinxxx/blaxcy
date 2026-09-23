@@ -1,0 +1,30 @@
+# Virtual environments
+.venv/
+venv/
+
+# Python caches / build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# BLAXCY runtime artifacts (must never be committed)
+logs/
+*.log
+bench/results/
+*.local.toml
+
+# Agent / tooling metadata (not BLAXCY source)
+.freebuff/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store

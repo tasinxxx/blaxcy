@@ -1,0 +1,98 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blaxcy"
+version = "0.1.0"
+description = "BLAXCY - a Linux-native AI computer-control BODY (perception, control, policy, verification, recovery)."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [{ name = "BLAXCY" }]
+
+# Runtime dependencies. Versions are intentionally lower-bounded, not pinned:
+# the specification forbids pinning arbitrary versions without checking real
+# compatibility, and every capability must be probed functionally at runtime.
+dependencies = [
+    "PySide6",
+    "google-genai",
+    "mss",
+    "numpy",
+    "opencv-python-headless",
+    "pytesseract",
+    "Pillow",
+    "python-xlib",
+    "keyring",
+    "SecretStorage",
+    "rapidfuzz",
+    "xxhash",
+    "psutil",
+    "pydantic>=2",
+    "tomlkit",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "pytest-qt",
+    "pytest-benchmark",
+    "mypy",
+    "ruff",
+    "black",
+]
+
+[project.scripts]
+blaxcy = "main:main"
+
+[tool.setuptools]
+py-modules = ["main"]
+packages = [
+    "config",
+    "security",
+    "schemas",
+    "core",
+    "control",
+    "control.backends",
+    "policy",
+    "ai",
+    "gui",
+    "watchdog",
+    "bench",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["."]
+markers = [
+    "safety: Phase 9 safety-critical tests (policy/executor/verifier/recovery/emergency stop)",
+    "batching: Phase 10.1 batching layer tests (run_sequence/resolver cache/speculative perception)",
+    "benchmark: performance benchmarks, not run by default",
+    "gui: requires a Qt event loop",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+warn_unreachable = true
+# Third-party modules without type information are imported but only interacted
+# with through guarded, runtime-probed access (Any); missing stubs must not
+# block type-checking of BLAXCY's own typed code.
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Package-installed-by-others libraries that ship no stubs.
+module = ["mss", "mss.*", "Xlib", "Xlib.*", "pytesseract", "pytesseract.*", "gi", "gi.*"]
+ignore_missing_imports = true

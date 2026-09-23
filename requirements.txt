@@ -1,0 +1,23 @@
+# BLAXCY runtime dependencies.
+# Install into a venv that can see system GI/AT-SPI packages:
+#   python -m venv --system-site-packages .venv
+#   . .venv/bin/activate
+#   pip install -r requirements.txt
+#
+# Versions are lower-bounded, not pinned: real compatibility is verified at
+# runtime via functional capability probes (specification section 28).
+PySide6
+google-genai
+mss
+numpy
+opencv-python-headless
+pytesseract
+Pillow
+python-xlib
+keyring
+SecretStorage
+rapidfuzz
+xxhash
+psutil
+pydantic>=2
+tomlkit

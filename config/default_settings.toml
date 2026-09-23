@@ -1,0 +1,117 @@
+# BLAXCY default configuration.
+#
+# This file is the packaged, reference set of defaults and the merge base for
+# a user config at ~/.config/blaxcy/config.toml. It never contains secrets --
+# the Gemini API key lives in the OS keyring (specification section 69).
+#
+# Security invariants are enforced in code (config/settings.py); disabling
+# terminal confirmation or credential-context privacy here will make BLAXCY
+# refuse to start rather than run in an unsafe state (sections 4 rule 25, 72).
+
+schema_version = 1
+
+[performance]
+# Cap on concurrent READ_ONLY tool dispatch (section 32.1). Read-only work does
+# not need the single-writer T-EXEC lock, but it must stay bounded.
+max_concurrent_readonly_dispatch = 4
+
+[capture]
+# Adaptive capture targets, not guarantees (section 33).
+idle_fps = 2.0
+normal_fps = 10.0
+active_fps = 30.0
+max_full_frames = 2
+max_thumbnails = 8
+
+[perception]
+pixel_threshold = 12
+meaningful_min_width = 80
+meaningful_min_height = 24
+meaningful_area_ratio = 0.015
+major_area_ratio = 0.30
+debounce_short_ms = 120
+debounce_major_ms = 300
+max_perception_jobs_per_second = 5
+animation_recheck_seconds = 3.0
+
+[accessibility]
+method_timeout_ms = 250
+startup_timeout_ms = 1000
+max_depth = 12
+max_nodes = 1200
+deadline_ms = 250
+cache_ttl_seconds = 2.0
+blacklist_after_failures = 3
+
+[ocr]
+minimum_width = 40
+minimum_height = 14
+max_regions = 6
+max_area_ratio = 0.015
+deadline_ms = 300
+
+[resolver]
+act_threshold = 0.65
+max_candidates = 5
+ambiguity_gap = 0.08
+weight_text = 0.40
+weight_source = 0.20
+weight_role = 0.15
+weight_context = 0.15
+weight_geometry = 0.10
+
+[resolver_cache]
+# Ships disabled (section 4 rule 31). Disabling must produce identical, only
+# slower, targeting decisions (section 43.1).
+enabled = false
+max_entries = 256
+ttl_seconds = 10.0
+semantic_match_floor = 70
+
+[sequence]
+# The batching layer ships disabled until Phase 9's safety gate passes and the
+# section 66.1/75 test list is green (sections 83, 84).
+enabled = false
+max_sequence_steps = 12
+max_sequence_wall_clock_seconds = 60.0
+capture_boost = false
+speculative_perception = false
+
+[lease]
+ttl_ms = 800
+
+[verification]
+max_action_state_age_ms = 1500
+require_verification_for_mutating = true
+
+[recovery]
+automatic_attempts_per_tool = 2
+attempts_per_task_step = 6
+identical_call_loop_guard = 3
+
+[safety]
+# First launch is always OBSERVE (section 56).
+mode = "OBSERVE"
+autonomous_max_session_duration_minutes = 30
+emergency_stop_target_ms = 150
+
+[terminal]
+submit_requires_confirmation = true
+destructive_always_protected = true
+
+[privacy]
+visual_upload_on_demand_only = true
+never_upload_credential_context = true
+never_ocr_password_fields = true
+
+[logging]
+level = "INFO"
+rotation_max_bytes = 10485760
+rotation_backups = 5
+redact_on_root_logger = true
+
+[gemini]
+model = "gemini-2.5-flash"
+max_model_turns = 40
+max_task_wall_clock_seconds = 300
+context_token_budget = 1200
