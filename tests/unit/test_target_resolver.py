@@ -287,6 +287,66 @@ def test_a_weaker_text_match_still_beats_a_role_only_tie() -> None:
     assert result.element.element_id == "weak"
 
 
+def test_a_decisive_match_is_not_vetoed_by_a_fuzzy_subset_competitor() -> None:
+    """Section 43.1: a fuzzy subset hit must not make a decisive target ambiguous.
+
+    The live case this pins: a query for "Search Address Bar" on a desktop that
+    also holds a button named "Search". ``token_set_ratio`` scores that button 100
+    (the query's tokens are a superset of its label), which used to put its total
+    inside the 0.08 gap of the decisive accessible-name match and refuse the
+    action. The fuzzy signal still scores; it no longer creates ambiguity against
+    a real text match.
+    """
+    field = _element(
+        "field", role=UIRole.TEXT_INPUT, text=None, accessible_name="Search Address Bar"
+    )
+    button = _element("button", text="Search", accessible_name="Search")
+    resolver = TargetResolver(
+        ResolverSettings(), semantic_scorer=lambda _query, _label: 100.0, semantic_match_floor=70.0
+    )
+
+    result = resolver.resolve(ElementQuery(text="Search Address Bar"), [field, button])
+
+    assert result.status is ResolutionStatus.RESOLVED
+    assert result.element is not None
+    assert result.element.element_id == "field"
+    assert result.matched_stage == "accessible_name"
+    # The weak competitor is still scored and still reported as a candidate.
+    assert any(c.element_id == "button" for c in result.candidates)
+
+
+def test_a_decisive_match_is_not_vetoed_by_a_fuzzy_duplicate_label() -> None:
+    """Two fuzzy competitors sharing a label must not veto a decisive target."""
+    field = _element(
+        "field", role=UIRole.TEXT_INPUT, text=None, accessible_name="Search Address Bar"
+    )
+    first = _element("first", text="Search", accessible_name="Search")
+    second = _element("second", text="Search", accessible_name="Search")
+    resolver = TargetResolver(
+        ResolverSettings(), semantic_scorer=lambda _query, _label: 100.0, semantic_match_floor=70.0
+    )
+
+    result = resolver.resolve(ElementQuery(text="Search Address Bar"), [field, first, second])
+
+    assert result.status is ResolutionStatus.RESOLVED
+    assert result.element is not None
+    assert result.element.element_id == "field"
+
+
+def test_a_fuzzy_only_query_keeps_the_conservative_ambiguity_rule() -> None:
+    """With no decisive match, weak signals still create ambiguity (unchanged)."""
+    first = _element("first", text="Send note", accessible_name="Send note")
+    second = _element("second", text="Send note", accessible_name="Send note")
+    resolver = TargetResolver(
+        ResolverSettings(), semantic_scorer=lambda _query, _label: 90.0, semantic_match_floor=70.0
+    )
+
+    result = resolver.resolve(ElementQuery(text="Transmit"), [first, second])
+
+    assert result.status is ResolutionStatus.AMBIGUOUS
+    assert result.best is None
+
+
 def test_role_only_query_with_duplicate_controls_stays_ambiguous() -> None:
     """A text-less query keeps the original conservative behaviour."""
     a = _element("a", text="Launcher", role=UIRole.TOGGLE, atspi_path="/p/a")
@@ -428,7 +488,7 @@ def test_semantic_scorer_is_inert_by_default() -> None:
     enabled = TargetResolver(ResolverSettings(), semantic_scorer=scorer, semantic_match_floor=70.0)
     result = enabled.resolve(ElementQuery(text="Transmit"), [element])
     assert result.status is ResolutionStatus.RESOLVED
-    assert result.matched_stage == "normalized_text"
+    assert result.matched_stage == "fuzzy_text"
 
 
 def test_stats_reports_configuration_and_counters() -> None:

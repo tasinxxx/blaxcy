@@ -317,6 +317,73 @@ Interpretation, stated narrowly and honestly:
   fixture injection paths moved from **1 passed / 3 skipped** to **3 passed / 1
   skipped** in the same session.
 
+### Phase 14 — the section 74 workflow at self-verifying scale (`workflow-verifiable`)
+
+Machine / session / backend (all rows): Kali GNU/Linux, XFCE on X11 (`DISPLAY=:0.0`),
+Python 3.14.6, real XTEST 2.2, live AT-SPI, the section 74 fixture.
+
+Command:
+
+```bash
+. .venv/bin/activate && python -m bench.real_desktop --confirm-real-input \
+  --workload workflow-verifiable --samples 20 --input-samples 30 --sequence-samples 20
+```
+
+| Measurement | p50 | p95 | n | Target | Verdict |
+|---|---|---|---|---|---|
+| accessibility query (live AT-SPI refresh) | 633.91 ms | 746.62 ms | 20 | — | 316 elements |
+| perception cycle, warm | 7.39 ms | 9.46 ms | 20 | ≤ 1500 ms | met (cache-served) |
+| perception cycle, cold | 640.65 ms | 690.22 ms | 20 | ≤ 1500 ms | met (live traversal) |
+| target resolution | 1.92 ms | 3.44 ms | 20 | — | over 316 live elements |
+| lease revalidation | 0.72 ms | 1.70 ms | 20 | ≤ 25 ms | **met** |
+| GUI refresh | 0.36 ms | 0.37 ms | 20 | ≤ 50 ms | met |
+| end-to-end click | 201.84 ms | 867.75 ms | 30 | — | **30/30 VERIFIED** |
+| end-to-end keyboard | 90.91 ms | 112.24 ms | 30 | — | **1/30 VERIFIED** |
+| end-to-end 5-step `run_sequence` | 345.41 ms | 1635.85 ms | 20 | ≤ 4000 ms warm | **2/20 completed all 5 steps** |
+
+The five-step sequence halted for three distinct reasons, recorded verbatim:
+`s2:FOCUS_MISMATCH` ×8, `s2:VERIFICATION_CONTRADICTED` ×4, `s4:VERIFICATION_UNVERIFIED` ×6.
+
+Interpretation, stated narrowly:
+
+- **This run does not reach the workflow happy path, and the target stays a
+  target.** Two of twenty runs completed all five steps. The `verifiable`
+  workload above (`20/20`, five synthetic clicks) remains the measured number that
+  meets the section 76 target; this workload asks the harder question — whether the
+  *realistic* pipeline (`search icon → type → submit → result → play`) verifies end
+  to end — and the honest answer on this host is *not yet*.
+- **The failures are the live typed/perception path, not the batching layer.** The
+  sequence really executes: the fixture's own state after the run shows its
+  `search_input` holding every typed sample and `submit_button: 76`, `search_icon:
+  20`, `play_button: 2` — the input landed. Step 2 then fails to be *verified*,
+  which is exactly the section 60 behaviour the sequence is required to respect
+  (halt rather than step onto an unconfirmed premise).
+- **Two production defects were found and fixed while building this workload**, and
+  both are real, not harness tuning:
+  1. `core/accessibility.py` classified a Qt editable text field as a static
+     `TEXT_FRAGMENT` because Qt's AT-SPI bridge announces it with the plain role
+     `text` (GTK announces `entry`). Section 51's focus guard only accepts a text
+     entry, so typing into a Qt field was refused outright. The `EDITABLE` state
+     now decides the role (section 37).
+  2. `_read_text_content` read through the deprecated `Atspi.Accessible.get_text`
+     shim, which on the installed PyGObject does not accept `(start, end)` and
+     silently returned nothing — so a navigation field's content was never
+     readable. It now reads through the `Atspi.Text` interface first.
+  Together these are what make the typed step verifiable *at all* on a Qt
+  application; before them, `type_text` could not verify against a Qt field.
+- **Two remaining blockers, filed rather than papered over.** (a) The section 51
+  focus guard and the section 60 text check are timing-sensitive under real input:
+  the field is focused by the fixture's search-icon click, but the accessibility
+  read of the field's content does not reliably reflect the typed text within the
+  bounded traversal (10 samples reported `no readable text`, 19 reported readable
+  text that did not yet contain it). (b) Selecting a `LIST_ITEM` does not
+  reliably repaint `MEANINGFUL`-ly at its own box, so step `s4` is `UNVERIFIED`.
+  Neither is a section 60 defect — section 60 is correctly refusing to call an
+  unconfirmed change a success. Making the workload pass requires either a fixture
+  that repaints at its own box on selection and a longer settle for the field read,
+  or accepting the honest partial result; that is an operator decision, not a
+  code fix to make unilaterally (section 4 rule 8).
+
 ## Reproducing
 
 ```bash
@@ -326,6 +393,7 @@ python -m pytest tests/unit/test_ocr.py -v                              # OCR un
 python -m pytest tests/integration/test_emergency_stop_real_display.py -v  # section 63, read-only
 python -m bench.real_desktop --confirm-real-input                       # Phase 14, real desktop
 python -m bench.real_desktop --confirm-real-input --workload verifiable # the section 76 happy-path workload
+python -m bench.real_desktop --confirm-real-input --workload workflow-verifiable # the section 74 pipeline at that scale
 # then re-run the inline capture/change-detection and OCR timing loops used above
 ```
 

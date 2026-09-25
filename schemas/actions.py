@@ -12,6 +12,7 @@ container, and its gate is the most restrictive class among its declared steps.
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass, field
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -169,6 +170,27 @@ class PlannedAction(BaseModel):
         if self.tool not in TOOL_ACTION_CLASS:
             raise ValueError(f"unknown or unresolvable tool {self.tool!r}")
         return self
+
+
+@dataclass(frozen=True)
+class ActivationOutcome:
+    """The result of invoking an element's accessibility action (section 66).
+
+    ``activate_element`` produces the same *kind* of change a click does -- it is
+    ``MUTATING`` (section 57) -- but it asks the application to perform its own
+    accessibility action instead of injecting a pointer event. That makes it
+    usable where a synthetic click is unreliable (no coordinates, no pointer
+    occlusion), while remaining subject to the identical policy, lease,
+    revalidation and verification path: it never replaces any of them.
+
+    ``action`` records *which* action was actually invoked, so a result can be
+    audited rather than merely trusted.
+    """
+
+    ok: bool
+    action: str | None = None
+    reason: str | None = None
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 class ToolEnvelope(BaseModel):

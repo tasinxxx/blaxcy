@@ -19,6 +19,9 @@ from bench.real_desktop import (
     FIXTURE_CONTROLS,
     HAPPY_PATH_PLAN,
     VERIFIABLE_PLAN,
+    WORKFLOW_BENCH_CONTROL_NAMES,
+    WORKFLOW_SEARCH_FIELD,
+    WORKFLOW_VERIFIABLE_PLAN,
     Environment,
     bench_gui_refresh,
     bench_keyboard,
@@ -61,6 +64,67 @@ def test_verifiable_plan_is_five_distinct_clicks_on_the_bench_controls() -> None
 def test_the_two_workloads_do_not_share_controls() -> None:
     """A plan's targets must belong to the layout it is measured against."""
     assert not set(BENCH_CONTROL_NAMES) & set(FIXTURE_CONTROLS)
+
+
+def test_workflow_verifiable_workload_selects_the_self_verifying_pipeline() -> None:
+    """``workflow-verifiable`` swaps in the section 74 pipeline at verifiable scale."""
+    env = Environment(real_input=False, workload="workflow-verifiable")
+
+    assert env.workflow_verifiable is True
+    assert env.verifiable is False
+    assert env.expected_controls == WORKFLOW_BENCH_CONTROL_NAMES
+    assert env.sequence_plan is WORKFLOW_VERIFIABLE_PLAN
+    assert env.click_target == "Submit"
+    assert env.keyboard_target == WORKFLOW_SEARCH_FIELD
+    # The typing target must hold focus, so the activation focus is the field
+    # rather than a non-focusable button.
+    assert env.focus_object == "search_input"
+    assert env.focus_accessible == WORKFLOW_SEARCH_FIELD
+
+
+def test_the_workflow_verifiable_plan_is_the_five_pipeline_steps() -> None:
+    """Search -> type -> submit -> result -> play, as descriptions only."""
+    assert [step["step_id"] for step in WORKFLOW_VERIFIABLE_PLAN] == [
+        "s1",
+        "s2",
+        "s3",
+        "s4",
+        "s5",
+    ]
+    assert [step["tool"] for step in WORKFLOW_VERIFIABLE_PLAN] == [
+        "click",
+        "type_text",
+        "click",
+        "click",
+        "click",
+    ]
+    assert [step["target"] for step in WORKFLOW_VERIFIABLE_PLAN] == [
+        "Search",
+        WORKFLOW_SEARCH_FIELD,
+        "Submit",
+        "Result 1",
+        "Play Button",
+    ]
+    # Section 66.1: a plan carries descriptions, never a pre-resolved coordinate.
+    assert all(
+        "element_id" not in step and "lease_id" not in step
+        for step in WORKFLOW_VERIFIABLE_PLAN
+    )
+
+
+def test_the_three_workloads_use_distinct_plans_and_layouts() -> None:
+    """Each workload's plan targets its own layout, so none can drift into another."""
+    workflow = Environment(real_input=False)
+    verifiable = Environment(real_input=False, workload="verifiable")
+    self_verifying = Environment(real_input=False, workload="workflow-verifiable")
+
+    assert len({id(env.sequence_plan) for env in (workflow, verifiable, self_verifying)}) == 3
+    assert not set(self_verifying.expected_controls) & set(verifiable.expected_controls)
+    # The self-verifying pipeline renames the search field (a navigation name is
+    # required for the typed step to verify), so the ordinary plan's target would
+    # not resolve against this layout -- the plans really are distinct.
+    assert WORKFLOW_SEARCH_FIELD not in set(workflow.expected_controls)
+    assert "Search Box" not in set(self_verifying.expected_controls)
 
 
 def test_gui_refresh_is_unmeasured_without_an_assembled_body() -> None:

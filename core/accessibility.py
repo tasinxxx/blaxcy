@@ -41,6 +41,7 @@ from dataclasses import dataclass
 from typing import Any, Final, Protocol
 
 from config.settings import AccessibilitySettings
+from schemas.actions import ActivationOutcome
 from schemas.capability import Capability
 from schemas.elements import UIElement, perception_confidence
 from schemas.enums import (
@@ -484,6 +485,25 @@ class AccessibilityService:
         result = self._invoke("query_roles", {"roles": tuple(roles)})
         return list(result)
 
+    def activate(self, path: str, action: str | None = None) -> ActivationOutcome:
+        """Invoke an accessibility action on the element at ``path`` (section 66).
+
+        Runs on the accessibility thread through the same request queue as every
+        other AT-SPI interaction (section 35), so it can never become a second
+        concurrent AT-SPI caller. The element is located by descending the path
+        <em>live</em> rather than by reusing a cached node, because a node held
+        from an earlier traversal is exactly the stale target section 45 exists
+        to reject; the caller is still responsible for the full policy -> lease ->
+        revalidation path before this is ever reached.
+        """
+        result = self._invoke("activate", {"path": path, "action": action})
+        if isinstance(result, ActivationOutcome):
+            return result
+        return ActivationOutcome(
+            ok=False,
+            reason="the accessibility backend returned no activation result",
+        )
+
     def snapshot(self) -> tuple[list[UIElement], float]:
         """Return the cached elements and their age in seconds (no backend call).
 
@@ -646,6 +666,20 @@ class AccessibilityService:
         if kind == "query_roles":
             roles = tuple(payload.get("roles", ()))
             return backend.query_roles(roles)
+        if kind == "activate":
+            # Activation is an *optional* backend capability, deliberately not part
+            # of the protocol above: a backend that cannot perform accessibility
+            # actions must be able to say so rather than be forced to pretend. The
+            # refusal is structured, so it surfaces as UNAVAILABLE, never as a
+            # silently substituted click.
+            perform = getattr(backend, "activate", None)
+            if perform is None:
+                raise BlaxcyError(
+                    ErrorCode.BACKEND_UNAVAILABLE,
+                    "this accessibility backend cannot perform accessibility actions",
+                    details={"backend": A11Y_BACKEND_NAME},
+                )
+            return perform(path=str(payload.get("path", "")), action=payload.get("action"))
         raise BlaxcyError(ErrorCode.INTERNAL_ERROR, f"unknown accessibility request {kind!r}")
 
     def _invoke(self, kind: str, payload: dict[str, Any] | None = None) -> Any:
@@ -888,6 +922,49 @@ class AtspiBackend:
             return collected
         return [element for element in self.enumerate_elements() if element.role in wanted]
 
+    def activate(self, *, path: str, action: str | None = None) -> ActivationOutcome:
+        """Perform an AT-SPI action on the live node at ``path`` (section 66).
+
+        This is the real implementation behind the ``activate_element`` tool. It
+        asks the application to perform its own action -- ``Atspi.Action`` --
+        rather than injecting a pointer event, which is why it needs no
+        coordinates and cannot be defeated by pointer occlusion. It performs no
+        policy, lease or verification work itself: those belong to the executor,
+        which reaches this only after the full section 59 pipeline.
+        """
+        atspi = self._require_atspi()
+        node = _descend_path(atspi, path)
+        if node is None:
+            return ActivationOutcome(
+                ok=False,
+                reason="the target is no longer present in the accessibility tree",
+                details={"path": path},
+            )
+        names = _read_actions(node)
+        index = _select_action_index(names, action)
+        if index is None:
+            return ActivationOutcome(
+                ok=False,
+                reason=(
+                    f"the element exposes no {action!r} action"
+                    if action
+                    else "the element exposes no activatable action"
+                ),
+                details={"path": path, "actions": list(names)},
+            )
+        if not _invoke_action(atspi, node, index):
+            return ActivationOutcome(
+                ok=False,
+                action=names[index],
+                reason="the application refused the accessibility action",
+                details={"path": path, "actions": list(names)},
+            )
+        return ActivationOutcome(
+            ok=True,
+            action=names[index],
+            details={"path": path, "actions": list(names)},
+        )
+
     def _try_collection(self, roles: frozenset[UIRole]) -> list[UIElement] | None:
         """Attempt an ``Atspi.Collection`` query, or return ``None`` to fall back.
 
@@ -1057,6 +1134,16 @@ class AtspiBackend:
         if "DEFUNCT" in states:
             return None, window_name, app_name, app_pid
 
+        # Qt's AT-SPI bridge announces an editable text field with the plain role
+        # "text" (GTK announces "entry"), so the role name alone would classify a
+        # text field as a static fragment -- and section 51's focus guard, which
+        # only accepts a text entry, would then refuse to type into it at all.
+        # The EDITABLE state is what actually distinguishes an input from a label,
+        # so it decides the role here (section 37). A non-editable "text" node is
+        # untouched and stays a fragment.
+        if role is UIRole.TEXT_FRAGMENT and "EDITABLE" in states:
+            role = UIRole.TEXT_INPUT
+
         actions = _read_actions(node)
         password = role is UIRole.PASSWORD_INPUT
         if password:
@@ -1064,7 +1151,7 @@ class AtspiBackend:
             text = None
         elif role in _EDITABLE_ROLES and _is_navigation_field(name):
             # A browser address/location bar: its content is a URL, not a secret.
-            text = _read_text_content(node) or None
+            text = _read_text_content(atspi, node) or None
         elif role in _TEXT_BEARING_ROLES:
             text = name or None
         else:
@@ -1174,15 +1261,43 @@ def _is_navigation_field(name: str) -> bool:
     return any(hint in lowered for hint in NAVIGATION_FIELD_HINTS)
 
 
-def _read_text_content(node: Any) -> str:
-    """Read an editable element's text; used only for navigation fields (section 36)."""
+def _read_text_content(atspi: Any, node: Any) -> str:
+    """Read an editable element's text; used only for navigation fields (section 36).
+
+    The AT-SPI ``Text`` interface owns ``get_text(start, end)``. The deprecated
+    ``Atspi.Accessible.get_text`` shim does **not** share that signature on every
+    PyGObject version -- on the installed one it accepts a single argument and
+    raises ``TypeError`` for ``(start, end)`` -- so reading through the shim
+    silently produced nothing at all. The interface method is therefore tried
+    first, and the node's own method is kept as a fallback for test doubles.
+    """
     try:
         if not node.is_text():
             return ""
-        value = node.get_text(0, -1)
     except Exception:
         return ""
-    return str(value) if value else ""
+
+    count = -1
+    try:
+        count = int(node.get_character_count())
+    except Exception:
+        count = -1
+
+    readers: list[Any] = []
+    text_interface = getattr(atspi, "Text", None)
+    if text_interface is not None:
+        readers.append(lambda: text_interface.get_text(node, 0, count))
+        readers.append(lambda: text_interface.get_text(node, 0, -1))
+    readers.append(lambda: node.get_text(0, -1))
+
+    for read in readers:
+        try:
+            value = read()
+        except Exception:
+            continue
+        if value:
+            return str(value)
+    return ""
 
 
 def _read_document_url(node: Any) -> str | None:
@@ -1255,6 +1370,91 @@ def _read_states(atspi: Any, node: Any) -> frozenset[str]:
         except Exception:
             continue
     return frozenset(observed)
+
+
+#: Action names preferred when ``activate_element`` is asked to act without
+#: naming one. Ordered most-specific first: an explicit ``click`` is what a
+#: pointer click would have done, then the toolkit's generic activation verb.
+_PREFERRED_ACTION_NAMES: Final[tuple[str, ...]] = ("click", "activate", "press", "toggle")
+
+
+def _select_action_index(names: Sequence[str], requested: str | None) -> int | None:
+    """Choose which of a node's actions to invoke, or ``None`` for none.
+
+    A requested name must match exactly (case-insensitively); guessing a *close*
+    name would be exactly the kind of invented behavior section 4 rule 4 forbids,
+    so a miss is reported rather than approximated.
+    """
+    if requested is not None:
+        wanted = requested.strip().lower()
+        for index, name in enumerate(names):
+            if name.lower() == wanted:
+                return index
+        return None
+    lowered = [name.lower() for name in names]
+    for preferred in _PREFERRED_ACTION_NAMES:
+        if preferred in lowered:
+            return lowered.index(preferred)
+    return 0 if names else None
+
+
+def _descend_path(atspi: Any, path: str) -> Any | None:
+    """Follow an accessibility path (``desktop[0]/25/0``) to its live node.
+
+    Descending is exact and costs one round-trip per path segment, so it is both
+    cheaper and more honest than re-traversing the whole tree to find an element
+    that may have moved. A path from a Collection query (which reconstructs paths
+    from role ancestry, not indices) does not resolve here -- it returns ``None``
+    and the caller reports the target as absent rather than acting on a guess.
+    """
+    if not path.startswith("desktop["):
+        return None
+    head, _, tail = path.partition("/")
+    try:
+        desktop_index = int(head[len("desktop[") : -1])
+    except (ValueError, IndexError):
+        return None
+    try:
+        node = atspi.get_desktop(desktop_index)
+    except Exception:
+        return None
+    if node is None:
+        return None
+    for segment in (part for part in tail.split("/") if part):
+        try:
+            child_index = int(segment)
+        except ValueError:
+            return None
+        try:
+            node = node.get_child_at_index(child_index)
+        except Exception:
+            return None
+        if node is None:
+            return None
+    return node
+
+
+def _invoke_action(atspi: Any, node: Any, index: int) -> bool:
+    """Perform an AT-SPI action, preferring the interface like other reads.
+
+    The interface method is tried first and the node's own method is kept as a
+    fallback, mirroring :func:`_read_text_content`: the deprecated shims do not
+    share a signature across PyGObject versions, and a silently-swallowed
+    failure there is how a real capability looks like an unsupported one.
+    """
+    action_interface = getattr(atspi, "Action", None)
+    attempts: list[Callable[[], Any]] = []
+    if action_interface is not None:
+        attempts.append(lambda: action_interface.do_action(node, index))
+    attempts.append(lambda: node.do_action(index))
+    for attempt in attempts:
+        try:
+            performed = attempt()
+        except Exception:
+            continue
+        if performed:
+            return True
+    return False
 
 
 def _read_actions(node: Any) -> tuple[str, ...]:

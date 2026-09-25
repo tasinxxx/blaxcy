@@ -260,12 +260,25 @@ def test_an_unknown_tool_is_never_executed_optimistically() -> None:
     _assert_nothing_injected(env)
 
 
-def test_activate_element_reports_unavailable_rather_than_faking_a_click() -> None:
-    """AT-SPI action invocation is not implemented, and BLAXCY says so."""
+def test_activate_element_never_fakes_a_click() -> None:
+    """Section 66/80: activation refuses honestly, and never substitutes a click.
+
+    ``activate_element`` is implemented now (the AT-SPI action lives behind
+    ``AccessibilityService.activate``). The property this test exists for is
+    unchanged and is what must survive the implementation: BLAXCY never
+    substitutes a synthetic pointer click for the accessibility action it was
+    asked to perform.    Which honest gate refuses first depends on the environment -- an absent
+    target is ``TARGET_NOT_FOUND``, a harvested state past its maximum age is
+    ``TARGET_STALE``, and a resolved target with no backend wired is
+    ``BACKEND_UNAVAILABLE``. The property asserted here is the one that must hold
+    regardless: a structured refusal, never a fabricated success, and nothing
+    injected.
+    """
     env = _env(mode=PolicyMode.ASSIST)
     envelope = env.dispatch(ToolName.ACTIVATE_ELEMENT, target="Send")  # type: ignore[attr-defined]
-    assert envelope.ok is False
-    assert envelope.error_code is ErrorCode.BACKEND_UNAVAILABLE
+    assert envelope.ok is False, "activation must never report success without acting"
+    assert envelope.error_code is not None
+    assert envelope.message, "a refusal must carry its reason"
     _assert_nothing_injected(env)
 
 

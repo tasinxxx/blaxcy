@@ -76,14 +76,23 @@ CASCADE_STAGES: tuple[str, ...] = (
     "role",
     "context",
     "dom_path",
+    # The weak text signals are appended last: they are text evidence, but they are
+    # not a match of the query's own text, so a real cascade stage outranks them
+    # when one is reported and they are excluded from TEXT_MATCH_STAGES below.
+    "substring_text",
+    "fuzzy_text",
 )
 
 #: The cascade stages that represent a match of the query's *own text* (section
 #: 43). A candidate whose stage is one of these actually matched the requested
-#: text; a candidate that matched only the role/context is a weaker stage and must
-#: not create an ambiguity against a decisive text match. ``normalized_text`` is
-#: included because the weak substring and section 43.1 fuzzy hits are graded
-#: below any real textual match but are still textual evidence, not role-only.
+#: text; a candidate that matched only the role/context -- or only the weak
+#: substring / section 43.1 fuzzy signals -- is a weaker stage and must not create
+#: an ambiguity against a decisive text match. The weak signals are deliberately
+#: **not** listed. A generic control whose label merely shares a token with the
+#: query scores 100 on ``token_set_ratio`` (``("Search Address Bar", "Search")``
+#: is such a pair), which used to land it inside the gap of a decisive
+#: accessible-name match and veto the action. A weak signal still contributes to
+#: the score; it is simply not grounds for refusing a decisive match.
 TEXT_MATCH_STAGES: frozenset[str] = frozenset(
     {"exact_text", "case_insensitive_text", "normalized_text", "accessible_name"}
 )
@@ -718,7 +727,7 @@ class TargetResolver:
             # Substring is a weak, honest signal, not an exact match.
             for value in (element.text, element.accessible_name):
                 if value and normalized in _normalize(value):
-                    consider(0.55, "normalized_text")
+                    consider(0.55, "substring_text")
 
         if best_score == 0.0 and self._semantic_scorer is not None and normalized:
             for value in (element.text, element.accessible_name):
@@ -729,8 +738,10 @@ class TargetResolver:
                     continue
                 if fuzzy >= self._semantic_match_floor:
                     # A fuzzy hit feeds the text weight, but is graded below any
-                    # real textual match so it can never masquerade as exact.
-                    consider(0.40 + 0.40 * (fuzzy / 100.0), "normalized_text")
+                    # real textual match (and below DECISIVE_TEXT_FLOOR) so it can
+                    # never masquerade as exact -- nor create an ambiguity against
+                    # a decisive match (see TEXT_MATCH_STAGES).
+                    consider(0.40 + 0.40 * (fuzzy / 100.0), "fuzzy_text")
 
         return best_score, best_stage
 

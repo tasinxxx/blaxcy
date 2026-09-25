@@ -94,6 +94,32 @@ WORKFLOW_PLAN: list[dict[str, Any]] = [
     {"step_id": "w5", "tool": "click", "target": "Play Button", "role": "BUTTON"},
 ]
 
+#: The section 74 workflow at a *self-verifying* scale (fixture layout
+#: ``--workflow-controls``). Every step's own repaint clears the section 34
+#: ``MEANINGFUL`` thresholds, and the search field is named as a navigation field
+#: so sections 36/42/55 permit reading its content -- which is what makes the typed
+#: step verifiable instead of honestly ``UNVERIFIED``.
+WORKFLOW_SEARCH_FIELD = "Search Address Bar"
+WORKFLOW_BENCH_CONTROL_NAMES: tuple[str, ...] = (
+    "Search",
+    WORKFLOW_SEARCH_FIELD,
+    "Submit",
+    "Results",
+    "Play Button",
+)
+WORKFLOW_VERIFIABLE_PLAN: list[dict[str, Any]] = [
+    {"step_id": "s1", "tool": "click", "target": "Search", "role": "BUTTON"},
+    {
+        "step_id": "s2",
+        "tool": "type_text",
+        "target": WORKFLOW_SEARCH_FIELD,
+        "text": "song name",
+    },
+    {"step_id": "s3", "tool": "click", "target": "Submit", "role": "BUTTON"},
+    {"step_id": "s4", "tool": "click", "target": "Result 1", "role": "LIST_ITEM"},
+    {"step_id": "s5", "tool": "click", "target": "Play Button", "role": "BUTTON"},
+]
+
 
 @dataclass
 class Samples:
@@ -158,19 +184,43 @@ class Environment:
         self.restore_pointer: tuple[int, int] | None = None
         self.notes: list[str] = []
         # The workload selects which fixture layout and plan are used. The
-        # "verifiable" workload adds the section 76 large self-verifying controls.
+        # "verifiable" workload adds the section 76 large self-verifying controls;
+        # "workflow-verifiable" lays the section 74 pipeline out at that scale too,
+        # so the workflow itself completes and is verified rather than halting.
         self.verifiable = workload == "verifiable"
-        self.expected_controls = BENCH_CONTROL_NAMES if self.verifiable else FIXTURE_CONTROLS
-        self.focus_object = "bench_target_1" if self.verifiable else "text_input"
-        self.focus_accessible = BENCH_CONTROL_NAMES[0] if self.verifiable else "Text Input"
-        self.sequence_plan = VERIFIABLE_PLAN if self.verifiable else HAPPY_PATH_PLAN
-        self.click_target = BENCH_CONTROL_NAMES[0] if self.verifiable else "Toggle State"
-        # The verifiable layout hides the ordinary text fields on purpose (they would
-        # overlap the large controls), so there is no honest typing target to measure
-        # there. Reporting a number against a target the layout does not expose would
-        # be a harness artifact, not a Body result, so the keyboard benchmark is
-        # skipped with a note instead (section 4 rule 8).
-        self.keyboard_target = None if self.verifiable else "Text Input"
+        self.workflow_verifiable = workload == "workflow-verifiable"
+        # The verifiable workload deliberately has no typing target; declared so the
+        # optional branch below is a real branch to the type checker too.
+        self.keyboard_target: str | None
+        if self.workflow_verifiable:
+            self.expected_controls = WORKFLOW_BENCH_CONTROL_NAMES
+            # Focus the search field, not the icon button: the section 51 guard
+            # requires the typed-into element to actually hold focus, and it is the
+            # field (not a non-focusable button) that can hold it.
+            self.focus_object = "search_input"
+            self.focus_accessible = WORKFLOW_SEARCH_FIELD
+            self.sequence_plan = WORKFLOW_VERIFIABLE_PLAN
+            self.click_target = "Submit"
+            self.keyboard_target = WORKFLOW_SEARCH_FIELD
+        elif self.verifiable:
+            self.expected_controls = BENCH_CONTROL_NAMES
+            self.focus_object = "bench_target_1"
+            self.focus_accessible = BENCH_CONTROL_NAMES[0]
+            self.sequence_plan = VERIFIABLE_PLAN
+            self.click_target = BENCH_CONTROL_NAMES[0]
+            # The verifiable layout hides the ordinary text fields on purpose (they
+            # would overlap the large controls), so there is no honest typing target
+            # to measure there. Reporting a number against a target the layout does
+            # not expose would be a harness artifact, not a Body result, so the
+            # keyboard benchmark is skipped with a note instead (section 4 rule 8).
+            self.keyboard_target = None
+        else:
+            self.expected_controls = FIXTURE_CONTROLS
+            self.focus_object = "text_input"
+            self.focus_accessible = "Text Input"
+            self.sequence_plan = HAPPY_PATH_PLAN
+            self.click_target = "Toggle State"
+            self.keyboard_target = "Text Input"
 
     def __enter__(self) -> Environment:
         selected = select_backend()
@@ -187,6 +237,7 @@ class Environment:
                 platform="xcb",
                 start_timeout=SETUP_TIMEOUT_SECONDS,
                 bench_controls=self.verifiable,
+                workflow_controls=self.workflow_verifiable,
             ).start()
 
         base = self_excluded_settings(load_settings(None))
@@ -521,8 +572,8 @@ def bench_keyboard(env: Environment, samples: int) -> Samples:
     if env.keyboard_target is None:
         result.note = (
             "not applicable: the verifiable workload has no visible text field by "
-            "design (it would overlap the large controls); see the workflow workload "
-            "for the keyboard number"
+            "design (it would overlap the large controls); see --workload "
+            "workflow-verifiable for the keyboard number"
         )
         return result
     verified = 0
@@ -591,7 +642,12 @@ def diagnose_fixture(env: Environment) -> list[dict[str, Any]]:
 def bench_sequence(env: Environment, samples: int) -> Samples:
     """Section 76: the real-desktop end-to-end five-step ``run_sequence``."""
     plan = env.sequence_plan
-    suffix = " (verifiable workload)" if env.verifiable else " (workflow controls)"
+    if env.workflow_verifiable:
+        suffix = " (section 74 workflow, self-verifying)"
+    elif env.verifiable:
+        suffix = " (verifiable workload)"
+    else:
+        suffix = " (workflow controls)"
     result = Samples(f"end-to-end 5-step run_sequence{suffix}", "ms", "<= 4000 ms warm")
     completed = 0
     halted: dict[str, int] = {}
@@ -734,7 +790,7 @@ def run(
             results.append(bench_click(env, input_samples).summary())
             results.append(bench_keyboard(env, input_samples).summary())
             results.append(bench_sequence(env, sequence_samples).summary())
-            if not env.verifiable:
+            if env.workload == "workflow":
                 results.append(
                     {"name": "section 74 workflow outcome", **bench_workflow_outcome(env)}
                 )
@@ -766,12 +822,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--workload",
-        choices=("workflow", "verifiable"),
+        choices=("workflow", "verifiable", "workflow-verifiable"),
         default="workflow",
         help=(
             "'workflow' uses the ordinary fixture controls (honest halt); "
             "'verifiable' adds the section 76 large self-verifying controls so a "
-            "real 5-step run_sequence happy path can be measured"
+            "real 5-step run_sequence happy path can be measured; "
+            "'workflow-verifiable' lays the section 74 search->play pipeline out at "
+            "that scale so the workflow itself completes and verifies"
         ),
     )
     args = parser.parse_args(argv)

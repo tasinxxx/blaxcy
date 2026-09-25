@@ -38,6 +38,7 @@ from pathlib import Path
 from config.settings import Settings, effective_settings_path, load_settings
 from core.application import BlaxcyApplication
 from core.capability_probe import probe_all
+from core.logging_setup import configure_logging
 from core.session_detector import SessionInfo, detect_session
 from core.single_instance import InstanceLock
 from schemas.capability import CapabilityReport
@@ -405,6 +406,21 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _configure_logging(args: argparse.Namespace) -> Path | None:
+    """Install structured file logging (section 70) before the command runs.
+
+    Best effort on purpose: a config the loader refuses is the *command's* error
+    to report with its taxonomy code (see ``_cmd_config``), not a reason for
+    logging setup to raise first and mask it. Returns the log path when one was
+    established, so the caller can mention it.
+    """
+    try:
+        settings = load_settings(Path(args.config) if args.config else None)
+    except BlaxcyError:
+        return None
+    return configure_logging(settings)
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code."""
     parser = _build_parser()
@@ -413,6 +429,7 @@ def main(argv: list[str] | None = None) -> int:
         # Default action: probe, with the standard table output.
         args = parser.parse_args(["probe", *(argv if argv is not None else [])])
     try:
+        _configure_logging(args)
         return int(args.func(args))
     except BlaxcyError as exc:
         print(f"error [{exc.code.value}]: {exc.message}", file=sys.stderr)

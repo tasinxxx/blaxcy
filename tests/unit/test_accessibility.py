@@ -330,6 +330,116 @@ def test_navigation_field_url_is_read_but_a_search_box_is_not() -> None:
     assert search_element.text is None
 
 
+def test_a_qt_editable_text_role_is_an_input_not_a_fragment() -> None:
+    """Section 37: Qt announces an editable field as role "text"; EDITABLE wins.
+
+    Without this, a Qt application's text field is perceived as a static text
+    fragment, so section 51's focus guard -- which only accepts a text entry --
+    refuses to type into it. The state, not the role name, is the discriminator,
+    and a genuinely static "text" node must stay a fragment.
+    """
+    editable = FakeNode(
+        "text", "Search Box", states=("SHOWING", "ENABLED", "EDITABLE"), is_text=True
+    )
+    static = FakeNode("text", "Just a caption", states=("SHOWING", "ENABLED"))
+
+    editable_element, *_ = _backend()._observe(editable, "root/0", None, None, None)
+    static_element, *_ = _backend()._observe(static, "root/1", None, None, None)
+
+    assert editable_element is not None
+    assert editable_element.role is UIRole.TEXT_INPUT
+    assert editable_element.is_text_entry is True
+    assert static_element is not None
+    assert static_element.role is UIRole.TEXT_FRAGMENT
+    assert static_element.is_text_entry is False
+
+
+def test_a_qt_editable_navigation_field_has_its_content_read() -> None:
+    """Section 36/55: the role fix and the navigation rule compose on Qt.
+
+    A Qt field named as an address/location bar is both recognized as an input and
+    allowed to have its content read -- which is what makes a typed step
+    verifiable at all. A plain Qt text box is still never read.
+    """
+    node = FakeNode(
+        "text",
+        "Search Address Bar",
+        states=("SHOWING", "ENABLED", "EDITABLE"),
+        is_text=True,
+        text="song name",
+    )
+
+    element, *_ = _backend()._observe(node, "root/0", None, None, None)
+
+    assert element is not None
+    assert element.role is UIRole.TEXT_INPUT
+    assert element.text == "song name"
+
+
+class _FakeTextInterface:
+    """The subset of ``Atspi.Text`` the reader uses (an interface, not a shim)."""
+
+    def get_text(self, node: _QtShimNode, start: int, end: int) -> str:
+        text = node.raw_text
+        return text[start:] if end < 0 else text[start:end]
+
+
+class _FakeAtspiWithText:
+    StateType = _FakeStateType
+    CoordType = SimpleNamespace(SCREEN="SCREEN")
+    Text = _FakeTextInterface()
+
+
+class _QtShimNode:
+    """A node whose deprecated ``get_text(start, end)`` shim raises, as PyGObject's does."""
+
+    def __init__(self, text: str) -> None:
+        self.raw_text = text
+
+    def get_role_name(self) -> str:
+        return "text"
+
+    def get_name(self) -> str:
+        return "Search Address Bar"
+
+    def get_state_set(self) -> _FakeStateSet:
+        return _FakeStateSet(("SHOWING", "ENABLED", "EDITABLE"))
+
+    def get_n_actions(self) -> int:
+        return 0
+
+    def get_extents(self, coord: Any) -> _Extents:
+        return _Extents(10, 20, 80, 24)
+
+    def is_text(self) -> bool:
+        return True
+
+    def get_text(self, *args: int) -> str:
+        raise TypeError("Atspi.Accessible.get_text() takes exactly 1 argument")
+
+    def get_character_count(self) -> int:
+        return len(self.raw_text)
+
+
+def test_a_navigation_field_is_read_through_the_text_interface() -> None:
+    """Section 36: read ``Atspi.Text``, not the deprecated single-argument shim.
+
+    On the installed PyGObject ``Atspi.Accessible.get_text(start, end)`` raises
+    ``TypeError``, so a reader that used only that shim returned nothing at all --
+    and every navigation field, plus the browser URL-discovery stage that shares
+    it, silently reported no content. This pins the interface-based read.
+    """
+    backend = AtspiBackend(AccessibilitySettings())
+    backend._atspi = _FakeAtspiWithText()
+    node = _QtShimNode("https://example.com")
+
+    element, *_ = backend._observe(node, "root/0", None, None, None)
+
+    assert element is not None
+    assert element.role is UIRole.TEXT_INPUT
+    assert element.text == "https://example.com"
+
+
 def test_defunct_and_unreportable_nodes_are_dropped() -> None:
     """A DEFUNCT node and an anonymous unknown-role node are not emitted."""
     defunct = FakeNode("push button", "Go", states=("DEFUNCT",))

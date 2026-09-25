@@ -8,46 +8,62 @@
 ## Project identity
 - Name: BLAXCY
 - Project root: `/home/tsn/blaxcy` (confirmed via `pwd` this session)
-- Repository: **git present**, branch `master`. Two commits now exist, so recovery
+- Repository: **git present**, branch `master`. Five commits now exist, so recovery
   checkpoints reach past the Phase 0/1 baseline (§11):
   - `a56d74a` — "Establish the BLAXCY baseline: Phase 0 scaffold and typed Phase 1
     contracts" (the first commit)
   - `947b001` — "Checkpoint Phases 2-7: perception, state, resolver and input
-    layers" (38 files, +10707/-226). Committed with the working tree verified
-    green (356 passed, 2 skipped; ruff + mypy clean).
-- Last verified commit: `947b001`
-- Working tree: **dirty, deliberately and verifiably**: everything from Phase 8,
-  Phase 9, §50's clipboard path, Phase 10, Phase 10.1, Phase 11, the Phase 12
-  composition root and §71 GUI, and Phase 13's installer + single-instance control
-  is still uncommitted on top of `947b001`. No commit has been made since
-  (committing needs explicit user confirmation, §11). The dirty tree is the
-  verified tree — see "Last test results" below.
-- **Index drift corrected 2026-09-24 (this session).** This file was last written at
-  18:06 (the Phase 11 closeout) while the next session kept working until 20:30 and
-  never updated it. The repository had therefore already moved past this index when
-  this session bootstrapped it: `core/perception.py`, `core/application.py`,
-  `main.py`'s new `status`/`run` commands, three harness/unit test files, and the
-  install of the `pytest-qt` dev dependency (which is what broke the pytest gate —
-  see "Known failures"). Everything below now records the reconciled state; the
-  drift is called out where it matters rather than silently absorbed.
+    layers" (38 files, +10707/-226).
+  - `30f0fa3` — "Checkpoint Phases 8-14: safety gate, Brain loop, batching, GUI and
+    installer" (131 files, +36183/-263) — the whole Phase 8-14 tree, committed on
+    operator instruction.
+  - `7950798` — "Narrow the §43 ambiguity rule and measure the §76 verifiable happy
+    path".
+  - `5e06bc0` — "Report the §76 perception cycle as warm and cold, not as one cached
+    number".
+- Last verified commit: `5e06bc0`.
+- Working tree: **dirty, and this session's reconciliation found the dirty set is a
+  complete-but-unindexed unit of work** (see the drift note below). The changed
+  files are the AT-SPI Qt text-field/role fixes (`core/accessibility.py`), the
+  resolver weak-signal stage split (`core/target_resolver.py`), the fixture's new
+  `--workflow-controls` layout (`tests/fixtures/fixture_app.py`,
+  `tests/harness/fixture_client.py`), the third benchmark workload
+  (`bench/real_desktop.py`), a new live test
+  (`tests/integration/test_workflow_controls_real_display.py`, untracked), and the
+  matching unit/integration tests. Verified green this session (**1121 passed, 6
+  skipped**; ruff + mypy clean, **174 files**) but not yet committed (committing
+  needs explicit user confirmation, §11).
+- **Index drift corrected 2026-09-25 (this session).** This file was last written by
+  the session that became commit `5e06bc0` (the warm/cold perceive-cycle work),
+  while a following session built the `workflow-verifiable` workload, the two AT-SPI
+  text fixes and the resolver stage split — and then ended without updating this
+  index or running the benchmark. The repository had therefore moved past this file
+  when this session bootstrapped it. Everything below now records the reconciled
+  state; the drift is called out where it matters rather than silently absorbed.
+  The earlier drift corrections are kept in the session log (append-only).
 
 ## Current phase
-- Phase: **Phase 13 — Installation (§73 + §85's install criteria)**. Delivered:
-  the installer (`installer/installer.py`, `installer/__main__.py`,
-  `installer/__init__.py`), the three entry scripts (`install.sh`, `update.sh`,
-  `uninstall.sh`), the desktop assets (`desktop/blaxcy.desktop`,
-  `desktop/blaxcy.png`, `desktop/make_icon.py`), and single-instance control
-  (`core/single_instance.py`, §72/§85). `main.py` gained the instance lock and a
-  `--lock-path` flag.
-- Phase status: **IMPLEMENTED and VERIFIED** (1069 passed, 2 skipped; ruff + mypy
-  clean, 168 files; 39 new tests + a real end-to-end install of a throwaway prefix
-  this session). BLAXCY is now a menu application: `./install.sh` puts the entry in
-  `~/.local/share/applications`, the launcher in `~/.local/bin`, and a per-file
-  sha256 manifest in `~/.local/share/blaxcy/`. Documentation: `docs/installation.md`.
-- Phase 13's two deliberate boundaries: the installer is **standard library only**
-  (it runs before the virtualenv it creates exists), and its only writes are the
-  file list, the launcher, the icon and the entry — with every overwrite backed up
-  so a failed run rolls back and an uninstall can hand the user's own files back.
+- Phase: **Phase 14 — Benchmarks (§76)**. Phases 0-13 are complete (Phase 12 and
+  Phase 13 are recorded under "Previous phases"). Every §76 number this host can
+  honestly produce is measured and recorded in `docs/benchmark_report.md`: frame
+  capture and change detection, OCR, stop latency, the Brain / tool-protocol
+  overhead, the Phase 10.1 batching overhead, and the real-desktop end-to-end set
+  (accessibility, perception cycle **warm and cold**, resolution, revalidation, GUI
+  refresh, click, keyboard, and the 5-step `run_sequence`).
+- Cross-cutting gaps closed this session: **§70 structured JSON logging now
+exists** (`core/logging_setup.py` + `security/redaction.py`, with the root
+redaction filter and rotation from `[logging]`), and the **three missing §26 docs
+are written** (`docs/architecture.md`, `docs/security.md`, `docs/limitations.md`).
+The `[logging]` config section is no longer a dead stub.
+- Phase status: **IN PROGRESS — one §76 row is measured but not met.** The
+  `workflow-verifiable` workload (the realistic §74 pipeline — search icon → type →
+  submit → result → play — laid out at self-verifying scale; built by the
+  un-indexed session, run for the first time this session) completes all five steps
+  in **2/20** runs, halting on `s2:FOCUS_MISMATCH` ×8, `s2:VERIFICATION_CONTRADICTED`
+  ×4 and `s4:VERIFICATION_UNVERIFIED` ×6. The 5-step happy-path **target is met**
+  by the synthetic `verifiable` workload (**20/20**, p50 2505.23 ms / p95 3671.94 ms,
+  ≤ 4000 ms), but the *realistic* pipeline is not yet, and closing that gap is an
+  operator decision (see "Known failures").
 - **One environment item is still open, and it is a human action, not code**: this
   host's PySide6 6.10.3 (apt) ships QtCore/QtGui/QtWidgets but **not QtTest**, so
   the installed `pytest-qt` plugin aborts *every* pytest run at configure time. The
@@ -60,6 +76,21 @@
   *documented* bare `pytest` command is. See "Known failures".
 
 ## Previous phases (complete)
+- Phase 13 — Installation (§73 + §85's install criteria): the installer
+  (`installer/installer.py`, `installer/__main__.py`, `installer/__init__.py`),
+  the three entry scripts (`install.sh`, `update.sh`, `uninstall.sh`), the desktop
+  assets (`desktop/blaxcy.desktop`, `desktop/blaxcy.png`, `desktop/make_icon.py`),
+  and single-instance control (`core/single_instance.py`, §72/§85). `main.py` gained
+  the instance lock and a `--lock-path` flag. **COMPLETE and VERIFIED** (1069
+  passed, 2 skipped at the time; ruff + mypy clean, 168 files; 39 new tests + a real
+  end-to-end install of a throwaway prefix). BLAXCY is a menu application:
+  `./install.sh` puts the entry in `~/.local/share/applications`, the launcher in
+  `~/.local/bin`, and a per-file sha256 manifest in `~/.local/share/blaxcy/`.
+  Documentation: `docs/installation.md`. Two deliberate boundaries: the installer is
+  **standard library only** (it runs before the virtualenv it creates exists), and
+  its only writes are the file list, the launcher, the icon and the entry — with
+  every overwrite backed up so a failed run rolls back and an uninstall can hand the
+  user's own files back.
 - Phase 12 — GUI (§71) plus the composition root it is a view over: the
   **application composition root** (`core/application.py`), the **perception
   orchestrator** (`core/perception.py`), and the seven `gui/` modules
@@ -990,7 +1021,13 @@
     against throwaway prefixes; no system-wide install was performed.
 
 ## Current task
-- **2026-09-25 (this bootstrap session): the remaining Phase 14 read-only numbers
+- **2026-09-25 (this session, continued): `activate_element` — the last unimplemented §66 tool — is now implemented and verified live.** §66 lists it as a required tool; the executor deliberately refused it with `BACKEND_UNAVAILABLE` because `core/accessibility.py` only ever *read* `Atspi.Action`, never invoked it. Delivered: `AccessibilityService.activate(path, action=None)` (marshalled to the single `T-A11Y` owner thread, descending the element path **live** rather than reusing a cached node, which would be exactly the stale target §45 exists to reject), the pure helpers behind it (`_descend_path`, `_select_action_index`, `_invoke_action`), `ActivationOutcome` as a shared typed result, the executor branch (an injected `activate=` hook, the same pattern as `perceive`/`resolve_fallback`), and the composition-root wiring. It is `MUTATING`, so it passes policy → resolve → lease → revalidation → verification exactly like a click, and it injects **no** pointer or key input. Because it is XTEST-free, it also works where a synthetic click is unreliable (no coordinates, no pointer occlusion). Activation is an *optional* backend capability: a backend without it reports a structured `UNAVAILABLE` rather than substituting a click.
+- **Two live/ordering defects were found by the new tests, not by reasoning.** (1) The first `activate` call raised `unknown accessibility request 'activate'` — `_dispatch` marshals through an explicit kind table and nothing had registered the new kind; the live integration test caught it immediately, which is precisely what a fake-only suite would have missed. (2) An existing safety test asserted that `activate_element` *always* reports `UNAVAILABLE`; once the tool is real that is no longer true (a late full-suite run reports `TARGET_STALE` because the harness's seeded state is past its 1500 ms maximum age), so the test was rewritten to pin the property that actually matters — a structured refusal, never a fabricated success, and nothing injected.
+- **2026-09-25 (this session, continued): §70 structured logging was entirely missing and is now implemented.** Reconciling the tree surfaced a real gap that is not a benchmark row: **no `logging` module was imported anywhere in the application**, while `config/settings.py` declared a `[logging]` section (`level`, `rotation_max_bytes`, `rotation_backups`, `redact_on_root_logger`) that no code consumed -- a §4 rule 10 dead stub, a §70 requirement, and the thing §85's "secrets never logged" criterion is about. Delivered: `security/redaction.py` (§26 names this module and it did not exist) with the redaction filter and a secret registry, and `core/logging_setup.py` with the JSON formatter, config-driven rotation and idempotent `configure_logging`. Wired into `main.py` (every command) and `core/application.py` (start/stop), with structured records at the `ToolDispatcher` chokepoint (tool, outcome, error code, verification, state version, frame, latency, task/step/sequence id) and on a sequence halt (`sequence_id`, `step_index`, `sequence_halt_reason`). `logging.redact_on_root_logger` was added to `SECURITY_INVARIANTS`, so a config that disables log redaction is now refused at load (§4 rule 25). **A real bug was found by the new tests and fixed:** the filter was first attached only to the *root logger*, where it never runs for a record propagated from a child logger (`blaxcy.core.executor` -> `blaxcy` -> root) -- so it redacted nothing that actually logs. It is now installed on the handler as well, which is what makes the §85 property true.
+- **Also delivered this session: the three §26-mandated docs that did not exist** -- `docs/architecture.md`, `docs/security.md`, `docs/limitations.md` (the last carries the §85 release-readiness reconciliation, which had never been walked). §26 listed six docs; only three existed.
+- **2026-09-25 (this bootstrap session): the un-indexed `workflow-verifiable` workload is verified and its §76 number is measured for the first time.** The tree carried a complete but unindexed unit of work from a session that ended before running anything: `core/accessibility.py` (Qt announces an editable text field with the plain AT-SPI role `text`, so it must be refined to `TEXT_INPUT` by the `EDITABLE` state or §51 refuses to type; and `_read_text_content` read through the deprecated `Atspi.Accessible.get_text` shim, which raises on `(start, end)` under the installed PyGObject and silently returned nothing), `core/target_resolver.py` (the weak `substring_text`/`fuzzy_text` signals were promoted to real cascade stages and excluded from `TEXT_MATCH_STAGES`, so a fuzzy `token_set_ratio` hit like `("Search Address Bar", "Search")` can no longer land inside the §43 gap of a decisive match and veto it), the fixture's `--workflow-controls` layout, the third `--workload workflow-verifiable`, and their tests (the full gate moved from the index's **1104 passed** to **1121 passed, 6 skipped**; ruff + mypy clean, 174 files). Re-verified green first, then ran the operator-approved real-input benchmark.
+- **Result: the §76 happy path is met by the synthetic workload and NOT yet by the realistic one.** `--workload verifiable` stays **20/20** (p50 2505.23 ms). `--workload workflow-verifiable` completed **2/20**, halting on `s2:FOCUS_MISMATCH` ×8, `s2:VERIFICATION_CONTRADICTED` ×4, `s4:VERIFICATION_UNVERIFIED` ×6; the input really lands (the fixture's own counters: `search_icon: 20`, `submit_button: 76`, `play_button: 2`, and its `search_input` holding every typed sample). Recorded in `docs/benchmark_report.md` "Phase 14 — the section 74 workflow at self-verifying scale".
+- (Superseded) **2026-09-25 (previous bootstrap session): the remaining Phase 14 read-only numbers
   are delivered and the half-applied edit is finished.** The tree carried an
   uncommitted, untested edit to `bench/real_desktop.py` adding the orchestrator's
   perceive-cycle and the section 71 GUI-refresh benchmarks. It was completed and
@@ -1058,8 +1095,36 @@
   a package install (see "Next concrete action") and therefore a human decision.
 
 ## Files being actively modified
-- (none mid-change; the half-applied Phase 14 benchmark edit was completed and
-  verified this session)
+- (none mid-change; the un-indexed `workflow-verifiable` work was verified and
+  measured this session, and its numbers are now recorded)
+- Touched by the un-indexed session (complete, verified this session):
+  `core/accessibility.py` (the Qt `text`+`EDITABLE` role refinement, the
+  `Atspi.Text`-interface read), `core/target_resolver.py` (the
+  `substring_text`/`fuzzy_text` stage split and the `TEXT_MATCH_STAGES` narrowing),
+  `tests/fixtures/fixture_app.py` (`--workflow-controls` layout),
+  `tests/harness/fixture_client.py`, `bench/real_desktop.py`,
+  `tests/integration/test_workflow_controls_real_display.py` (new, untracked),
+  `tests/integration/test_bench_workload_fixture.py`,
+  `tests/unit/test_accessibility.py`, `tests/unit/test_bench_real_desktop.py`,
+  `tests/unit/test_target_resolver.py`
+- Touched this session (the `activate_element` unit): `core/accessibility.py` (the
+  `activate` capability and its helpers), `control/executor.py`
+  (`ACTIVATE_ELEMENT` in `EXECUTOR_TOOLS`/`_TARGET_TOOLS`, the `activate=` hook and
+  the `_perform` branch), `core/application.py` (`_activate_element` wiring),
+  `schemas/actions.py` (`ActivationOutcome`), `tests/harness/phase8.py` (the
+  `activate` pass-through), `tests/unit/test_activate_element.py` (new, 13),
+  `tests/integration/test_workflow_controls_real_display.py` (the live activation
+  test), `tests/safety/test_tool_dispatch_safety.py` (the rewritten property),
+  `docs/limitations.md`, this file
+- Touched this session: `docs/benchmark_report.md` (the new workload subsection and
+  the `Reproducing` command), `docs/architecture.md` (new), `docs/security.md`
+  (new), `docs/limitations.md` (new), `security/redaction.py` (new),
+  `core/logging_setup.py` (new), `config/settings.py` (the logging invariant),
+  `main.py` (logging setup per command), `core/application.py` (start/stop records),
+  `ai/tool_protocol.py` (the dispatch wrapper and `_log_dispatch`),
+  `control/sequence_runner.py` (the halt record), `tests/conftest.py` (a hermetic
+  `BLAXCY_LOG_DIR`), `tests/unit/test_redaction.py` (new),
+  `tests/unit/test_logging_setup.py` (new), this file
 - Touched this session (complete, verified): `bench/real_desktop.py` (the read-only
   `AppOwner` type, the warm/cold perceive-cycle split, the GUI-refresh benchmark,
   the corrected accessibility note), `tests/unit/test_bench_real_desktop.py` (+1),
@@ -1096,6 +1161,54 @@
   `docs/environment_report.md` (regenerated)
 
 ## Last test results (verbatim, not paraphrased as "passed")
+- Command: `. .venv/bin/activate && ruff check . && mypy . && timeout 900 python -m pytest -o addopts="" -p no:pytest-qt -q`
+- Result (`2026-09-25`, this session, after implementing `activate_element`):
+  `1156 passed, 6 skipped, 4 warnings in 32.86s`; `ruff check .` ->
+  `All checks passed!`; `mypy .` -> `Success: no issues found in 179 source files`.
+  New: `tests/unit/test_activate_element.py` (13) and the live
+  `test_the_live_submit_control_is_really_activated_through_atspi`.
+- Command (live, **no pointer or key input injected**, this session):
+  `. .venv/bin/activate && python -m pytest -o addopts="" -p no:pytest-qt -q tests/integration/test_workflow_controls_real_display.py`
+- Result: `4 passed` — `AccessibilityService.activate` really invoked the Qt fixture's
+  Submit action on the live AT-SPI tree, and the fixture's own `submit_button`
+  counter proved the application genuinely performed the action (so the effect
+  cannot have come from injected input).
+- Command: `. .venv/bin/activate && ruff check . && mypy . && timeout 900 python -m pytest -o addopts="" -p no:pytest-qt -q`
+- Result (`2026-09-25`, this session, after implementing §70 logging and the three
+  missing docs): `1142 passed, 6 skipped, 4 warnings in 32.08s`; `ruff check .` ->
+  `All checks passed!`; `mypy .` -> `Success: no issues found in 178 source files`.
+  21 new tests: `tests/unit/test_redaction.py` (11) and
+  `tests/unit/test_logging_setup.py` (10).
+- Command (end-to-end, this session, throwaway log dir, **no input injected**):
+  `. .venv/bin/activate && LOGD=$(mktemp -d) && BLAXCY_LOG_DIR="$LOGD" python main.py probe >/dev/null && cat "$LOGD"/blaxcy.jsonl`
+- Result: the CLI created `blaxcy.jsonl` and wrote structured JSON
+  (`{"ts": "2026-09-25T13:06:09+00:00", "level": "INFO", "logger":
+  "numexpr.utils", "message": "NumExpr defaulting to 8 threads."}`) — proving the
+  root handler, the formatter and propagation all work, not just the unit paths.
+- Command: `. .venv/bin/activate && ruff check . && mypy . && timeout 900 python -m pytest -o addopts="" -p no:pytest-qt -q`
+- Result (`2026-09-25`, this session, over the reconciled un-indexed tree):
+  `1121 passed, 6 skipped, 5 warnings in 31.10s`; `ruff check .` ->
+  `All checks passed!`; `mypy .` -> `Success: no issues found in 174 source files`.
+- Command (targeted, this session):
+  `. .venv/bin/activate && python -m pytest -o addopts="" -p no:pytest-qt -q tests/integration/test_workflow_controls_real_display.py tests/integration/test_bench_workload_fixture.py tests/unit/test_accessibility.py tests/unit/test_target_resolver.py -v`
+- Result: `85 passed` — including the **live** `test_workflow_controls_real_display.py`
+  (3): it proves on the real AT-SPI tree that Qt's editable `text` node becomes a
+  `TEXT_INPUT` with readable content, that the clickable controls are perceivable
+  `BUTTON`s, and that the results are named `LIST_ITEM`s with geometry.
+- Command (operator-approved real input, **real mouse/keyboard injected**, this session):
+  `. .venv/bin/activate && python -m bench.real_desktop --confirm-real-input --workload workflow-verifiable --samples 20 --input-samples 30 --sequence-samples 20`
+- Result (`2026-09-25`, live X11/XTEST, the §74 fixture): accessibility p50
+  **633.91 ms** (n=20, 316 elements); perception cycle warm p50 **7.39 ms** / cold p50
+  **640.65 ms**; resolution p50 **1.92 ms**; revalidation p50 **0.72 ms** (target
+  ≤ 25 ms **met**, checks=11); GUI refresh p50 **0.36 ms**; click p50 **201.84 ms**,
+  **30/30 VERIFIED**; keyboard p50 **90.91 ms**, **1/30 VERIFIED** (19
+  `VERIFICATION_CONTRADICTED`, 10 `VERIFICATION_UNVERIFIED`); 5-step `run_sequence`
+  p50 **345.41 ms** / p95 1635.85 ms, **2/20 completed all 5 steps** (halted:
+  `s2:FOCUS_MISMATCH` 8, `s4:VERIFICATION_UNVERIFIED` 6, `s2:VERIFICATION_CONTRADICTED` 4).
+  Recorded in `docs/benchmark_report.md` "Phase 14 — the section 74 workflow at
+  self-verifying scale". The input genuinely landed — the fixture's own counters after
+  the run read `search_icon: 20`, `submit_button: 76`, `play_button: 2` and its
+  `search_input` held every typed sample.
 - Command: `. .venv/bin/activate && ruff check . && mypy . && timeout 900 python -m pytest -o addopts="" -p no:pytest-qt -q`
 - Result (`2026-09-25`, this session, after finishing the half-applied Phase 14
   benchmark edit): `1104 passed, 6 skipped, 4 warnings`; `ruff check .` ->
@@ -1419,6 +1532,45 @@
 
 ## Known failures
 *(structure per §12.1)*
+- **The realistic §74 workflow happy path is built but NOT achieved on the real
+  desktop — `workflow-verifiable` completes 2/20** (found and measured 2026-09-25
+  this session; **open — needs a decision, not a code fix**)
+  - failure: with the fixture's `--workflow-controls` layout and
+    `--workload workflow-verifiable`, only 2 of 20 five-step `run_sequence` runs
+    completed all five steps; the rest halted at step `s2` (typing) or `s4`
+    (result selection)
+  - environment: this host, XFCE X11 (`DISPLAY=:0.0`), real XTEST 2.2, live AT-SPI,
+    Python 3.14.6, the §74 fixture as target
+  - trigger: `require_verification_for_mutating = true` (the default) plus §66.1's
+    halt-on-`UNVERIFIED`/`CONTRADICTED`; the step then has to verify against a live
+    AT-SPI read of the Qt field/list
+  - observed result: `s2:FOCUS_MISMATCH` ×8, `s2:VERIFICATION_CONTRADICTED` ×4,
+    `s4:VERIFICATION_UNVERIFIED` ×6; keyboard benchmark `1/30 VERIFIED` with the
+    same signature (10 `no readable text`, 19 readable-but-not-containing). The
+    typed content really reached the widget — the fixture reports its `search_input`
+    holding every sample (`bench0…bench29song name`)
+  - expected result: (for a happy path) all five steps verified — the §76 number
+  - likely cause: **two distinct limits, neither a §60 defect.** (a) The §51 focus
+    guard / §60 text check are timing-sensitive under real input: the fixture's
+    search-icon click does focus the field (`_on_search_clicked` calls
+    `search_input.setFocus()`), but the bounded AT-SPI traversal does not reliably
+    reflect the field's content inside the step's settle window — the read lags the
+    injection rather than disagreeing with it. (b) Selecting a `LIST_ITEM` does not
+    reliably repaint `MEANINGFUL`-ly at its own box, so `s4` is `UNVERIFIED`.
+    `verify_text` uses a *containment* check (not exact match), so accumulated
+    field content is not the cause. Section 60 is correctly refusing to call an
+    unconfirmed change a success.
+  - current status: **open**; the synthetic `verifiable` workload still meets the
+    §76 5-step target (**20/20**, p50 2505.23 ms), so the target is met by one
+    workload and not by the realistic one. Numbers and interpretation are in
+    `docs/benchmark_report.md` "Phase 14". No safety guarantee is weakened.
+  - next investigation: decide between (a) accept the honest 2/20 as the realistic
+    workload's result and keep the synthetic 20/20 as the §76 happy-path number, or
+    (b) make the workload genuinely verifiable — give the result list a selection
+    highlight that repaints `MEANINGFUL`-ly at the selected item's own box, and give
+    the typed step a longer settle/re-perceive window before verification — then
+    re-measure. Either way a fixed number must be re-measured, not asserted
+    (§76). Do **not** loosen §60 to make the number nicer (§4 rule 8).
 - **pytest cannot run at all while `pytest-qt` is installed — PySide6 has no `QtTest`**
   - failure: every `python -m pytest ...` invocation ends in `INTERNALERROR` during
     `pytest_configure`, collecting zero tests; `main.py`, `ruff` and `mypy` are
@@ -1562,7 +1714,30 @@
     concrete action").
 
 ## Next concrete action
-- **§76 verifiable workload: RUN and recorded (2026-09-25).** With the operator's
+- **A decision, not a benchmark run: what to do about the realistic §74 workflow's
+  2/20.** The measurement is delivered and recorded. The two candidate paths are in
+  the new "Known failures" entry: (a) accept it — the §76 5-step happy-path target is
+  already met by the synthetic `verifiable` workload (**20/20**), and the realistic
+  pipeline's honest partial result is recorded as such; or (b) make the workload
+  genuinely verifiable (a result-list selection highlight that repaints
+  `MEANINGFUL`-ly at the selected item's own box, plus a longer settle/re-perceive
+  window before the typed step's verification) and re-measure. Path (b) is
+  benchmark-harness work; it must not touch §60.
+- **Phase 14 is otherwise delivered.** Every other §76 number is measured and in the
+  §76 form (`target, actual, machine, desktop/session, backend, sample count`) in
+  `docs/benchmark_report.md`, including this session's third-workload run. A target
+  stays a target until re-measured.
+- **One human command is still outstanding** (not a code task), and it is the only
+  thing blocking the *documented* bare `pytest` command:
+  ```bash
+  sudo apt-get install -y python3-pyside6.qttest
+  ```
+  then `python -m pytest -o addopts="" -q` should be green with no `-p no:pytest-qt`,
+  and the "Known failures" entry above can be deleted.
+- **The reconciled tree is uncommitted.** It is green (**1121 passed, 6 skipped**;
+  ruff + mypy clean, 174 files) and is the natural next recovery checkpoint after
+  `5e06bc0`; committing needs explicit user confirmation (§11).
+- (Superseded) **§76 verifiable workload: RUN and recorded (2026-09-25).** With the operator's
   go-ahead:
   ```bash
   . .venv/bin/activate && python -m bench.real_desktop --confirm-real-input --workload verifiable --samples 20 --input-samples 30 --sequence-samples 20
@@ -1941,10 +2116,10 @@
   the running program it is still unreachable because no composition root attaches
   it (see the composition-root item above); the dispatcher keeps reporting an
   honest `BACKEND_UNAVAILABLE` until one does.
-- `activate_element` has no implementation anywhere: the executor refuses it with
-  `BACKEND_UNAVAILABLE` and `core/accessibility.py` exposes no AT-SPI action
-  invocation. Implementing it (in `core/accessibility.py`) is the honest way to
-  enable it — no stub currently claims otherwise.
+- ~~`activate_element` has no implementation anywhere~~ — **DELIVERED 2026-09-25**
+  (see "Current task"): `core/accessibility.py` now invokes the application's own
+  AT-SPI action, the executor reaches it through the full pipeline, and it is
+  verified live on the §74 fixture. Every §66 tool now has a real implementation.
 - ~~§50 clipboard-assisted typing needs a real `control/clipboard.py`
   `ClipboardPaster`~~ — **delivered** (`control/clipboard.py`, verified live);
   what remains is only the composition-root wiring noted above.
@@ -1965,7 +2140,18 @@
 
 ## Verification status snapshot
 - Build: N/A (interpreted Python; no build step yet)
-- Lint/typecheck: PASS (`ruff check .` clean; `mypy .` clean, **173 files**)
+- Lint/typecheck: PASS (`ruff check .` clean; `mypy .` clean, **179 files**)
+- `activate_element` (§66): PASS — 13 unit tests (`tests/unit/test_activate_element.py`:
+  action selection, live path descent, interface-then-fallback invocation, the
+  executor's unavailable/absent-target/refused-action paths, the assertion that no
+  input is injected, and OBSERVE refusing before invocation) plus the live
+  AT-SPI activation test above.
+- Logging (§70) and redaction (§85): PASS — 21 new tests in
+  `tests/unit/test_redaction.py` and `tests/unit/test_logging_setup.py`, including
+  the end-to-end property that a **registered secret and a password-named field
+  never appear in the log file**, that the rotation bounds come from `[logging]`,
+  and that a config cannot disable log redaction (it is now a §25 invariant).
+  Verified live through the CLI (see "Last test results").
 - Unit tests: PASS (incl. accessibility 21 + browser accessibility 12; event bus 12 +
   state cache 21; OCR 20 incl. one real-backend functional test; target resolver 26;
   mouse 16 + keyboard 23 + input backends 8; policy modes 9 + terminal guard 39 +
@@ -2037,6 +2223,18 @@
   sha256 each; a second launch is refused with the holder named and exit 2, and a
   launch after the first dies succeeds (no stale lock).
 
+- Workflow workload and the Qt text-field fixes: PASS — the new **live**
+  `tests/integration/test_workflow_controls_real_display.py` (3) drives the real
+  AT-SPI tree and proves a Qt editable field is a readable `TEXT_INPUT`, the
+  clickable controls are perceivable `BUTTON`s, and the results are named
+  `LIST_ITEM`s with geometry; the §43 weak-signal split is covered by 3 new
+  `tests/unit/test_target_resolver.py` test functions (decisive-vs-fuzzy, fuzzy
+  duplicate, fuzzy-only conservatism; the file collects **46**, the index's older
+  `26` was stale) and the Qt role/read fixes by 3 new
+  `tests/unit/test_accessibility.py` test functions (the file collects **25**, up
+  from the `21` recorded); `tests/unit/test_bench_real_desktop.py` collects **9** and
+  `tests/integration/test_bench_workload_fixture.py` collects **11**. **The realistic
+  5-step workflow is measured at 2/20** — see "Known failures".
 - Benchmark: PARTIAL (Phase 2 capture + change detection, Phase 5 OCR, the
   Phase 9 stop latency, the Phase 10 tool-protocol overhead and the **Phase 10.1
   batching measurements** are recorded in `docs/benchmark_report.md`; Phase 11's
@@ -2050,12 +2248,17 @@
   (2026-09-25): accessibility / resolution / revalidation / click / keyboard, and a
   real-desktop `run_sequence` that honestly halts at step 1 on
   `VERIFICATION_UNVERIFIED` rather than faking a happy path — see
-  `docs/benchmark_report.md` "Phase 14". The only §76 target not met on this host is
-  the real-desktop 5-step happy path, and the reason is verification (§60), not the
-  batching layer — **and this session added the orchestrator's perceive cycle
-  (warm p50 10.61 ms / cold p50 830.78 ms) and the section 71 GUI refresh (p50
-  0.39 ms), closing the read-only gaps**; the only unmeasured row left is the
-  workflow layout's keyboard/click pair, reported `n = 0` with a reason)
+  `docs/benchmark_report.md` "Phase 14". The real-desktop 5-step happy path **is
+  met by the synthetic `verifiable` workload (20/20, p50 2505.23 ms)**; what is not
+  met is the *realistic* §74 pipeline at the same scale (`workflow-verifiable`,
+  measured this session at **2/20**), and the reason is the live verification path
+  (§51/§60), not the batching layer — see "Known failures". **This session added the
+  orchestrator's perceive cycle (warm p50 7.39 ms / cold p50 640.65 ms) and the
+  section 71 GUI refresh (p50 0.36 ms) on the workflow layout**; the one row that
+  remains genuinely inapplicable on the *older* `verifiable` layout is its
+  keyboard/click pair, reported `n = 0` with a reason, and the `workflow-verifiable`
+  layout now supplies the keyboard number instead (`1/30 VERIFIED`, honestly
+  reported))
 
 - **Real-desktop `run_sequence` happy path is unachievable on the section 74 fixture —
   §60 verification refuses sub-`MEANINGFUL` changes** (found 2026-09-25 while running
@@ -2550,3 +2753,80 @@
   cycle p50 **10.61 ms**, cold cycle p50 **830.78 ms**, GUI refresh p50 **0.39 ms**,
   revalidation p50 0.90 ms (target <= 25 ms met). Gate: **1104 passed, 6 skipped**;
   ruff + mypy clean (**173 files**). Still uncommitted on top of `30f0fa3`.
+- 2026-09-25 — next session, bootstrap: the index matched the tree except for a
+  complete-but-unindexed unit of work (the repository had moved two commits past
+  this file, `7950798` and `5e06bc0`). Reconciled and verified it rather than
+  trusting it: `core/accessibility.py` now refines a Qt editable `text` node to
+  `TEXT_INPUT` via the `EDITABLE` state (§37) — without it §51's focus guard refused
+  to type into any Qt field — and `_read_text_content` reads through the
+  `Atspi.Text` interface instead of the deprecated `Atspi.Accessible.get_text` shim,
+  which raises on `(start, end)` under the installed PyGObject and so silently
+  returned nothing for a navigation field; `core/target_resolver.py` promotes the
+  weak `substring_text`/`fuzzy_text` signals to their own cascade stages and removes
+  them from `TEXT_MATCH_STAGES`, so a fuzzy `token_set_ratio` hit
+  (`("Search Address Bar", "Search")` scores 100) can no longer sit inside the §43
+  0.08 gap of a decisive match and veto a uniquely-named target; and the fixture
+  gained a `--workflow-controls` layout plus a third `--workload workflow-verifiable`
+  whose point is to make the *realistic* §74 pipeline (search icon → type → submit →
+  result → play) complete and verify. Verified green first (**1121 passed, 6
+  skipped**; ruff + mypy clean, 174 files; the new live
+  `tests/integration/test_workflow_controls_real_display.py` **3 passed** against the
+  real AT-SPI tree), then, on the operator's explicit approval, ran the real-input
+  benchmark. **The honest result: the synthetic `verifiable` workload stays 20/20
+  (the §76 5-step happy path is therefore met), while the realistic
+  `workflow-verifiable` pipeline completed only 2/20**, halting on
+  `s2:FOCUS_MISMATCH` ×8, `s2:VERIFICATION_CONTRADICTED` ×4 and
+  `s4:VERIFICATION_UNVERIFIED` ×6 — the live AT-SPI read of the typed field lagging
+  the injection, and a `LIST_ITEM` selection that does not repaint `MEANINGFUL`-ly at
+  its own box. The input genuinely landed (the fixture's own counters:
+  `search_icon: 20`, `submit_button: 76`, `play_button: 2`, and its `search_input`
+  holding every sample). Recorded in `docs/benchmark_report.md`; the gap is filed as
+  a new "Known failures" entry with both candidate next paths rather than papered
+  over or made to pass by loosening §60 (§4 rule 8). No production code was changed
+  this session — it was verification, the one measurement, and correcting a
+  materially stale index that predated two commits and an entire unindexed workload.
+- 2026-09-25 — same session, continued: on the operator's "continue" instruction,
+  resolved where the project actually stands against §26/§85 and implemented the
+  highest-value real gap rather than documenting around it. **§70 structured
+  logging did not exist** — no `logging` import anywhere in the application, and a
+  `[logging]` config section nothing consumed (§4 rule 10, §70, §85). Implemented
+  `security/redaction.py` (a §26-named module that was absent: the redaction filter
+  plus a secret registry) and `core/logging_setup.py` (JSON formatter, rotation from
+  `[logging]`, idempotent `configure_logging`, `BLAXCY_LOG_DIR` override), wired it
+  into every CLI command and into `Application.start`/`shutdown`, added structured
+  records at the `ToolDispatcher` chokepoint and on a sequence halt, and made
+  `logging.redact_on_root_logger` a §25 security invariant so a config cannot turn
+  log redaction off. **The new tests found a real defect in the first attempt:** a
+  filter attached to the *root logger* never runs for a record propagated from a
+  child logger, so it redacted nothing the codebase actually logs; the filter now
+  also sits on the handler. Gate: **1142 passed, 6 skipped** (was 1121); ruff + mypy
+  clean (**178 files**); verified end-to-end through the CLI with a throwaway
+  `BLAXCY_LOG_DIR`. Also wrote the three §26-mandated docs that did not exist
+  (`docs/architecture.md`, `docs/security.md`, `docs/limitations.md`, the last
+  carrying the §85 release-readiness reconciliation, which had never been walked)
+  and corrected `docs/limitations.md`'s honest verdict: the project is **not
+  complete** — Phase 15 is unstarted, one §76 row is measured but unmet, Wayland and
+  `activate_element` are unimplemented, and the documented bare `pytest` is still
+  blocked on `python3-pyside6.qttest`. Nothing committed; the tree is green and
+  uncommitted on top of `5e06bc0`.
+- 2026-09-25 — same session, continued: closed the last unimplemented §66 tool.
+  **`activate_element`** was the one required tool with no implementation anywhere
+  (the executor refused it with `BACKEND_UNAVAILABLE` because the accessibility
+  layer only *read* `Atspi.Action`). Added the invocation at the accessibility
+  layer (on the single `T-A11Y` owner thread, descending the element path live),
+  a shared `ActivationOutcome`, an injected `activate=` hook on the executor, and
+  the composition-root wiring; it is `MUTATING`, so it travels the full policy →
+  resolve → lease → revalidate → verify pipeline and injects no pointer or key
+  input — which is what makes it usable where a synthetic click is unreliable.
+  Activation is an optional backend capability, so a backend without it reports a
+  structured `UNAVAILABLE` instead of substituting a click. **Two defects were
+  found by the tests rather than by reasoning, which is the point of adding them:**
+  the first live `activate` call raised `unknown accessibility request 'activate'`
+  because `_dispatch`'s kind table had never been taught the new request (a fake-only
+  suite would have missed it), and a pre-existing safety test that asserted
+  "activation always reports UNAVAILABLE" stopped being true once the tool worked,
+  so it was rewritten to assert the property that still matters — a structured
+  refusal, never a fabricated success, nothing injected. Gate: **1156 passed, 6
+  skipped**; ruff + mypy clean (**179 files**); `docs/limitations.md` updated
+  (`activate_element` is no longer listed as a gap). Every §66 tool now has a real
+  implementation. Nothing committed.

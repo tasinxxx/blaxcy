@@ -63,7 +63,13 @@ from core.target_resolver import (
 )
 from policy.modes import ModeController
 from policy.permissions import PermissionEngine, PolicyDecision, is_terminal_submit
-from schemas.actions import PlannedAction, ToolEnvelope, ToolName, elapsed_ms_since
+from schemas.actions import (
+    ActivationOutcome,
+    PlannedAction,
+    ToolEnvelope,
+    ToolName,
+    elapsed_ms_since,
+)
 from schemas.capability import CapabilityReport
 from schemas.elements import ElementQuery, UIElement, identity_fingerprint
 from schemas.enums import (
@@ -283,9 +289,10 @@ def revalidate_target(
     )
 
 
-#: Tools this executor can genuinely perform. ``activate_element`` is absent on
-#: purpose: invoking an AT-SPI action is not implemented at the service layer, so
-#: the honest answer is an unavailable backend rather than a fabricated click.
+#: Tools this executor can genuinely perform. ``activate_element`` is included,
+#: but only when an activation hook is actually wired (``activate=`` below): the
+#: AT-SPI action invocation lives at the accessibility layer, and without one the
+#: honest answer remains an unavailable backend rather than a fabricated click.
 EXECUTOR_TOOLS: frozenset[str] = frozenset(
     {
         ToolName.CLICK,
@@ -297,6 +304,7 @@ EXECUTOR_TOOLS: frozenset[str] = frozenset(
         ToolName.SCROLL,
         ToolName.DRAG,
         ToolName.ENSURE_WINDOW,
+        ToolName.ACTIVATE_ELEMENT,
     }
 )
 
@@ -308,6 +316,7 @@ _TARGET_TOOLS: frozenset[str] = frozenset(
         ToolName.RIGHT_CLICK,
         ToolName.TYPE_TEXT,
         ToolName.SCROLL,
+        ToolName.ACTIVATE_ELEMENT,
     }
 )
 
@@ -383,6 +392,7 @@ class Executor:
         calibration: Calibration | None = None,
         recovery: RecoveryController | None = None,
         resolve_fallback: Callable[[ElementQuery], bool] | None = None,
+        activate: Callable[[UIElement], ActivationOutcome] | None = None,
     ) -> None:
         self._settings = settings
         self._permissions = permissions
@@ -402,6 +412,7 @@ class Executor:
         self._calibration = calibration
         self._recovery = recovery
         self._resolve_fallback = resolve_fallback
+        self._activate = activate
         self._actions = 0
         self._denied = 0
         self._recovery_attempts = 0
@@ -959,6 +970,31 @@ class Executor:
                 return None
             if tool is ToolName.HOTKEY:
                 self._keyboard.hotkey(str(planned.params.get("combo", "")))
+                return None
+            # Section 66's ``activate_element``: the application performs its own
+            # accessibility action instead of receiving a synthetic pointer event.
+            # It is handled before the geometry requirement on purpose -- an
+            # AT-SPI action needs no coordinates -- but it still arrives here only
+            # after policy, a fresh lease and the full section 45 revalidation,
+            # and it is verified exactly like any other MUTATING action.
+            if tool is ToolName.ACTIVATE_ELEMENT:
+                if self._activate is None:
+                    return self._deny(
+                        started,
+                        ErrorCode.BACKEND_UNAVAILABLE,
+                        "no accessibility action backend is wired for activate_element",
+                        planned,
+                    )
+                if element is None:
+                    return self._deny(started, ErrorCode.TARGET_STALE, "target vanished", planned)
+                outcome = self._activate(element)
+                if not outcome.ok:
+                    return self._deny(
+                        started,
+                        ErrorCode.BACKEND_UNAVAILABLE,
+                        outcome.reason or "the accessibility action was refused",
+                        planned,
+                    )
                 return None
 
             point = element.point_for_input() if element is not None else None

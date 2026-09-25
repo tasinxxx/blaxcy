@@ -67,12 +67,14 @@ class FixtureApp:
         start_timeout: float = 20.0,
         command_timeout: float = 10.0,
         bench_controls: bool = False,
+        workflow_controls: bool = False,
     ) -> None:
         self._platform = platform
         self._title = title
         self._start_timeout = start_timeout
         self._command_timeout = command_timeout
         self._bench_controls = bench_controls
+        self._workflow_controls = workflow_controls
         self._process: subprocess.Popen[str] | None = None
         self._lines: queue.Queue[Any] = queue.Queue()
         self._reader: threading.Thread | None = None
@@ -95,6 +97,8 @@ class FixtureApp:
         argv = [sys.executable, str(FIXTURE_APP), "--title", self._title]
         if self._bench_controls:
             argv.append("--bench-controls")
+        if self._workflow_controls:
+            argv.append("--workflow-controls")
         self._process = subprocess.Popen(
             argv,
             cwd=str(PROJECT_ROOT),

@@ -56,8 +56,12 @@ master specification for the full bootstrap procedure.
   stage, gated to `mode >= ASSIST`, never over credential/protected context), and
   **single-instance control** (`single_instance.py` §72/§85, Phase 13 — an
   `flock` on `$XDG_RUNTIME_DIR/blaxcy/instance.lock`, taken by `main.py`'s `gui`
-  and `run` only; the kernel drops the lock on death, so there is no stale-lock
-  case)
+  and  `run` only; the kernel drops the lock on death, so there is no stale-lock
+  case), and **structured logging** (`logging_setup.py` §70 — one JSON object per
+  line, rotation from `[logging]`, installed by every `main.py` command and by
+  `Application.start`; the root redaction filter lives beside it in
+  `security/redaction.py`, and `logging.redact_on_root_logger` is a section 25
+  invariant, so a config cannot turn it off)
 - `control/` — **input layer (Phase 7)**: `backends/` (`base.py` the narrow
   backend contract, `keys.py` keysym helpers, `xtest.py` the preferred in-process
   XTEST backend, selected only after a functional probe), `mouse.py` (§48 sequence
@@ -166,6 +170,11 @@ master specification for the full bootstrap procedure.
 ## Conventions
 
 - Python 3.12+, strict typing on `schemas/`, `core/`, `control/`, `policy/`.
+- **Logs are structured JSON**, written to `$XDG_STATE_HOME/blaxcy/blaxcy.jsonl`
+  (override the directory with `BLAXCY_LOG_DIR`). Never log a secret, a password
+  value or protected visual content: register a secret with
+  `security.redaction.register_secret` and it is replaced with `***` everywhere,
+  including in a formatted traceback (section 70).
 - No fake tools, fake status, or fake verification.
 - Every capability reports `AVAILABLE` / `DEGRADED` / `UNAVAILABLE`, never assumed.
 - Capabilities are established by functional probes, not by the presence of an

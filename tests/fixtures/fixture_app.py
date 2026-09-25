@@ -41,7 +41,7 @@ import select
 import sys
 from typing import Any
 
-from PySide6.QtCore import QPoint, Qt, QTimer
+from PySide6.QtCore import QPoint, QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPaintEvent, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -76,6 +76,21 @@ BENCH_CONTROL_WIDTH = 240
 BENCH_CONTROL_HEIGHT = 80
 BENCH_CONTROL_GAP = 50
 BENCH_CONTROL_HGAP = 20
+
+#: Section 74/76 workflow-controls layout: the same five-control pipeline laid out
+#: at the benchmark scale, so each control's own repaint clears the section 34
+#: ``MEANINGFUL`` thresholds and a real click on it is verifiable (section 60)
+#: rather than merely ``TRIVIAL``. Sized and spaced like the benchmark controls for
+#: the same reason -- a change smaller than a thumbnail tile establishes nothing.
+WORKFLOW_CONTROL_WIDTH = 240
+WORKFLOW_CONTROL_HEIGHT = 80
+WORKFLOW_CONTROL_VGAP = 36
+
+#: The accessible name the workflow layout gives its search field. It must read as
+#: a *navigation* field (section 36) because only such a field's editable content
+#: may be read (sections 42, 55); without that, a typed step is honestly
+#: ``UNVERIFIED`` and the workflow can never complete.
+WORKFLOW_SEARCH_FIELD_NAME = "Search Address Bar"
 
 
 class CanvasWidget(QWidget):
@@ -116,15 +131,21 @@ def _make_icon() -> QIcon:
 class FixtureWindow(QMainWindow):
     """The fixture window: widget inventory, counters and command operations."""
 
-    def __init__(self, title: str, *, bench_controls: bool = False) -> None:
+    def __init__(
+        self, title: str, *, bench_controls: bool = False, workflow_controls: bool = False
+    ) -> None:
         super().__init__()
         self.setWindowTitle(title)
         self._bench_controls = bench_controls
+        self._workflow_controls = workflow_controls
         #: Per-control toggle state for the benchmark controls (specification
         #: section 76). Kept separate from ``_counters`` so a benchmark can prove a
         #: real click actually changed the control rather than only bumping a count.
         self._bench_state: dict[int, bool] = {}
         self._bench_buttons: list[QPushButton] = []
+        #: Per-control highlight state for the workflow-controls layout, kept out of
+        #: ``_counters`` so a benchmark can prove the control really repainted.
+        self._highlight_state: dict[str, bool] = {}
         self.setObjectName("fixture_window")
 
         self._counters: dict[str, int] = {}
@@ -252,6 +273,33 @@ class FixtureWindow(QMainWindow):
             for widget in widgets:
                 widget.setParent(hidden)
                 widget.hide()
+        elif workflow_controls:
+            # Section 74/76 workflow workload: the same five-control pipeline, at a
+            # scale where every step's own repaint is verifiable. Like the benchmark
+            # layout, the ordinary controls stay parented but hidden so none of them
+            # becomes a stray top-level window.
+            self._configure_workflow_controls()
+            workflow_widgets = (
+                self.search_icon,
+                self.search_input,
+                self.submit_button,
+                self.result_list,
+                self.play_button,
+            )
+            grid = QGridLayout()
+            grid.setHorizontalSpacing(20)
+            grid.setVerticalSpacing(WORKFLOW_CONTROL_VGAP)
+            for row, widget in enumerate(workflow_widgets):
+                grid.addWidget(widget, row, 0)
+            layout.addLayout(grid)
+            layout.addStretch(1)
+            hidden = QWidget(root)
+            hidden.hide()
+            for widget in widgets:
+                if widget in workflow_widgets:
+                    continue
+                widget.setParent(hidden)
+                widget.hide()
         else:
             for widget in widgets:
                 layout.addWidget(widget, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -327,6 +375,40 @@ class FixtureWindow(QMainWindow):
         if isinstance(widget, QPushButton):
             widget.setStyleSheet(self._bench_style(self._bench_state[index]))
 
+    def _configure_workflow_controls(self) -> None:
+        """Scale the five workflow controls so each step of the pipeline verifies.
+
+        Two things are changed from the ordinary layout, and both are necessary:
+        the clickable controls are made large and self-repainting (section 34's
+        ``MEANINGFUL`` thresholds decide whether section 60 can verify a click),
+        and the search field is renamed as a navigation field (section 36), since
+        only such a field's editable content may be read (sections 42, 55).
+        """
+        self.search_input.setAccessibleName(WORKFLOW_SEARCH_FIELD_NAME)
+        for button in (self.search_icon, self.submit_button, self.play_button):
+            self._make_self_verifying(button)
+        self.search_input.setFixedSize(WORKFLOW_CONTROL_WIDTH, WORKFLOW_CONTROL_HEIGHT)
+        self.result_list.setFixedSize(WORKFLOW_CONTROL_WIDTH, WORKFLOW_CONTROL_HEIGHT * 2)
+
+    def _make_self_verifying(self, button: QPushButton) -> None:
+        """Size a control so its own repaint is ``MEANINGFUL``, and make it toggle.
+
+        Non-focusable on purpose: a focus ring appearing on a nearby control would
+        add a second changed region beside the target and make the neighbourhood
+        look like animation.
+        """
+        button.setFixedSize(WORKFLOW_CONTROL_WIDTH, WORKFLOW_CONTROL_HEIGHT)
+        button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        button.setStyleSheet(self._bench_style(False))
+        self._highlight_state[button.objectName()] = False
+        button.clicked.connect(lambda _checked=False, b=button: self._toggle_highlight(b))
+
+    def _toggle_highlight(self, button: QPushButton) -> None:
+        """Flip a self-verifying control's background so its repaint is visible."""
+        name = button.objectName()
+        self._highlight_state[name] = not self._highlight_state.get(name, False)
+        button.setStyleSheet(self._bench_style(self._highlight_state[name]))
+
     def _on_focus_changed(self, _old: QWidget | None, now: QWidget | None) -> None:
         """Record the object name of the newly focused widget, if any."""
         if now is None:
@@ -343,7 +425,14 @@ class FixtureWindow(QMainWindow):
         self.result_list.clear()
         query = self.search_input.text() or "(empty)"
         for index in range(1, 4):
-            self.result_list.addItem(QListWidgetItem(f"Result {index} for {query}"))
+            item = QListWidgetItem(f"Result {index} for {query}")
+            if self._workflow_controls:
+                # A stable exact name (the plan targets it by description) and a
+                # rect large enough that selecting it repaints MEANINGFUL-ly at
+                # its own box, so a click on the result can be verified.
+                item.setText(f"Result {index}")
+                item.setSizeHint(QSize(WORKFLOW_CONTROL_WIDTH, WORKFLOW_CONTROL_HEIGHT))
+            self.result_list.addItem(item)
         self.play_button.setEnabled(True)
 
     # -- lookup ---------------------------------------------------------------
@@ -612,9 +701,13 @@ class CommandPump:
             app.quit()
 
 
-def build_window(title: str, *, bench_controls: bool = False) -> FixtureWindow:
+def build_window(
+    title: str, *, bench_controls: bool = False, workflow_controls: bool = False
+) -> FixtureWindow:
     """Create and show the fixture window (does not start the event loop)."""
-    window = FixtureWindow(title, bench_controls=bench_controls)
+    window = FixtureWindow(
+        title, bench_controls=bench_controls, workflow_controls=workflow_controls
+    )
     window.show()
     return window
 
@@ -633,6 +726,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="add the section 76 large self-verifying benchmark controls",
     )
+    parser.add_argument(
+        "--workflow-controls",
+        action="store_true",
+        help="lay the section 74 workflow controls out at self-verifying scale",
+    )
     args = parser.parse_args(argv)
 
     if args.offscreen:
@@ -643,7 +741,11 @@ def main(argv: list[str] | None = None) -> int:
     if not isinstance(app, QApplication):
         app = QApplication(sys.argv[:1])
 
-    window = build_window(args.title, bench_controls=args.bench_controls)
+    window = build_window(
+        args.title,
+        bench_controls=args.bench_controls,
+        workflow_controls=args.workflow_controls,
+    )
     pump = CommandPump(window)
     pump.start()
     return int(app.exec())

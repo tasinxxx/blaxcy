@@ -42,6 +42,7 @@ from config.settings import Settings
 from control.executor import Executor
 from control.window_manager import WindowController
 from core.event_bus import EventBus
+from core.logging_setup import get_logger
 from core.state_cache import StateCache
 from core.target_resolver import ResolutionStatus, TargetResolver
 from schemas.actions import (
@@ -65,6 +66,8 @@ from schemas.errors import BlaxcyError
 from schemas.geometry import Rect
 from schemas.screen_state import ScreenState
 from schemas.sequences import RunSequenceRequest, SequenceResult
+
+_log = get_logger(__name__)
 
 #: How long a read-only call waits for a dispatch slot before giving up. The
 #: bound exists so a stalled read handler cannot hold every slot forever and
@@ -848,6 +851,63 @@ class ToolDispatcher:
                 66.1). ``None`` means "use the class default", which is what
                 every standalone call does.
         """
+        envelope = self._dispatch_inner(
+            call,
+            task_id=task_id,
+            step_id=step_id,
+            sequence_id=sequence_id,
+            confirmed=confirmed,
+            require_verification=require_verification,
+        )
+        self._log_dispatch(
+            call, envelope, task_id=task_id, step_id=step_id, sequence_id=sequence_id
+        )
+        return envelope
+
+    def _log_dispatch(
+        self,
+        call: ToolCall,
+        envelope: ToolEnvelope,
+        *,
+        task_id: str | None,
+        step_id: str | None,
+        sequence_id: str | None,
+    ) -> None:
+        """Write one structured line per call (section 70).
+
+        Only metadata section 70 permits is attached: the tool, the outcome, the
+        error code, the verification state, the state version and frame the
+        decision was taken against, the latency, and the batching identity when
+        there is one. The call's *arguments* and the resolved target are never
+        logged -- a target may describe a credential field (sections 42/55), and
+        the arguments are exactly where an operator would put a password.
+        """
+        _log.info(
+            "tool call",
+            extra={
+                "action_type": call.name,
+                "ok": envelope.ok,
+                "verification": envelope.verification.value,
+                "error_code": envelope.error_code.value if envelope.error_code else None,
+                "latency_ms": round(envelope.elapsed_ms, 3),
+                "state_version": envelope.state_version,
+                "frame_id": envelope.frame_id,
+                "task_id": task_id,
+                "step_id": step_id,
+                "sequence_id": sequence_id,
+            },
+        )
+
+    def _dispatch_inner(
+        self,
+        call: ToolCall,
+        *,
+        task_id: str | None = None,
+        step_id: str | None = None,
+        sequence_id: str | None = None,
+        confirmed: bool = False,
+        require_verification: bool | None = None,
+    ) -> ToolEnvelope:
         started = self._clock()
         self.stats.calls[call.name] = self.stats.calls.get(call.name, 0) + 1
         try:

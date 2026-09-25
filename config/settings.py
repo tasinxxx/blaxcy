@@ -363,6 +363,11 @@ SECURITY_INVARIANTS: Final[tuple[Invariant, ...]] = (
         lambda s: s.privacy.visual_upload_on_demand_only,
         "No continuous screen streaming; visual upload is on-demand only (section 42).",
     ),
+    (
+        "logging.redact_on_root_logger",
+        lambda s: s.logging.redact_on_root_logger,
+        "Log redaction must never be disabled: secrets must never reach a log (section 70).",
+    ),
 )
 
 

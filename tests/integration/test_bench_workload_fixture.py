@@ -17,7 +17,13 @@ from typing import Any
 
 import pytest
 
-from tests.fixtures.fixture_app import BENCH_CONTROL_HEIGHT, BENCH_CONTROL_WIDTH
+from tests.fixtures.fixture_app import (
+    BENCH_CONTROL_HEIGHT,
+    BENCH_CONTROL_WIDTH,
+    WORKFLOW_CONTROL_HEIGHT,
+    WORKFLOW_CONTROL_WIDTH,
+    WORKFLOW_SEARCH_FIELD_NAME,
+)
 from tests.harness import FixtureApp
 
 #: The five verifiable controls, in the order ``bench/real_desktop.py`` clicks them.
@@ -107,3 +113,76 @@ def test_bench_controls_hide_the_ordinary_widgets(bench_fixture: FixtureApp) -> 
     # Their state is still real and readable, so the harness keeps working.
     bench_fixture.set_text("text_input", "still readable")
     assert bench_fixture.stats()["text_input"] == "still readable"
+
+
+# ---------------------------------------------------------------------------
+# Section 74 workflow at a self-verifying scale.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def workflow_fixture() -> Iterator[FixtureApp]:
+    """One workflow-controls fixture process shared by the module."""
+    with FixtureApp(workflow_controls=True) as app:
+        yield app
+
+
+def test_the_workflow_layout_is_the_pipeline_at_a_self_verifying_scale(
+    workflow_fixture: FixtureApp,
+) -> None:
+    """Each clickable step is large enough for its own repaint to be MEANINGFUL.
+
+    The section 34 thresholds decide whether section 60 can verify a click, so the
+    layout -- not the plan -- is what makes the workflow completable.
+    """
+    entries = _entries_by_name(workflow_fixture)
+    for name in ("search_icon", "submit_button", "play_button"):
+        local = entries[name]["local"]
+        assert local["width"] == WORKFLOW_CONTROL_WIDTH
+        assert local["height"] == WORKFLOW_CONTROL_HEIGHT
+        assert entries[name]["visible"] is True
+    assert entries["result_list"]["local"]["width"] == WORKFLOW_CONTROL_WIDTH
+
+
+def test_the_workflow_search_field_is_named_as_a_navigation_field(
+    workflow_fixture: FixtureApp,
+) -> None:
+    """Sections 36/55: only a navigation field's content is readable.
+
+    A plain "Search Box" would make the typed step honestly ``UNVERIFIED``, so the
+    self-verifying layout must name the field as a navigation one.
+    """
+    entries = _entries_by_name(workflow_fixture)
+    field = entries["search_input"]
+    assert field["accessible_name"] == WORKFLOW_SEARCH_FIELD_NAME
+    assert field["visible"] is True
+    assert field["local"]["width"] == WORKFLOW_CONTROL_WIDTH
+
+
+def test_the_workflow_layout_hides_the_ordinary_controls(workflow_fixture: FixtureApp) -> None:
+    """The ordinary widgets stay parented but hidden, as in the benchmark layout."""
+    entries = _entries_by_name(workflow_fixture)
+    assert entries["text_input"]["visible"] is False
+    assert entries["password_input"]["visible"] is False
+    assert entries["btn_alpha"]["visible"] is False
+
+
+def test_a_click_reaches_the_workflow_control_it_targets(workflow_fixture: FixtureApp) -> None:
+    """A click on a workflow control is recorded by that control, not another."""
+    before = dict(workflow_fixture.stats()["counters"])
+
+    workflow_fixture.click("search_icon")
+
+    after = workflow_fixture.stats()["counters"]
+    assert after["search_icon"] == before.get("search_icon", 0) + 1
+
+
+def test_submit_produces_three_results_and_enables_play(workflow_fixture: FixtureApp) -> None:
+    """The submit step really populates the list and arms the play step."""
+    workflow_fixture.set_text("search_input", "song name")
+
+    workflow_fixture.click("submit_button")
+
+    stats = workflow_fixture.stats()
+    assert stats["result_count"] == 3
+    assert stats["play_enabled"] is True

@@ -58,6 +58,7 @@ from core.calibration import identity_geometry_map, layout_from_topology
 from core.capability_probe import probe_all
 from core.event_bus import EventBus
 from core.frame_engine import FrameEngine
+from core.logging_setup import get_logger
 from core.ocr import OcrEngine
 from core.perception import PerceptionOrchestrator
 from core.resolver_cache import ResolverCache, scorer_or_none
@@ -68,7 +69,9 @@ from core.target_resolver import TargetResolver
 from core.visual_grounder import VisualGrounder
 from policy.modes import ModeController
 from policy.permissions import PermissionEngine
+from schemas.actions import ActivationOutcome
 from schemas.capability import CapabilityReport
+from schemas.elements import UIElement
 from schemas.enums import CapabilityName, CapabilityStatus, ErrorCode, PolicyMode
 from schemas.errors import BlaxcyError
 from schemas.events import Event, EventType
@@ -90,6 +93,9 @@ ConfirmationFn = Callable[[str, dict[str, Any]], bool]
 _PLACEHOLDER_LAYOUT: Final[MonitorLayout] = MonitorLayout(
     monitors=(MonitorGeometry(monitor_id=0, width=1, height=1, is_primary=True),)
 )
+
+
+_log = get_logger(__name__)
 
 
 @dataclass
@@ -300,6 +306,7 @@ class BlaxcyApplication:
             calibration=None,
             recovery=self.recovery,
             resolve_fallback=self._resolve_fallback,
+            activate=self._activate_element,
         )
         self.dispatcher = ToolDispatcher(
             settings,
@@ -401,7 +408,41 @@ class BlaxcyApplication:
             self.crash_guard.install()
             self.startup.crash_guard = self.crash_guard.installed
         self.startup.started = True
+        # Section 70: what actually came up, recorded in the log as well as in the
+        # returned report. The backend is the one fact a later investigation needs
+        # most, and it is safe metadata.
+        _log.info(
+            "body started",
+            extra={
+                "action_type": "startup",
+                "ok": True,
+                "backend": self.startup.input_backend,
+                "state_version": None,
+            },
+        )
         return self.startup
+
+    def _activate_element(self, element: UIElement) -> ActivationOutcome:
+        """Perform the target's accessibility action (section 66).
+
+        This is the wiring behind ``activate_element``: the executor owns policy,
+        the lease and revalidation, and hands the already-revalidated element here
+        so the accessibility service -- the single AT-SPI owner (section 35) -- can
+        ask the application to perform its own action. A target with no
+        accessibility path (an OCR or visual element, for example) cannot be
+        activated this way and says so rather than falling back to a click the
+        caller did not ask for.
+        """
+        if not self.accessibility.is_running:
+            return ActivationOutcome(
+                ok=False, reason="the accessibility service is not running on this host"
+            )
+        if not element.atspi_path:
+            return ActivationOutcome(
+                ok=False,
+                reason="the target has no accessibility path, so it has no accessibility action",
+            )
+        return self.accessibility.activate(element.atspi_path)
 
     def shutdown(self) -> None:
         """Release held input, stop every thread and mark the run clean."""
@@ -425,6 +466,7 @@ class BlaxcyApplication:
             self._adapter.close()
         self._loops.clear()
         self.startup.started = False
+        _log.info("body stopped", extra={"action_type": "shutdown", "ok": True})
 
     def __enter__(self) -> BlaxcyApplication:
         self.start()

@@ -194,6 +194,7 @@ class ExecutorEnv:
         recovery: object | None = None,
         clipboard: object | None = None,
         resolver_cache: object | None = None,
+        activate: object | None = None,
     ) -> None:
         """Build the environment and seed the cache with ``state``.
 
@@ -256,6 +257,7 @@ class ExecutorEnv:
             capabilities=capabilities,  # type: ignore[arg-type]
             calibration=calibration,  # type: ignore[arg-type]
             recovery=recovery,  # type: ignore[arg-type]
+            activate=activate,  # type: ignore[arg-type]
         )
 
 

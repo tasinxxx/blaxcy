@@ -40,6 +40,7 @@ from typing import Any, Protocol, runtime_checkable
 from ai.tool_protocol import ToolCall
 from config.settings import Settings
 from core.event_bus import EventBus
+from core.logging_setup import get_logger
 from core.resolver_cache import CacheOutcome, ResolverCache
 from core.speculative_perceiver import SpeculativePerceiver
 from core.state_cache import StateCache
@@ -57,6 +58,8 @@ from schemas.sequences import (
     SequenceStep,
     SequenceStepResult,
 )
+
+_log = get_logger(__name__)
 
 
 @runtime_checkable
@@ -616,6 +619,21 @@ class SequenceRunner:
                 "step_index": min(start_index, len(request.steps) - 1),
                 "total_steps": len(request.steps),
                 "halt_reason": reason,
+                "error_code": code.value,
+                "completed_count": len(results),
+            },
+        )
+        # Section 70: a halted sequence is exactly where a human needs to be able
+        # to see *why* from the log alone, with the step index and the reason.
+        _log.warning(
+            "sequence halted",
+            extra={
+                "action_type": "run_sequence",
+                "ok": False,
+                "sequence_id": sequence_id,
+                "step_index": min(start_index, len(request.steps) - 1),
+                "total_steps": len(request.steps),
+                "sequence_halt_reason": reason,
                 "error_code": code.value,
                 "completed_count": len(results),
             },
