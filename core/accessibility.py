@@ -824,8 +824,18 @@ class AtspiBackend:
             return
         self._event_listeners.append(listener)
 
-    def _on_event(self, event: Any) -> None:
-        """Record an AT-SPI event; the service treats it as a cache invalidation."""
+    def _on_event(self, event: Any, *_extra: Any) -> None:
+        """Record an AT-SPI event; the service treats it as a cache invalidation.
+
+        The extra positional arguments are accepted deliberately. The registered
+        callback is invoked by the accessibility stack, not by BLAXCY, and the
+        number of arguments it passes depends on the installed ``Atspi``/GI
+        version (some deliver ``(event, source, user_data)``). A single-argument
+        signature raises ``TypeError`` on those versions, which would silently
+        lose every event -- and a lost event is a stale element cache
+        (section 35). Accepted and ignored, rather than guessed at.
+        """
+        del event, _extra
         self._events_seen += 1
 
     def poll_events(self) -> bool:
@@ -922,7 +932,7 @@ class AtspiBackend:
         for match in matches or []:
             path = self._ancestry_path(match)
             try:
-                element, _window, _app = self._observe(match, path, None, None)
+                element, _window, _app, _pid = self._observe(match, path, None, None, None)
             except Exception:
                 self._blacklist.record_failure(path)
                 continue
@@ -967,8 +977,8 @@ class AtspiBackend:
     ) -> None:
         """Bounded depth-first traversal of one desktop (section 35)."""
         settings = self._settings
-        stack: list[tuple[Any, int, str, str | None, str | None]] = [
-            (root, 0, root_path, None, None)
+        stack: list[tuple[Any, int, str, str | None, str | None, int | None]] = [
+            (root, 0, root_path, None, None, None)
         ]
         visited = 0
         while stack:
@@ -979,12 +989,14 @@ class AtspiBackend:
                 self._traversal_timeouts += 1
                 self._truncated = True
                 break
-            node, depth, path, window_name, app_name = stack.pop()
+            node, depth, path, window_name, app_name, app_pid = stack.pop()
             visited += 1
             if self._blacklist.is_blocked(path):
                 continue
             try:
-                element, new_window, new_app = self._observe(node, path, window_name, app_name)
+                element, new_window, new_app, new_pid = self._observe(
+                    node, path, window_name, app_name, app_pid
+                )
             except Exception:
                 self._blacklist.record_failure(path)
                 continue
@@ -1009,7 +1021,7 @@ class AtspiBackend:
                     continue
                 if child is None:
                     continue
-                stack.append((child, depth + 1, child_path, new_window, new_app))
+                stack.append((child, depth + 1, child_path, new_window, new_app, new_pid))
 
     def _observe(
         self,
@@ -1017,26 +1029,33 @@ class AtspiBackend:
         path: str,
         window_name: str | None,
         app_name: str | None,
-    ) -> tuple[UIElement | None, str | None, str | None]:
+        app_pid: int | None,
+    ) -> tuple[UIElement | None, str | None, str | None, int | None]:
         """Turn one AT-SPI accessible into a :class:`UIElement`.
 
         Returns the element (or ``None`` for a node that carries no reportable
         information) plus the window/application context to propagate to
-        children.
+        children. That context includes the owning process id, which is the exact
+        key that lets section 46's occlusion rule place an element in the window
+        manager's stacking order (the window title beside it is only a heuristic).
         """
         atspi = self._require_atspi()
         role_name = _safe_str(node.get_role_name)
         name = _safe_str(node.get_name)
         role = map_role_name(role_name)
 
-        if role_name.casefold() == "application" and name:
-            app_name = name
+        if role_name.casefold() == "application":
+            if name:
+                app_name = name
+            # Read even when the application reports no name: the pid is what the
+            # occlusion join actually needs.
+            app_pid = _safe_pid(node)
         if role_name.casefold() in _WINDOW_ROLE_NAMES and name:
             window_name = name
 
         states = _read_states(atspi, node)
         if "DEFUNCT" in states:
-            return None, window_name, app_name
+            return None, window_name, app_name, app_pid
 
         actions = _read_actions(node)
         password = role is UIRole.PASSWORD_INPUT
@@ -1078,6 +1097,11 @@ class AtspiBackend:
             occluded=False,
             password=password,
             owner_window_id=None,
+            # The title of the window this node lives in (propagated from the frame
+            # ancestor). It is what lets the section 46 occlusion rule ask "is this
+            # window above the target's?" instead of guessing from geometry.
+            owner_window_title=window_name,
+            owner_app_pid=app_pid,
             owner_app=app_name,
             actions=actions,
             monitor_id=None,
@@ -1094,8 +1118,8 @@ class AtspiBackend:
             conflict=False,
         )
         if not _is_reportable(element):
-            return None, window_name, app_name
-        return element, window_name, app_name
+            return None, window_name, app_name, app_pid
+        return element, window_name, app_name, app_pid
 
     def _require_atspi(self) -> Any:
         """Return the Atspi module, or raise if the backend is not initialized."""
@@ -1194,6 +1218,22 @@ def _safe_str(getter: Callable[[], Any]) -> str:
     except Exception:
         return ""
     return str(value) if value is not None else ""
+
+
+def _safe_pid(node: Any) -> int | None:
+    """The process id AT-SPI reports for a node, or ``None``.
+
+    Never raises: an application that does not answer this query is a missing
+    join, not a perception failure, and the occlusion rule treats a missing join
+    conservatively.
+    """
+    try:
+        pid = node.get_process_id()
+    except Exception:
+        return None
+    if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
+        return None
+    return int(pid)
 
 
 def _read_states(atspi: Any, node: Any) -> frozenset[str]:

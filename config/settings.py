@@ -89,6 +89,37 @@ class OcrSettings(_Section):
     deadline_ms: int = Field(default=300, ge=1)
 
 
+class VisualSettings(_Section):
+    """Visual grounding: the final perception fallback (section 41).
+
+    Visual grounding is the *only* source that uploads screen pixels to a remote
+    model, so its knobs are deliberately narrow:
+
+    * ``max_confidence`` is capped at the section 41 ceiling (0.80). A visual
+      result can be trusted *less* than that, never more -- the bound is
+      enforced by the field itself, so a config cannot raise it.
+    * ``enabled = false`` removes the capability entirely (``UNAVAILABLE``), it
+      never creates another path to input.
+    * ``model_timeout_ms`` bounds the one model call a grounding attempt makes.
+
+    Enabling this does **not** let it run in OBSERVE: section 41 requires
+    ``mode >= ASSIST``, which the grounder and
+    :func:`policy.guards.check_visual_fallback` both enforce. Since section 56
+    starts every fresh configuration in OBSERVE, raising the mode is the
+    operator's explicit decision before any pixel can leave the machine.
+    """
+
+    enabled: bool = True
+    #: Longest side of the image uploaded to the visual model (section 41).
+    max_image_side: int = Field(default=1024, ge=64, le=4096)
+    #: Section 41 confidence ceiling. Only lowerable: never above 0.80.
+    max_confidence: float = Field(default=0.80, gt=0.0, le=0.80)
+    #: Most candidate locations accepted from one call.
+    max_results: int = Field(default=3, ge=1, le=20)
+    #: Bounded wait for the model response.
+    model_timeout_ms: int = Field(default=12000, ge=1000, le=60000)
+
+
 class ResolverSettings(_Section):
     """Target resolver scoring and ambiguity rule (section 43)."""
 
@@ -105,12 +136,13 @@ class ResolverSettings(_Section):
 class ResolverCacheSettings(_Section):
     """Resolver cache (section 43.1).
 
-    Ships **disabled** by default per section 4 rule 31: an optimization that
-    has not been proven safe under concurrent/adversarial conditions must not
-    be on. Disabling it must produce identical (only slower) targeting.
+    Enabled by default: the section 43.1/75 test list is green, a hit is only a
+    traversal-order hint that is re-queried and re-scored live, and disabling it
+    produces identical (only slower) targeting decisions. It remains a
+    configuration switch so an operator can turn it off without a code change.
     """
 
-    enabled: bool = False
+    enabled: bool = True
     max_entries: int = Field(default=256, ge=1)
     ttl_seconds: float = Field(default=10.0, gt=0.0)
     semantic_match_floor: int = Field(default=70, ge=0, le=100)
@@ -119,15 +151,19 @@ class ResolverCacheSettings(_Section):
 class SequenceSettings(_Section):
     """``run_sequence`` limits (sections 66.1, 33.1, 33.2, 32.1).
 
-    The whole batching layer ships disabled until Phase 9's safety gate has
-    passed and its own test list passes (sections 83, 84).
+    Enabled by default: Phase 9's safety gate passed and the section 66.1/75
+    batching test list is green (sections 83, 84). Batching removes Brain
+    round-trips only -- it can never skip a policy, resolve, lease, revalidate,
+    execute or verify step, and every step still runs the standalone pipeline.
+    Each flag stays independently switchable, and disabling one can only remove
+    capability, never remove a check.
     """
 
-    enabled: bool = False
+    enabled: bool = True
     max_sequence_steps: int = Field(default=12, ge=1, le=256)
     max_sequence_wall_clock_seconds: float = Field(default=60.0, gt=0.0, le=3600.0)
-    capture_boost: bool = False
-    speculative_perception: bool = False
+    capture_boost: bool = True
+    speculative_perception: bool = True
 
 
 class InputSettings(_Section):
@@ -155,10 +191,46 @@ class InputSettings(_Section):
     guard_focus: bool = True
 
 
-class LeaseSettings(_Section):
-    """Element lease lifetime (section 44)."""
+class ClipboardSettings(_Section):
+    """Clipboard-assisted typing (section 50).
 
-    ttl_ms: int = Field(default=800, ge=1)
+    These knobs tune how BLAXCY *borrows* the clipboard; none of them is a
+    safety switch. ``enabled = false`` only removes a capability: text the
+    keyboard cannot produce then fails honestly with ``UNICODE_UNSUPPORTED``
+    instead of being typed. Nothing here can add a path to unverified input --
+    the executor still owns the lease and revalidation that precede a paste.
+
+    The two grace windows exist because an X selection is served *lazily*: the
+    target application asks the owner for the data after the paste keystroke, so
+    BLAXCY must stay the owner and answer for a moment after injecting it, and
+    must serve the clipboard's previous content for a moment before handing
+    ownership back (which is what lets a clipboard manager capture it).
+    """
+
+    #: Borrow the X CLIPBOARD selection for long or non-ASCII text (section 50).
+    enabled: bool = True
+    #: Keep serving BLAXCY's text after the paste is injected, so the in-flight
+    #: selection request is still answerable.
+    paste_grace_ms: int = Field(default=400, ge=0, le=5000)
+    #: Serve the captured previous clipboard text before handing ownership back.
+    restore_grace_ms: int = Field(default=400, ge=0, le=5000)
+    #: Bounded wait when reading the clipboard's previous content.
+    read_timeout_ms: int = Field(default=300, ge=1, le=5000)
+    #: Largest payload BLAXCY will place on the clipboard.
+    max_bytes: int = Field(default=262144, ge=1, le=16777216)
+
+
+class LeaseSettings(_Section):
+    """Element lease lifetime (section 44).
+
+    The bound must exceed one real perception cycle: section 45 revalidates a
+    lease against a fresh observation, and that observation is produced inside the
+    lease's lifetime. A real re-perception measures 0.68-1.36 s on the reference
+    host (capture + AT-SPI traversal + OCR), so a tighter default made every target
+    action expire while it was being revalidated.
+    """
+
+    ttl_ms: int = Field(default=3000, ge=1)
 
 
 class VerificationSettings(_Section):
@@ -177,11 +249,24 @@ class RecoverySettings(_Section):
 
 
 class SafetySettings(_Section):
-    """Policy mode and session ceilings (sections 56, 63)."""
+    """Policy mode, session ceilings and application policy (sections 56-58, 63).
+
+    ``blocked_applications`` is the section 58 deny-list: no visual upload, no
+    input, no autonomous override, and any in-flight sequence halts when the
+    active application matches. ``protected_applications`` is the section 42
+    privacy list: content from these applications must never be uploaded to a
+    visual model (a password manager is protected even before it is blocked).
+
+    Both are *substring* matches, case-folded, against the owning application,
+    the window title and the window class -- deliberately broad, because a
+    deny-list that can be evaded by a renamed window is not a deny-list.
+    """
 
     mode: PolicyMode = PolicyMode.OBSERVE
     autonomous_max_session_duration_minutes: int = Field(default=30, ge=1, le=1440)
     emergency_stop_target_ms: int = Field(default=150, ge=1)
+    blocked_applications: tuple[str, ...] = ()
+    protected_applications: tuple[str, ...] = ()
 
 
 class TerminalSettings(_Section):
@@ -229,10 +314,12 @@ class Settings(BaseModel):
     perception: PerceptionSettings = Field(default_factory=PerceptionSettings)
     accessibility: AccessibilitySettings = Field(default_factory=AccessibilitySettings)
     ocr: OcrSettings = Field(default_factory=OcrSettings)
+    visual: VisualSettings = Field(default_factory=VisualSettings)
     resolver: ResolverSettings = Field(default_factory=ResolverSettings)
     resolver_cache: ResolverCacheSettings = Field(default_factory=ResolverCacheSettings)
     sequence: SequenceSettings = Field(default_factory=SequenceSettings)
     input: InputSettings = Field(default_factory=InputSettings)
+    clipboard: ClipboardSettings = Field(default_factory=ClipboardSettings)
     lease: LeaseSettings = Field(default_factory=LeaseSettings)
     verification: VerificationSettings = Field(default_factory=VerificationSettings)
     recovery: RecoverySettings = Field(default_factory=RecoverySettings)

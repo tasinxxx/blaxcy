@@ -18,25 +18,25 @@
 
 | Capability | Status | Backend | Latency (ms) | Reason |
 |---|---|---|---|---|
-| capture | AVAILABLE | mss | 33.885 |  |
-| accessibility | AVAILABLE | atspi | 1.219 |  |
+| capture | AVAILABLE | mss | 54.814 |  |
+| accessibility | AVAILABLE | atspi | 252.806 |  |
 | mouse | AVAILABLE | xtest | - |  |
-| pointer_readback | AVAILABLE | xlib | 2.278 |  |
+| pointer_readback | AVAILABLE | xlib | 5.069 |  |
 | keyboard | AVAILABLE | xtest | - |  |
-| ocr | AVAILABLE | pytesseract | 13.308 |  |
-| clipboard | AVAILABLE | xlib | - |  |
-| window_info | AVAILABLE | python-xlib | 2.429 |  |
-| browser_accessibility | UNAVAILABLE | - | - | browser accessibility perception is not implemented until Phase 3 |
-| visual_grounding | UNAVAILABLE | - | - | visual grounding fallback is not implemented until Phase 11 |
-| sequence_execution | UNAVAILABLE | - | - | sequence runner is not implemented until Phase 10.1 |
+| ocr | AVAILABLE | pytesseract | 19.659 |  |
+| clipboard | AVAILABLE | xlib-selection | 5.419 |  |
+| window_info | AVAILABLE | python-xlib | 5.071 |  |
+| browser_accessibility | UNAVAILABLE | atspi | - | no supported browser is currently exposing an accessibility tree |
+| visual_grounding | UNAVAILABLE | google-genai | - | no Gemini API key stored, so visual grounding cannot call a visual model (keyring service='blaxcy', key='gemini_api_key') |
+| sequence_execution | AVAILABLE | sequence_runner | - |  |
 | brain | UNAVAILABLE | google-genai | - | no Gemini API key stored (keyring service='blaxcy', key='gemini_api_key') |
 
 ## Configuration
 
 - Effective config path: `/home/tsn/blaxcy/config/default_settings.toml`
 - Policy mode: `OBSERVE`
-- Resolver cache enabled: `False`
-- Sequence execution enabled: `False`
+- Resolver cache enabled: `True`
+- Sequence execution enabled: `True`
 
 ## Notes
 

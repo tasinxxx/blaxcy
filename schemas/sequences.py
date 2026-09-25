@@ -260,6 +260,13 @@ class SequenceResult(BaseModel):
     steps: tuple[SequenceStepResult, ...]
     halted: bool
     halt_reason: str | None = None
+    halt_code: ErrorCode | None = Field(
+        default=None,
+        description=(
+            "The structured code the halt maps to (section 77), so the Brain does "
+            "not have to parse a message. Set only when the sequence halted."
+        ),
+    )
     wall_clock_ms: float = Field(ge=0.0)
     started_at: float
 
@@ -272,6 +279,8 @@ class SequenceResult(BaseModel):
             raise ValueError("a halted sequence must record a halt_reason")
         if not self.halted and self.halt_reason is not None:
             raise ValueError("an unhalted sequence must not carry a halt_reason")
+        if not self.halted and self.halt_code is not None:
+            raise ValueError("an unhalted sequence must not carry a halt_code")
         return self
 
     @property
@@ -292,6 +301,7 @@ class SequenceResult(BaseModel):
             "sequence_id": self.sequence_id,
             "halted": self.halted,
             "halt_reason": self.halt_reason,
+            "halt_code": None if self.halt_code is None else self.halt_code.value,
             "wall_clock_ms": self.wall_clock_ms,
             "completed_count": self.completed_count,
             "steps": [

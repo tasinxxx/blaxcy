@@ -269,6 +269,24 @@ class MouseController:
         """Release every held button/key (sections 52, 63)."""
         self._backend.release_all()
 
+    @property
+    def held_buttons(self) -> tuple[PointerButton, ...]:
+        """The buttons currently held down, so a stop can report what it released."""
+        return tuple(self._backend.held_buttons)
+
+    @property
+    def held_keys(self) -> tuple[int, ...]:
+        """The keycodes currently held down (the backend is the one authority)."""
+        return tuple(self._backend.held_keys)
+
+    def release_buttons(self) -> None:
+        """Release every held pointer button (section 63 step 3)."""
+        self._backend.release_buttons()
+
+    def release_keys(self) -> None:
+        """Release every held key/modifier (section 63 step 4)."""
+        self._backend.release_keys()
+
     def close(self) -> None:
         """Release held input and close the backend."""
         self._backend.close()

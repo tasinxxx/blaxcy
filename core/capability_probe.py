@@ -28,10 +28,16 @@ from core.session_detector import SessionInfo
 from schemas.capability import Capability, CapabilityReport
 from schemas.enums import CapabilityName, CapabilityStatus, SessionType
 from schemas.errors import BlaxcyError
+from security.keyring_manager import (
+    KEYRING_GEMINI_KEY,
+    KEYRING_SERVICE,
+    ApiKeyManager,
+    KeyringError,
+)
 
-#: Keyring coordinates for the Gemini API key (specification section 69).
-KEYRING_SERVICE = "blaxcy"
-KEYRING_GEMINI_KEY = "gemini_api_key"
+# ``KEYRING_SERVICE``/``KEYRING_GEMINI_KEY`` are re-exported from
+# ``security.keyring_manager`` (section 69) rather than redefined here: there is
+# exactly one module that knows where BLAXCY's Brain credential lives.
 
 
 def _try_import(module: str) -> Any:
@@ -329,49 +335,64 @@ def probe_ocr(session: SessionInfo) -> Capability:
     )
 
 
-def probe_clipboard(session: SessionInfo) -> Capability:
-    """Probe clipboard access read-only by inspecting CLIPBOARD selection ownership."""
+def probe_clipboard(session: SessionInfo, settings: Settings | None = None) -> Capability:
+    """Probe the clipboard by exercising the mechanism section 50's paste path uses.
+
+    This is the *same* code the keyboard layer will use
+    (:class:`control.clipboard.X11ClipboardPaster`), so a passing probe means the
+    long/non-ASCII typing path really can borrow the clipboard -- not merely that
+    an X connection could be opened. The probe connects, interns the selection and
+    target atoms and creates its owner window, but deliberately **never takes
+    ownership**: stealing the user's clipboard to test the clipboard would be a
+    real side effect on a shared resource.
+    """
     if not session.has_x_display:
         return _cap(
             CapabilityName.CLIPBOARD,
             CapabilityStatus.UNAVAILABLE,
             reason="no X display available for X11 clipboard access",
+            details={"needed_for": "text the keyboard cannot type (section 50)"},
         )
-    if _try_import("Xlib") is None:
+
+    from control.clipboard import probe_x11_clipboard
+
+    clipboard_settings = settings.clipboard if settings is not None else None
+    probe = probe_x11_clipboard(clipboard_settings)
+    if not probe.available:
+        if probe.reason and "python-xlib" in probe.reason:
+            return _cap(
+                CapabilityName.CLIPBOARD,
+                CapabilityStatus.UNAVAILABLE,
+                backend=probe.name,
+                reason=probe.reason,
+                fix_hint="pip install python-xlib",
+            )
         return _cap(
             CapabilityName.CLIPBOARD,
             CapabilityStatus.UNAVAILABLE,
-            reason="python-xlib is not importable",
-            fix_hint="pip install python-xlib",
+            backend=probe.name,
+            latency_ms=probe.latency_ms,
+            reason=probe.reason or "the clipboard selection cannot be served",
+            fix_hint="long or non-ASCII text will be refused instead of pasted",
         )
-    try:
-        from Xlib import display
-
-        conn = display.Display()
-        try:
-            root = conn.screen().root
-            atom = conn.intern_atom("CLIPBOARD")
-            owner = conn.get_selection_owner(atom)
-            owner_known = owner is not None and owner != 0
-            root.id  # noqa: B018 - touching the root proves the connection is live
-        finally:
-            conn.close()
-    except Exception as exc:
+    if clipboard_settings is not None and not clipboard_settings.enabled:
+        # The mechanism works; the operator turned its use off. That is a real,
+        # honest degradation, not a failure of the clipboard itself.
         return _cap(
             CapabilityName.CLIPBOARD,
             CapabilityStatus.DEGRADED,
-            reason=f"clipboard selection query failed: {exc!r}",
-            fix_hint="verify clipboard tooling in Phase 7",
+            backend=probe.name,
+            latency_ms=probe.latency_ms,
+            details=probe.details,
+            reason="clipboard typing is disabled by configuration ([clipboard] enabled = false)",
+            fix_hint="set [clipboard] enabled = true to type long or non-ASCII text",
         )
-    details: dict[str, Any] = {"selection_owned": bool(owner_known)}
-    xclip = _which("xclip")
-    if xclip:
-        details["xclip"] = xclip
     return _cap(
         CapabilityName.CLIPBOARD,
         CapabilityStatus.AVAILABLE,
-        backend="xlib",
-        details=details,
+        backend=probe.name,
+        latency_ms=probe.latency_ms,
+        details=probe.details,
     )
 
 
@@ -468,14 +489,33 @@ def probe_browser_accessibility(
             active_service.stop()
 
 
-def probe_visual_grounding(session: SessionInfo) -> Capability:
-    """Report visual grounding honestly: not implemented until Phase 11."""
-    return _cap(
-        CapabilityName.VISUAL_GROUNDING,
-        CapabilityStatus.UNAVAILABLE,
-        reason="visual grounding fallback is not implemented until Phase 11",
-        fix_hint="implement core/visual_grounder.py in Phase 11; it also requires a Brain",
-    )
+def probe_visual_grounding(session: SessionInfo, settings: Settings) -> Capability:
+    """Probe visual grounding through the grounder's own capability verdict.
+
+    One source of truth, exactly as the mouse/keyboard probes share the input
+    backend's functional probe: ``VisualGrounder.capability()`` checks the
+    configured switch, the SDK, and the stored credential in one place, so the
+    probe cannot drift from what the grounder will actually do. It makes no
+    network call and uploads nothing -- a capability probe must not spend the
+    user's screen or quota to answer a question about itself.
+
+    ``session`` is accepted for probe-signature symmetry; visual grounding does
+    not depend on the display session (the frame it is given is already captured).
+    """
+    del session
+    module = _try_import("core.visual_grounder")
+    if module is None:
+        return _cap(
+            CapabilityName.VISUAL_GROUNDING,
+            CapabilityStatus.UNAVAILABLE,
+            reason="the visual grounding module (core.visual_grounder) is not importable",
+            fix_hint="reinstall BLAXCY; the fallback ships with the application",
+        )
+    # ``module`` is a runtime-imported module (``_try_import`` returns ``Any``), so
+    # the verdict is annotated here rather than trusted structurally.
+    grounder = module.VisualGrounder(settings.visual, model=settings.gemini.model)
+    capability: Capability = grounder.capability()
+    return capability
 
 
 def probe_sequence_execution(settings: Settings) -> Capability:
@@ -486,14 +526,17 @@ def probe_sequence_execution(settings: Settings) -> Capability:
         "max_sequence_wall_clock_seconds": settings.sequence.max_sequence_wall_clock_seconds,
         "capture_boost": settings.sequence.capture_boost,
         "speculative_perception": settings.sequence.speculative_perception,
+        "resolver_cache_enabled": settings.resolver_cache.enabled,
+        "resolver_cache_max_entries": settings.resolver_cache.max_entries,
+        "semantic_match_floor": settings.resolver_cache.semantic_match_floor,
     }
     runner = _try_import("control.sequence_runner")
     if runner is None:
         return _cap(
             CapabilityName.SEQUENCE_EXECUTION,
             CapabilityStatus.UNAVAILABLE,
-            reason="sequence runner is not implemented until Phase 10.1",
-            fix_hint="implement control/sequence_runner.py after the Phase 9 safety gate",
+            reason="the sequence runner module (control.sequence_runner) is not importable",
+            fix_hint="reinstall BLAXCY; the batching layer ships with the application",
             details=limits,
         )
     if not settings.sequence.enabled:
@@ -501,7 +544,7 @@ def probe_sequence_execution(settings: Settings) -> Capability:
             CapabilityName.SEQUENCE_EXECUTION,
             CapabilityStatus.UNAVAILABLE,
             reason="sequence execution is implemented but disabled by configuration",
-            fix_hint="set [sequence] enabled = true only after the batching test list passes",
+            fix_hint="set [sequence] enabled = true to use run_sequence (it is on by default)",
             details=limits,
         )
     return _cap(
@@ -522,23 +565,18 @@ def probe_brain(settings: Settings) -> Capability:
             reason="google-genai SDK is not importable",
             fix_hint="pip install google-genai",
         )
-    keyring = _try_import("keyring")
-    if keyring is None:
-        return _cap(
-            CapabilityName.BRAIN,
-            CapabilityStatus.UNAVAILABLE,
-            backend="google-genai",
-            reason="keyring is not importable, so no API key can be read",
-            fix_hint="pip install keyring SecretStorage",
-        )
+    # One code path knows where the key lives (section 69). The manager is read
+    # through, never around: a probe that called keyring itself would be a second
+    # place to keep correct, and the honest distinction between "no key stored"
+    # and "the keyring backend is broken" would be lost.
     try:
-        key = keyring.get_password(KEYRING_SERVICE, KEYRING_GEMINI_KEY)
-    except Exception as exc:
+        key = ApiKeyManager().gemini_key()
+    except KeyringError as exc:
         return _cap(
             CapabilityName.BRAIN,
             CapabilityStatus.UNAVAILABLE,
             backend="google-genai",
-            reason=f"keyring backend is unavailable: {exc!r}",
+            reason=f"keyring backend is unavailable: {exc.message}",
             fix_hint="ensure a working Secret Service/keyring backend is running",
         )
     if not key:
@@ -598,10 +636,10 @@ def probe_all(
             probe_pointer_readback(session),
             probe_keyboard(session),
             probe_ocr(session),
-            probe_clipboard(session),
+            probe_clipboard(session, settings),
             probe_window_info(session),
             probe_browser_accessibility(session, settings.accessibility, service=service),
-            probe_visual_grounding(session),
+            probe_visual_grounding(session, settings),
             probe_sequence_execution(settings),
             probe_brain(settings),
         )

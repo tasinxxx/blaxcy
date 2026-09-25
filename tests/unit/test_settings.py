@@ -27,20 +27,65 @@ def test_packaged_defaults_load_and_match_spec() -> None:
     assert settings.capture.normal_fps == 10.0
     assert settings.capture.active_fps == 30.0
     assert settings.perception.pixel_threshold == 12
-    assert settings.lease.ttl_ms == 800
+    # Section 44's bound had to be raised from 800 ms: section 45 revalidates a
+    # lease against a *fresh* observation, and a real re-perception on this host
+    # measures 0.68-1.36 s, so the tighter bound expired during the very
+    # re-perception meant to validate it. See ``docs/benchmark_report.md``.
+    assert settings.lease.ttl_ms == 3000
     assert settings.verification.max_action_state_age_ms == 1500
     assert settings.resolver.act_threshold == 0.65
     assert settings.recovery.automatic_attempts_per_tool == 2
     assert settings.safety.mode is PolicyMode.OBSERVE
 
 
-def test_batching_layer_ships_disabled() -> None:
-    """Section 4 rule 31: unproven optimizations default off."""
+def test_batching_layer_is_enabled_by_default() -> None:
+    """Sections 83/84: the layer is on now that the 66.1/75 test list is green."""
     settings = Settings()
+    assert settings.resolver_cache.enabled is True
+    assert settings.sequence.enabled is True
+    assert settings.sequence.capture_boost is True
+    assert settings.sequence.speculative_perception is True
+
+
+def test_batching_layer_can_be_disabled_by_user_config(tmp_path: Path) -> None:
+    """Each flag stays a switch: an operator can turn the layer off in config."""
+    path = tmp_path / "config.toml"
+    path.write_text(
+        "[resolver_cache]\nenabled = false\n\n[sequence]\nenabled = false\n"
+        "capture_boost = false\nspeculative_perception = false\n",
+        encoding="utf-8",
+    )
+    settings = load_settings(path)
     assert settings.resolver_cache.enabled is False
     assert settings.sequence.enabled is False
     assert settings.sequence.capture_boost is False
     assert settings.sequence.speculative_perception is False
+
+
+def test_visual_grounding_defaults_match_the_specification() -> None:
+    """Section 41's limits are the packaged defaults, and the ceiling is a bound."""
+    settings = Settings()
+    assert settings.visual.enabled is True
+    assert settings.visual.max_image_side == 1024
+    assert settings.visual.max_confidence == 0.80
+    assert settings.visual.max_results == 3
+
+
+def test_the_visual_confidence_ceiling_cannot_be_raised(tmp_path: Path) -> None:
+    """A config may lower section 41's 0.80 ceiling, never raise it."""
+    path = tmp_path / "config.toml"
+    path.write_text("[visual]\nmax_confidence = 0.99\n", encoding="utf-8")
+    with pytest.raises(BlaxcyError):
+        load_settings(path)
+
+
+def test_the_visual_fallback_can_be_disabled_by_config(tmp_path: Path) -> None:
+    """The switch removes the capability without weakening any check."""
+    path = tmp_path / "config.toml"
+    path.write_text("[visual]\nenabled = false\n", encoding="utf-8")
+    settings = load_settings(path)
+    assert settings.visual.enabled is False
+    assert settings.visual.max_image_side == 1024
 
 
 def test_user_override_merges_over_defaults(tmp_path: Path) -> None:

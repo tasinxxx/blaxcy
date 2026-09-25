@@ -50,6 +50,18 @@ max_regions = 6
 max_area_ratio = 0.015
 deadline_ms = 300
 
+[visual]
+# Visual grounding is the final perception fallback (section 41): the only source
+# that uploads screen pixels to a remote model. It is never reached in OBSERVE --
+# the grounder and policy both require mode >= ASSIST -- and credential context is
+# never uploaded (sections 42, 55). `max_confidence` is capped at the section 41
+# ceiling of 0.80 and can only be lowered; the same bound is enforced in code.
+enabled = true
+max_image_side = 1024
+max_confidence = 0.80
+max_results = 3
+model_timeout_ms = 12000
+
 [resolver]
 act_threshold = 0.65
 max_candidates = 5
@@ -61,21 +73,28 @@ weight_context = 0.15
 weight_geometry = 0.10
 
 [resolver_cache]
-# Ships disabled (section 4 rule 31). Disabling must produce identical, only
-# slower, targeting decisions (section 43.1).
-enabled = false
+# Enabled by default now that the section 43.1/75 test list is green. A hit is
+# only a traversal-order hint: it is re-queried and re-scored live, and disabling
+# it produces identical (only slower) targeting decisions (sections 4 rule 31,
+# 43.1). It stays a switch so an operator can turn it off without a code change.
+enabled = true
 max_entries = 256
 ttl_seconds = 10.0
 semantic_match_floor = 70
 
 [sequence]
-# The batching layer ships disabled until Phase 9's safety gate passes and the
-# section 66.1/75 test list is green (sections 83, 84).
-enabled = false
+# The batching layer is enabled by default: Phase 9's safety gate passed and the
+# section 66.1/75 batching test list is green (sections 83, 84). Batching removes
+# Brain round-trips, never a policy/resolve/lease/revalidate/execute/verify step.
+# `enabled = false` refuses `run_sequence` outright; OBSERVE mode also refuses it.
+enabled = true
 max_sequence_steps = 12
 max_sequence_wall_clock_seconds = 60.0
-capture_boost = false
-speculative_perception = false
+# Scheduling (section 33.1) and read-side prefetch (section 33.2) layers, both
+# proven safe by the section 33.1/33.2/75 tests. Turning either off can only
+# remove capability, never remove a check.
+capture_boost = true
+speculative_perception = true
 
 [input]
 # Physical input timing (sections 48-52). These are behavioural knobs, not
@@ -89,8 +108,33 @@ ascii_direct_max = 200
 key_interval_ms = 10
 guard_focus = true
 
+[clipboard]
+# Clipboard-assisted typing (section 50). Not safety switches: disabling the
+# paster only removes the capability, so long/non-ASCII text then fails honestly
+# with UNICODE_UNSUPPORTED instead of being typed.
+#
+# An X selection is served lazily: the target asks the owner for the data after
+# the paste keystroke, so BLAXCY must keep answering afterwards (paste_grace_ms)
+# and must serve the clipboard's previous content for a moment before handing
+# ownership back (restore_grace_ms), which is what lets a clipboard manager
+# capture it.
+enabled = true
+paste_grace_ms = 400
+restore_grace_ms = 400
+read_timeout_ms = 300
+max_bytes = 262144
+
 [lease]
-ttl_ms = 800
+# Section 44. This bound must exceed one real perception cycle, because section 45
+# revalidates a lease against a *fresh* observation and that observation has to be
+# produced inside the lease's lifetime. Measured on this host, a real re-perception
+# (capture + AT-SPI traversal + OCR pass over 172 elements, 8 s traversal budget)
+# costs 0.68-1.36 s, so an 800 ms bound expired during the very re-perception meant
+# to validate it and no target action could ever be authorised. 3000 ms leaves room
+# for that cycle plus the enqueueing and verification that follow it. The other
+# section 45 guarantees (state freshness, generation, identity, geometry drift) are
+# unchanged and remain the checks that actually decide.
+ttl_ms = 3000
 
 [verification]
 max_action_state_age_ms = 1500
@@ -106,6 +150,13 @@ identical_call_loop_guard = 3
 mode = "OBSERVE"
 autonomous_max_session_duration_minutes = 30
 emergency_stop_target_ms = 150
+# Section 58 deny-list: no input, no visual upload, no autonomous override, and
+# any in-flight sequence halts while one of these owns the active window.
+# Substring match, case-folded, against app name / window title / window class.
+blocked_applications = []
+# Section 42 privacy list: content from these applications is never uploaded to
+# a visual model (they may still be typed into; they are not blocked).
+protected_applications = []
 
 [terminal]
 submit_requires_confirmation = true

@@ -11,9 +11,24 @@ Section 50 decides *how* text is typed:
 * when neither is possible, the call fails with ``UNICODE_UNSUPPORTED`` rather
   than typing an approximation of the requested text.
 
-The clipboard is a pluggable :class:`ClipboardPaster`. No clipboard
-implementation ships in Phase 7, so until one is wired in the controller simply
-says so -- it never fakes a paste.
+Credential content (section 42/55) never takes the clipboard path at all -- see
+``sensitive`` on :meth:`KeyboardController.type_text`. The clipboard is readable
+by every application on the session and a clipboard manager keeps it in history,
+so pasting a password there would move it out of the field it belongs in.
+
+The clipboard is a pluggable :class:`ClipboardPaster`, and the consumer owns that
+interface: ``control/keyboard.py`` declares what it needs and never imports a
+concrete implementation, so the composition root wires one in. The real X11
+implementation is :class:`control.clipboard.X11ClipboardPaster` (selected by
+``control.clipboard.select_clipboard_paster``); when no paster is wired -- or its
+functional probe fails -- the controller says so instead of faking a paste.
+
+A paster's :meth:`ClipboardPaster.set_text` must leave the text *servable* until
+:meth:`ClipboardPaster.restore` is called: an X selection is served lazily, so
+the target application asks the owner for the data only after Ctrl+V has been
+processed. That is why this module calls ``restore()`` in a ``finally`` block
+rather than immediately after injecting the paste, and why the caller must not
+slip other work between the two calls.
 
 Section 51's focus guard runs *before* any key is injected: if the caller names
 the element it intends to type into, the guard verifies (against the current
@@ -33,7 +48,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from config.settings import InputSettings
-from control.backends.base import InputBackend, KeyResolution
+from control.backends.base import InputBackend, KeyResolution, PointerButton
 from control.backends.keys import canonical_key_name, keysym_for_char, keysym_for_name
 from schemas.elements import UIElement
 from schemas.enums import ErrorCode
@@ -45,13 +60,25 @@ SleepFn = Callable[[float], None]
 
 
 class ClipboardPaster(Protocol):
-    """A clipboard able to hold text for a paste, then restore prior content."""
+    """A clipboard able to hold text for a paste, then restore prior content.
+
+    Implementations must keep ``text`` retrievable by *other applications* until
+    :meth:`restore` is called (see the module docstring): returning from
+    ``set_text`` means the data is available, not that the transfer is over.
+    """
 
     def set_text(self, text: str) -> bool:
-        """Place ``text`` on the clipboard; return False when unavailable."""
+        """Make ``text`` available for a paste; return False when unavailable.
+
+        ``True`` must mean the text can really be pasted, never merely that an
+        attempt was made.
+        """
 
     def restore(self) -> None:
-        """Restore whatever the clipboard held before :meth:`set_text`."""
+        """Stop offering ``text`` and put the clipboard back as it was.
+
+        Best effort and never raising: it runs on the failure path too.
+        """
 
 
 @dataclass(frozen=True)
@@ -160,6 +187,7 @@ class KeyboardController:
         *,
         expected_focus: UIElement | None = None,
         state: ScreenState | None = None,
+        sensitive: bool = False,
     ) -> TypeResult:
         """Type ``text``, choosing the direct or clipboard path (section 50).
 
@@ -168,6 +196,12 @@ class KeyboardController:
             expected_focus: When given (and the guard is enabled), the element
                 that must be focused before any key is injected (section 51).
             state: The current observation the focus guard checks against.
+            sensitive: Credential content (sections 42, 55). When True the
+                clipboard path is **not** used at all, even if it would make the
+                text producible: the clipboard is readable by every application,
+                and a clipboard manager keeps it in history, so pasting a
+                password there would leak it out of the field it belongs in. Text
+                that cannot be typed directly is then refused.
 
         Raises:
             BlaxcyError: ``FOCUS_MISMATCH`` when the focus guard fails,
@@ -186,11 +220,14 @@ class KeyboardController:
 
         strokes = self._resolve_text(text)
         limit = self._settings.ascii_direct_max
-        if strokes is not None and (len(text) <= limit or self._clipboard is None):
+        # Credential content never reaches the clipboard, so for sensitive text the
+        # clipboard simply does not exist as a path (sections 42, 55).
+        clipboard_allowed = self._clipboard is not None and not sensitive
+        if strokes is not None and (len(text) <= limit or not clipboard_allowed):
             self._type_direct(strokes)
             return TypeResult(True, "xtest_direct", len(text), focus)
 
-        if self._clipboard is not None:
+        if clipboard_allowed:
             if not self._paste_via_clipboard(text):
                 raise BlaxcyError(
                     ErrorCode.CLIPBOARD_FAILED,
@@ -199,6 +236,13 @@ class KeyboardController:
                 )
             return TypeResult(True, "clipboard", len(text), focus)
 
+        if sensitive:
+            raise BlaxcyError(
+                ErrorCode.UNICODE_UNSUPPORTED,
+                "credential text cannot be typed: this keyboard mapping cannot produce it, "
+                "and credential content is never placed on the clipboard",
+                details={"characters": len(text), "ascii_direct_max": limit, "sensitive": True},
+            )
         raise BlaxcyError(
             ErrorCode.UNICODE_UNSUPPORTED,
             "text cannot be produced: it is non-ASCII (or not on this keyboard mapping) "
@@ -249,6 +293,24 @@ class KeyboardController:
     def release_all(self) -> None:
         """Release every held key/button (sections 52, 63)."""
         self._backend.release_all()
+
+    @property
+    def held_buttons(self) -> tuple[PointerButton, ...]:
+        """The buttons currently held down, so a stop can report what it released."""
+        return tuple(self._backend.held_buttons)
+
+    @property
+    def held_keys(self) -> tuple[int, ...]:
+        """The keycodes currently held down (the backend is the one authority)."""
+        return tuple(self._backend.held_keys)
+
+    def release_buttons(self) -> None:
+        """Release every held pointer button (section 63 step 3)."""
+        self._backend.release_buttons()
+
+    def release_keys(self) -> None:
+        """Release every held key/modifier (section 63 step 4)."""
+        self._backend.release_keys()
 
     def close(self) -> None:
         """Release held input and close the backend."""

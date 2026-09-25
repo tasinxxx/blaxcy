@@ -87,6 +87,15 @@ CHANGE_CLASS_SEVERITY: dict[ChangeClass, int] = {
     ChangeClass.MAJOR: 4,
 }
 
+#: The change classes that count as *structural*: only these invalidate a
+#: perception snapshot, a resolver-cache hint or a section 33.2 speculation,
+#: and only these force a full re-validation of the region they cover. A
+#: ``TRIVIAL``/``ANIMATION`` change deliberately invalidates nothing, so a
+#: spinner elsewhere on screen cannot throw away a correct resolution.
+SIGNIFICANT_CHANGE_CLASSES: frozenset[ChangeClass] = frozenset(
+    {ChangeClass.MEANINGFUL, ChangeClass.MAJOR}
+)
+
 
 class UIRole(StrEnum):
     """Specification section 37: the perception element role vocabulary."""

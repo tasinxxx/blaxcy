@@ -215,6 +215,23 @@ class XtestBackend(InputBackend):
             while int(keycode) in self._held_keys:
                 self._held_keys.remove(int(keycode))
 
+    # -- Ownership reporting (sections 63, 64) --------------------------------
+
+    @property
+    def held_keys(self) -> tuple[int, ...]:
+        """Every keycode currently held down, in press order."""
+        with self._lock:
+            return tuple(self._held_keys)
+
+    @property
+    def held_buttons(self) -> tuple[PointerButton, ...]:
+        """Every pointer button currently held down."""
+        with self._lock:
+            number_to_button = {number: button for button, number in _BUTTON_NUMBERS.items()}
+            return tuple(
+                number_to_button.get(number, PointerButton.LEFT) for number in self._held_buttons
+            )
+
     # -- Synchronisation and cleanup ------------------------------------------
 
     def flush(self) -> None:
@@ -224,10 +241,13 @@ class XtestBackend(InputBackend):
                 self._display.flush()
 
     def release_all(self) -> None:
-        """Release every key and button this backend still holds.
+        """Release every button and key this backend still holds.
 
         Safe to call from another thread (the emergency-stop path) and safe to
-        call when nothing is held or the connection is already gone.
+        call when nothing is held or the connection is already gone. Overrides
+        the base implementation so the X calls are guarded individually and the
+        held sets are cleared even when the connection has already died -- a
+        cleanup that raises would leave BLAXCY believing it still holds input.
         """
         with self._lock:
             display = self._display

@@ -26,7 +26,11 @@ from schemas.elements import UIElement, identity_fingerprint
 from schemas.enums import PerceptionSource
 
 #: Default lease TTL (specification section 44, configurable via ``[lease]``).
-DEFAULT_LEASE_TTL_MS: int = 800
+#: It must exceed one real perception cycle, because section 45 revalidates a lease
+#: against a fresh observation that is produced inside the lease's lifetime; a real
+#: re-perception measures 0.68-1.36 s, so an 800 ms bound expired during the very
+#: re-perception meant to validate it.
+DEFAULT_LEASE_TTL_MS: int = 3000
 
 
 class ElementLease(BaseModel):

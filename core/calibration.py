@@ -15,7 +15,7 @@ calibration was required.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -145,6 +145,40 @@ class Calibration(BaseModel):
             MonitorInputTransform(monitor_id=c.monitor_id, desktop_to_input=c.transform) for c in self.monitors
         )
         return GeometryMap(layout=self.layout, input_transforms=transforms, calibrated=True)
+
+
+def layout_from_topology(topology: Sequence[Mapping[str, int]]) -> MonitorLayout | None:
+    """Build a monitor layout from a capture backend's reported topology.
+
+    Returns ``None`` when the backend reported nothing usable, so a caller
+    reports that honestly rather than inventing a desktop size (section 4 rule 8).
+    Entry order is the backend's monitor order; the first usable entry is marked
+    primary, and monitor ids are assigned densely from zero so a layout is always
+    internally consistent.
+
+    Args:
+        topology: Entries carrying ``left``/``top``/``width``/``height``. Any
+            entry with a non-positive size is skipped rather than clamped.
+    """
+    monitors: list[MonitorGeometry] = []
+    for entry in topology:
+        width = int(entry.get("width", 0))
+        height = int(entry.get("height", 0))
+        if width <= 0 or height <= 0:
+            continue
+        monitors.append(
+            MonitorGeometry(
+                monitor_id=len(monitors),
+                origin_x=float(entry.get("left", 0)),
+                origin_y=float(entry.get("top", 0)),
+                width=width,
+                height=height,
+                is_primary=not monitors,
+            )
+        )
+    if not monitors:
+        return None
+    return MonitorLayout(monitors=tuple(monitors))
 
 
 def identity_geometry_map(layout: MonitorLayout) -> GeometryMap:

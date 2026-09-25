@@ -8,21 +8,42 @@ Usage:
     python main.py probe     # functional capability report (default)
     python main.py session   # detected session/environment facts
     python main.py config    # resolved configuration and its source path
+    python main.py keys      # Brain API key status (keyring only)
+    python main.py keys set-gemini   # store the key, read from a hidden prompt
+    python main.py status    # the assembled Body's live state (starts every component)
+    python main.py run TASK  # run one task through the Brain and the real desktop
+
+``status`` and ``run`` are the two commands that construct the whole Body
+(core/application.py). ``status`` performs one real observation and injects no
+input; ``run`` needs a stored Brain key and, headlessly, refuses any action that
+requires a human confirmation rather than assuming one (sections 54, 56, 71).
+
+``gui`` (section 71) is the same Body with a window over it. Qt is imported only
+inside that command, so every other command works without a Qt binding installed.
+
+``gui`` and ``run`` — the two commands that *own* the desktop — take the section 72
+single-instance lock first, so a second Body is refused rather than silently
+competing for the same mouse and keyboard. The read-only commands deliberately do
+not: they inject nothing, so running one beside a live Body is safe and useful.
 """
 
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import sys
 from pathlib import Path
 
 from config.settings import Settings, effective_settings_path, load_settings
+from core.application import BlaxcyApplication
 from core.capability_probe import probe_all
 from core.session_detector import SessionInfo, detect_session
+from core.single_instance import InstanceLock
 from schemas.capability import CapabilityReport
-from schemas.enums import CapabilityStatus
+from schemas.enums import CapabilityStatus, ErrorCode
 from schemas.errors import BlaxcyError
+from security.keyring_manager import ApiKeyManager
 
 
 def _print_session(session: SessionInfo) -> None:
@@ -155,17 +176,183 @@ def _cmd_config(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_keys(args: argparse.Namespace) -> int:
+    """Manage the Brain credential in the OS keyring (section 69).
+
+    The key is never accepted as an argument: it is read from a hidden prompt, so
+    it cannot end up in the shell history or the process table.
+    """
+    manager = ApiKeyManager()
+    action = getattr(args, "keys_action", "status")
+
+    if action == "status":
+        print(json.dumps(manager.status(), indent=2))
+        return 0
+
+    if action == "clear-gemini":
+        removed = manager.clear_gemini_key()
+        print(
+            "removed the stored Gemini API key"
+            if removed
+            else "no Gemini API key was stored"
+        )
+        return 0
+
+    key = getpass.getpass("Gemini API key (hidden; never passed as an argument): ").strip()
+    if not key:
+        print("error [INTERNAL_ERROR]: refusing to store an empty key", file=sys.stderr)
+        return 2
+    manager.set_gemini_key(key)
+    print(
+        "stored the Gemini API key in the OS keyring "
+        f"(service={manager.service!r}); it is not written to config, logs or argv"
+    )
+    return 0
+
+
+def _cmd_status(args: argparse.Namespace) -> int:
+    """Report the assembled Body's real state, starting every component."""
+    settings = load_settings(Path(args.config) if args.config else None)
+    # No watchdog for a read-only report: it holds no input, so there is nothing
+    # for a crash guard to release, and a status command should leave no
+    # heartbeat file behind.
+    app = BlaxcyApplication(settings, with_watchdog=False)
+    app.start()
+    try:
+        app.perceive()  # one real observation, so the report is about this desktop
+        report = app.status()
+        if args.json:
+            print(json.dumps(report, indent=2))
+        else:
+            _print_status(report)
+    finally:
+        app.shutdown()
+    return 0
+
+
+def _print_status(report: dict[str, object]) -> None:
+    """Render the status snapshot as a compact block."""
+    startup = report["startup"]
+    state = report["state"]
+    caps = report["capabilities"]
+    assert isinstance(startup, dict) and isinstance(state, dict)
+    print(f"session           : {report['session_type']}")
+    print(f"mode              : {report['mode']}")
+    print(f"started           : {report['started']}")
+    print(f"input backend     : {startup['input_backend'] or '(none available)'}")
+    print(f"accessibility     : {startup['accessibility']}")
+    print(f"clipboard         : {startup['clipboard']}")
+    print(f"window manager    : {startup['window_manager']}")
+    print(f"brain             : {startup['brain'] or '(not connected)'}")
+    print(f"sequence enabled  : {startup['sequence_enabled']}")
+    print(f"resolver cache    : {startup['resolver_cache_enabled']}")
+    print(f"state frame id    : {state['frame_id']}")
+    print(f"state age (ms)    : {state['age_ms']}")
+    print(f"elements observed : {state['element_count']}")
+    print(f"active app        : {state['active_app']}")
+    if isinstance(caps, dict):
+        print(f"capabilities      : {pending_summary(caps['AVAILABLE'], caps['DEGRADED'], caps['UNAVAILABLE'])}")
+    notes = startup["notes"]
+    assert isinstance(notes, list)
+    for note in notes:
+        print(f"note              : {note}")
+
+
+def _cmd_run(args: argparse.Namespace) -> int:
+    """Run one task through the Brain and the real desktop (section 67).
+
+    There is deliberately no ``--yes``/``--confirm`` flag: a confirmation is a
+    human decision shown with the action, the target and any literal terminal
+    text, and a flag that answers it in advance would be exactly the bypass
+    sections 54 and 71 forbid. Headless, an action that needs one is refused.
+    """
+    lock = _acquire_instance_lock(getattr(args, "lock_path", None))
+    if lock is None:
+        return 2
+    try:
+        settings = load_settings(Path(args.config) if args.config else None)
+        app = BlaxcyApplication(settings)
+        app.start()
+        try:
+            result = app.run_task(args.task)
+            print(json.dumps(result.to_dict(), indent=2))
+            return 2 if result.halted else 0
+        finally:
+            app.shutdown()
+    finally:
+        lock.release()
+
+
+def _acquire_instance_lock(lock_path: str | None = None) -> InstanceLock | None:
+    """Take the section 72 single-instance lock, or report why it is refused.
+
+    The refusal is printed without a bracketed error code on purpose. Section 77's
+    taxonomy describes *action* failures, and its exact list is pinned by
+    ``tests/unit/test_error_taxonomy.py``; a refused second launch never reaches an
+    action, so labelling it with an action code would misdescribe it.
+
+    The lock path is an explicit flag and never a configuration value: a user
+    config must not be able to switch off the guarantee that a second Body is
+    refused (section 4 rule 25).
+    """
+    lock = InstanceLock(
+        Path(lock_path).expanduser() if lock_path else None,
+        command=" ".join(sys.argv[:3]),
+    )
+    if lock.acquire():
+        return lock
+    print(f"error: {lock.refusal_message()}", file=sys.stderr)
+    return None
+
+
+def _cmd_gui(args: argparse.Namespace) -> int:
+    """Open the GUI over a real Body (section 71).
+
+    The Qt import is deliberately local: ``probe``/``session``/``config``/``keys``
+    must work on a machine with no Qt binding, and a missing PySide6 must be an
+    honest error from *this* command rather than an ImportError at startup.
+    """
+    argv: list[str] = []
+    if args.config:
+        argv += ["--config", args.config]
+    if args.offscreen:
+        argv.append("--offscreen")
+    try:
+        from gui.app import run as run_gui
+    except ImportError as exc:
+        print(
+            f"error [{ErrorCode.BACKEND_UNAVAILABLE.value}]: the GUI needs PySide6, "
+            f"which is not importable: {exc!r}",
+            file=sys.stderr,
+        )
+        return 2
+    lock = _acquire_instance_lock(getattr(args, "lock_path", None))
+    if lock is None:
+        return 2
+    try:
+        return run_gui(argv)
+    finally:
+        lock.release()
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """Construct the CLI parser."""
     parser = argparse.ArgumentParser(
         prog="blaxcy",
-        description="BLAXCY — Linux-native AI computer-control BODY (Phase 0).",
+        description="BLAXCY — Linux-native AI computer-control BODY.",
     )
     parser.add_argument(
         "--config",
         metavar="PATH",
         default=None,
         help="explicit TOML config path (defaults to ~/.config/blaxcy/config.toml)",
+    )
+    parser.add_argument(
+        "--lock-path",
+        metavar="PATH",
+        default=None,
+        help="section 72 single-instance lock file (used by gui/run; defaults to "
+        "$XDG_RUNTIME_DIR/blaxcy/instance.lock)",
     )
     sub = parser.add_subparsers(dest="command")
 
@@ -184,6 +371,36 @@ def _build_parser() -> argparse.ArgumentParser:
 
     config = sub.add_parser("config", help="show the resolved configuration")
     config.set_defaults(func=_cmd_config)
+
+    keys = sub.add_parser("keys", help="manage the Brain API key in the OS keyring")
+    keys.add_argument(
+        "keys_action",
+        nargs="?",
+        default="status",
+        choices=("status", "set-gemini", "clear-gemini"),
+        help="what to do with the stored key (default: report status)",
+    )
+    keys.set_defaults(func=_cmd_keys)
+
+    status = sub.add_parser(
+        "status", help="start every component and report the assembled Body's state"
+    )
+    status.add_argument("--json", action="store_true", help="emit JSON")
+    status.set_defaults(func=_cmd_status)
+
+    gui = sub.add_parser(
+        "gui", help="open the section 71 window over the assembled Body"
+    )
+    gui.add_argument(
+        "--offscreen",
+        action="store_true",
+        help="force the Qt offscreen platform (no display server needed)",
+    )
+    gui.set_defaults(func=_cmd_gui)
+
+    run = sub.add_parser("run", help="run one task through the Brain and the real desktop")
+    run.add_argument("task", help="the task text handed to the Brain")
+    run.set_defaults(func=_cmd_run)
 
     return parser
 

@@ -60,6 +60,16 @@ class UIElement(BaseModel):
     occluded: bool = False
     password: bool = False
     owner_window_id: int | None = None
+    #: The title of the window this element belongs to, as the accessibility tree
+    #: reports it. One half of the join key between an AT-SPI element and the window
+    #: manager's stacking order, which is what makes the section 46 occlusion rule
+    #: answerable: only windows *above* the target can hide it (sections 46, 47).
+    owner_window_title: str | None = None
+    #: The process id of the application this element belongs to, from the
+    #: accessibility tree. This is the *exact* half of that join key -- both AT-SPI
+    #: and EWMH report the process that owns a window -- so it is preferred over the
+    #: title, which is only a heuristic.
+    owner_app_pid: int | None = None
     owner_app: str | None = None
     actions: tuple[str, ...] = ()
     monitor_id: int | None = Field(default=None, ge=0)

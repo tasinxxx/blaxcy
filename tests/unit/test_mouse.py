@@ -213,7 +213,7 @@ def test_drag_presses_moves_and_releases_without_leaving_the_button_held() -> No
         "release",
         "flush",
     ]
-    assert backend.held_buttons == []
+    assert backend.held_buttons == ()
     assert result.destination == (200, 150)
 
 
@@ -223,7 +223,7 @@ def test_drag_releases_the_button_when_a_move_fails_mid_way() -> None:
     with pytest.raises(BlaxcyError) as excinfo:
         _controller(backend).drag(_point(100.0, 100.0), _point(200.0, 200.0), steps=3)
     assert excinfo.value.code is ErrorCode.INTERNAL_ERROR
-    assert backend.held_buttons == []
+    assert backend.held_buttons == ()
     assert "release" in backend.event_names()
 
 

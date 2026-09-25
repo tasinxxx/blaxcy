@@ -61,6 +61,7 @@ packages = [
     "gui",
     "watchdog",
     "bench",
+    "installer",
 ]
 
 [tool.pytest.ini_options]

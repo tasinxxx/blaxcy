@@ -72,7 +72,13 @@ from schemas.geometry import (
     Size,
 )
 from schemas.leases import DEFAULT_LEASE_TTL_MS, ElementLease, issue_lease
-from schemas.screen_state import ChangeRegion, ScreenDelta, ScreenState, classify_delta
+from schemas.screen_state import (
+    ChangeRegion,
+    ScreenDelta,
+    ScreenState,
+    WindowStackEntry,
+    classify_delta,
+)
 from schemas.sequences import (
     DEFAULT_HALT_CONDITIONS,
     FORBIDDEN_STEP_KEYS,
@@ -144,6 +150,7 @@ __all__ = [
     "UIElement",
     "UIRole",
     "VerificationState",
+    "WindowStackEntry",
     "action_class_for",
     "classify_delta",
     "elapsed_ms_since",

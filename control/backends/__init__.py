@@ -19,6 +19,7 @@ from control.backends.keys import (
     keysym_for_char,
     keysym_for_name,
 )
+from control.backends.unavailable import UnavailableBackend
 from control.backends.xtest import XtestBackend
 
 __all__ = [
@@ -26,6 +27,7 @@ __all__ = [
     "InputBackend",
     "KeyResolution",
     "PointerButton",
+    "UnavailableBackend",
     "XtestBackend",
     "canonical_key_name",
     "is_modifier_name",
@@ -47,3 +49,14 @@ def select_backend() -> InputBackend | None:
     if probe.available:
         return xtest
     return None
+
+
+def resolve_backend() -> InputBackend:
+    """A usable backend, or one that refuses every injection honestly.
+
+    The composition root needs *a* backend to construct the input controllers
+    with, even on a session where none works. Handing it a real backend whenever
+    one passed its probe and :class:`UnavailableBackend` otherwise keeps the
+    capability report truthful and the refusal structured (sections 11, 28, 80).
+    """
+    return select_backend() or UnavailableBackend()

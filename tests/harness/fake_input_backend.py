@@ -30,8 +30,8 @@ class FakeInputBackend(InputBackend):
         raise_on_key_press: int | None = None,
     ) -> None:
         self.events: list[tuple[object, ...]] = []
-        self.held_buttons: list[int] = []
-        self.held_keys: list[int] = []
+        self._held_buttons: list[int] = []
+        self._held_keys: list[int] = []
         self.pointer: tuple[int, int] = (0, 0)
         self._readback_fn = readback_fn
         self._readback_supported = readback_supported
@@ -67,14 +67,14 @@ class FakeInputBackend(InputBackend):
     def press_button(self, button: PointerButton) -> None:
         number = {PointerButton.LEFT: 1, PointerButton.MIDDLE: 2, PointerButton.RIGHT: 3}[button]
         self.events.append(("press", number))
-        if number not in self.held_buttons:
-            self.held_buttons.append(number)
+        if number not in self._held_buttons:
+            self._held_buttons.append(number)
 
     def release_button(self, button: PointerButton) -> None:
         number = {PointerButton.LEFT: 1, PointerButton.MIDDLE: 2, PointerButton.RIGHT: 3}[button]
         self.events.append(("release", number))
-        while number in self.held_buttons:
-            self.held_buttons.remove(number)
+        while number in self._held_buttons:
+            self._held_buttons.remove(number)
 
     def scroll(self, *, vertical: int = 0, horizontal: int = 0) -> None:
         self.events.append(("scroll", vertical, horizontal))
@@ -90,21 +90,34 @@ class FakeInputBackend(InputBackend):
         self.events.append(("key_press", keycode))
         if self._raise_on_key_press is not None and self._key_press_count == self._raise_on_key_press:
             raise BlaxcyError(ErrorCode.INTERNAL_ERROR, "injected key failure")
-        if keycode not in self.held_keys:
-            self.held_keys.append(keycode)
+        if keycode not in self._held_keys:
+            self._held_keys.append(keycode)
 
     def key_release(self, keycode: int) -> None:
         self.events.append(("key_release", keycode))
-        while keycode in self.held_keys:
-            self.held_keys.remove(keycode)
+        while keycode in self._held_keys:
+            self._held_keys.remove(keycode)
 
     def flush(self) -> None:
         self.events.append(("flush",))
 
+    # -- Ownership reporting (sections 63, 64) --------------------------------
+
+    @property
+    def held_keys(self) -> tuple[int, ...]:
+        """Every keycode currently held down, in press order."""
+        return tuple(self._held_keys)
+
+    @property
+    def held_buttons(self) -> tuple[PointerButton, ...]:
+        """Every pointer button currently held down."""
+        number_to_button = {1: PointerButton.LEFT, 2: PointerButton.MIDDLE, 3: PointerButton.RIGHT}
+        return tuple(number_to_button[number] for number in self._held_buttons)
+
     def release_all(self) -> None:
         self.events.append(("release_all",))
-        self.held_keys.clear()
-        self.held_buttons.clear()
+        self._held_keys.clear()
+        self._held_buttons.clear()
 
     def close(self) -> None:
         self.release_all()

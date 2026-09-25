@@ -307,7 +307,7 @@ def _backend() -> AtspiBackend:
 def test_password_node_content_is_never_read() -> None:
     """Sections 42/55: a password field is reported with text=None and password=True."""
     node = FakeNode("password text", "Password", is_text=True, text="hunter2")
-    element, _window, _app = _backend()._observe(node, "root/0", None, None)
+    element, _window, _app, _pid = _backend()._observe(node, "root/0", None, None, None)
     assert element is not None
     assert element.role is UIRole.PASSWORD_INPUT
     assert element.password is True
@@ -321,8 +321,8 @@ def test_navigation_field_url_is_read_but_a_search_box_is_not() -> None:
     )
     search = FakeNode("entry", "Search", is_text=True, text="secret query")
 
-    nav_element, *_ = _backend()._observe(nav, "root/0", None, None)
-    search_element, *_ = _backend()._observe(search, "root/1", None, None)
+    nav_element, *_ = _backend()._observe(nav, "root/0", None, None, None)
+    search_element, *_ = _backend()._observe(search, "root/1", None, None, None)
 
     assert nav_element is not None
     assert nav_element.text == "https://example.com"
@@ -335,14 +335,14 @@ def test_defunct_and_unreportable_nodes_are_dropped() -> None:
     defunct = FakeNode("push button", "Go", states=("DEFUNCT",))
     anonymous = FakeNode("panel", "", states=("SHOWING",))
 
-    assert _backend()._observe(defunct, "root/0", None, None)[0] is None
-    assert _backend()._observe(anonymous, "root/1", None, None)[0] is None
+    assert _backend()._observe(defunct, "root/0", None, None, None)[0] is None
+    assert _backend()._observe(anonymous, "root/1", None, None, None)[0] is None
 
 
 def test_zero_sized_extents_produce_no_geometry() -> None:
     """A not-laid-out component has no usable geometry, not a bogus rectangle."""
     node = FakeNode("push button", "Go", extents=(0, 0, 0, 0))
-    element, *_ = _backend()._observe(node, "root/0", None, None)
+    element, *_ = _backend()._observe(node, "root/0", None, None, None)
     assert element is not None
     assert element.bbox is None
     assert element.visible is False
@@ -506,3 +506,19 @@ def test_service_context_manager_starts_and_stops() -> None:
     with _service(backend) as service:
         assert _is_running(service) is True
     assert _is_running(service) is False
+
+
+def test_event_callback_tolerates_the_platform_call_signature() -> None:
+    """The AT-SPI stack may pass more than the event; extra arguments must not raise.
+
+    Regression test for a defect found by running the assembled Body against the
+    live bus: the installed GI/Atspi calls the registered listener with
+    ``(event, source, user_data)``, and a single-argument callback raised
+    ``TypeError`` on every event. A lost event is a stale element cache
+    (section 35) and a traceback on a worker thread, so the callback accepts and
+    ignores whatever the platform passes (section 82).
+    """
+    backend = AtspiBackend(AccessibilitySettings())
+    backend._on_event(object())  # pyatspi-style call
+    backend._on_event(object(), object(), None)  # the live GI-style call
+    assert backend._events_seen == 2

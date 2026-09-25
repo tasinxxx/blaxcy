@@ -40,18 +40,38 @@ def test_probe_all_covers_every_required_capability() -> None:
     ]
 
 
-def test_unimplemented_capabilities_are_unavailable() -> None:
-    """Not-yet-built features must report UNAVAILABLE with an honest reason."""
-    session = detect_session()
+def test_visual_grounding_reports_its_real_availability_with_evidence() -> None:
+    """Phase 11 is implemented, so the verdict is about *availability*, not build state.
+
+    The probe shares ``VisualGrounder.capability()`` rather than guessing, so on
+    any host the status follows the switch, the SDK and the stored credential --
+    and an UNAVAILABLE verdict always names a reason and a fix (section 80).
+    """
     settings = Settings()
+    visual = probe_visual_grounding(detect_session(), settings)
 
-    visual = probe_visual_grounding(session)
-    sequence = probe_sequence_execution(settings)
+    assert visual.details["max_image_side"] == 1024
+    assert visual.details["max_confidence"] == 0.80
+    assert "Phase 11" not in (visual.reason or "")
+    if visual.status is CapabilityStatus.AVAILABLE:
+        assert visual.backend == "google-genai"
+        assert visual.details["key_present"] is True
+    else:
+        assert visual.status is CapabilityStatus.UNAVAILABLE
+        assert visual.reason
+        assert visual.fix_hint
 
-    for cap in (visual, sequence):
-        assert cap.status is CapabilityStatus.UNAVAILABLE
-        assert cap.reason
-    assert "Phase 11" in (visual.reason or "")
+
+def test_visual_grounding_follows_the_configuration_switch() -> None:
+    """Turning the fallback off is reported as UNAVAILABLE, never hidden."""
+    base = Settings()
+    disabled = base.model_copy(
+        update={"visual": base.visual.model_copy(update={"enabled": False})}
+    )
+    visual = probe_visual_grounding(detect_session(), disabled)
+    assert visual.status is CapabilityStatus.UNAVAILABLE
+    assert "disabled by configuration" in (visual.reason or "")
+    assert visual.fix_hint
 
 
 def test_browser_accessibility_reports_unavailable_without_a_bus() -> None:
@@ -69,15 +89,28 @@ def test_browser_accessibility_reports_unavailable_without_a_bus() -> None:
     assert cap.fix_hint
 
 
-def test_sequence_probe_reports_configured_limits() -> None:
-    """Even while unavailable, the sequence capability must surface its limits."""
+def test_sequence_execution_is_available_and_reports_its_limits() -> None:
+    """Sections 83/84: the runner exists and the batching layer ships enabled."""
     settings = Settings()
     cap = probe_sequence_execution(settings)
-    assert cap.details["configured_enabled"] is False
+    assert cap.status is CapabilityStatus.AVAILABLE
+    assert cap.backend == "sequence_runner"
+    assert cap.details["configured_enabled"] is True
     assert cap.details["max_sequence_steps"] == settings.sequence.max_sequence_steps
     assert cap.details["max_sequence_wall_clock_seconds"] == (
         settings.sequence.max_sequence_wall_clock_seconds
     )
+
+
+def test_sequence_execution_reports_disabled_when_configured_off() -> None:
+    """The capability follows the configuration switch, so the probe stays honest."""
+    base = Settings()
+    disabled = base.model_copy(
+        update={"sequence": base.sequence.model_copy(update={"enabled": False})}
+    )
+    cap = probe_sequence_execution(disabled)
+    assert cap.status is CapabilityStatus.UNAVAILABLE
+    assert cap.details["configured_enabled"] is False
 
 
 def test_mouse_probe_is_unavailable_without_an_x_display() -> None:

@@ -25,10 +25,13 @@ callers:
   state it was resolved against, so a lease can never silently outlive the
   perception it was based on.
 
-The resolver cache and rapidfuzz semantic matching of section 43.1 are **not**
-implemented here: that is the Phase 10.1 batching layer, and it ships disabled
-(section 4 rule 31). ``TargetResolver`` accepts an optional semantic scorer so
-that layer can plug in later, but it is inert unless one is passed in.
+The resolver cache and rapidfuzz semantic matching of section 43.1 are wired in
+here as an **optional hint**, never as an authority: when a
+:class:`~core.resolver_cache.ResolverCache` is supplied it tells the resolver
+where the element last was, the resolver re-queries that identity against the
+live elements, and the cache can never change a score, the candidate set, the
+ambiguity verdict or the threshold. With no cache (or a disabled one) the
+decisions are identical, only computed from scratch (section 4 rule 31).
 """
 
 from __future__ import annotations
@@ -40,11 +43,18 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from config.settings import ResolverSettings
+from core.resolver_cache import (
+    CacheLookup,
+    CacheOutcome,
+    IdentityHint,
+    ResolverCache,
+    identity_path,
+)
 from schemas.elements import ElementCandidate, ElementQuery, UIElement
 from schemas.enums import SOURCE_BASE_CONFIDENCE
 from schemas.geometry import Rect
 from schemas.leases import DEFAULT_LEASE_TTL_MS, ElementLease, issue_lease
-from schemas.screen_state import ScreenState
+from schemas.screen_state import ScreenState, WindowStackEntry
 
 #: Default occlusion threshold (section 46): more covered than this is not
 #: actionable. The rule is conservative by design -- only an exact backend may
@@ -128,6 +138,18 @@ class ResolutionResult(BaseModel):
     matched_stage: str | None = None
     ambiguity: bool = False
     occlusion: OcclusionAssessment | None = None
+    cache: CacheLookup | None = Field(
+        default=None,
+        description=(
+            "The section 43.1 cache lookup that preceded this resolution. Purely "
+            "diagnostic: it never contributed a score or a candidate."
+        ),
+    )
+
+    @property
+    def cache_hit(self) -> bool:
+        """True when a live identity hint was available for this description."""
+        return self.cache is not None and self.cache.hit
 
     @property
     def is_resolved(self) -> bool:
@@ -159,6 +181,7 @@ class ResolutionResult(BaseModel):
             "best": self.best.to_dict() if self.best is not None else None,
             "candidates": [candidate.to_dict() for candidate in self.candidates],
             "occlusion": self.occlusion.to_dict() if self.occlusion is not None else None,
+            "cache": self.cache.to_dict() if self.cache is not None else None,
         }
 
 
@@ -262,6 +285,136 @@ def assess_occlusion(
     )
 
 
+def _is_ancestor_path(ancestor: str | None, descendant: str | None) -> bool:
+    """Whether ``ancestor``'s accessibility path contains ``descendant``.
+
+    Paths are ``/``-separated node indices (``desktop[0]/25/0/1``). A container is
+    a *segment* prefix of everything it holds, so ``desktop[0]/2`` is not an
+    ancestor of ``desktop[0]/25`` -- which a plain string-prefix test would
+    wrongly conclude.
+    """
+    if not ancestor or not descendant:
+        return False
+    outer = ancestor.strip("/").split("/")
+    inner = descendant.strip("/").split("/")
+    return len(outer) < len(inner) and inner[: len(outer)] == outer
+
+
+def _title_position(
+    title: str | None,
+    stack: Sequence[WindowStackEntry],
+    indices: Sequence[int],
+) -> int | None:
+    """The highest stacking position among ``indices`` matching ``title``.
+
+    Titles come from two sources -- the accessibility tree's window node and the
+    window manager's ``_NET_WM_NAME`` -- and they are not always byte-identical
+    (a browser publishes a decorated name to the window manager and a different
+    one to accessibility). Matching therefore falls back to containment in either
+    direction. Taking the highest of several matches is the conservative choice:
+    the topmost instance is the one that could be in front.
+    """
+    if not title:
+        return None
+    exact = [index for index in indices if stack[index].title == title]
+    if exact:
+        return exact[-1]
+    contained: list[int] = []
+    for index in indices:
+        name = stack[index].title
+        if name and (name in title or title in name):
+            contained.append(index)
+    return contained[-1] if contained else None
+
+
+def _window_position(
+    element: UIElement,
+    stack: Sequence[WindowStackEntry],
+    *,
+    lowest: bool,
+) -> int | None:
+    """The stacking position of the window that owns ``element``, or ``None``.
+
+    The pid is tried first because it is exact: accessibility reports the process
+    id of the window's owner (``get_process_id()``) and the window manager reports
+    the same process in ``_NET_WM_PID``, so the two join without any guessing. The
+    title is the fallback for hosts where either side omits the pid, and it is a
+    heuristic by nature.
+
+    ``lowest`` breaks an ambiguity, and the direction is a safety decision rather
+    than a cosmetic one:
+
+    * for the **target**, assume the lowest candidate window, so that as many
+      windows as possible count as being above it;
+    * for a **candidate occluder**, assume the highest, so that it counts as being
+      above as often as possible.
+
+    Both directions widen the resulting occluder set, which is the only direction
+    a safety check may err in.
+    """
+    if not stack:
+        return None
+    indices = list(range(len(stack)))
+    if element.owner_app_pid is not None:
+        same_pid = [index for index in indices if stack[index].pid == element.owner_app_pid]
+        if len(same_pid) == 1:
+            return same_pid[0]
+        if same_pid:
+            by_title = _title_position(element.owner_window_title, stack, same_pid)
+            if by_title is not None:
+                return by_title
+            return same_pid[0] if lowest else same_pid[-1]
+    return _title_position(element.owner_window_title, stack, indices)
+
+
+def occluders_above(
+    target: UIElement,
+    candidates: Sequence[Occluder],
+    stack: Sequence[WindowStackEntry] = (),
+) -> tuple[Occluder, ...]:
+    """Narrow a candidate occluder set to the objects that can hide ``target``.
+
+    Section 46 asks whether something is *in front of* the target. Callers hand
+    over every perceived element, which includes the desktop background and the
+    windows **behind** the target -- objects that cannot hide it, and which on a
+    real desktop make every target read as fully covered. Window stacking is the
+    only honest source of "in front" (geometry cannot tell behind from in front),
+    so it is used whenever it is known:
+
+    * the target's **ancestors** are dropped. A container cannot hide what it
+      contains, and on a real desktop the target's own window frame and the
+      ``desktop[0]`` root cover it completely;
+    * both the target's window and the candidate's window have a known position ->
+      the candidate counts only when its window is **at or above** the target's.
+      The same window counts, because an overlay inside one window really can
+      cover a control in it;
+    * either position is unknown, or no stacking information is available -> the
+      candidate is **kept**.
+
+    Keeping the unknown case is deliberate: a missing stacking list must never
+    become a permission, so without this information the check stays exactly as
+    conservative as it was before this function existed. Non-element occluders
+    (bare rectangles) carry no ownership at all and are likewise kept.
+    """
+    kept: list[Occluder] = []
+    for candidate in candidates:
+        if isinstance(candidate, UIElement) and _is_ancestor_path(
+            candidate.atspi_path, target.atspi_path
+        ):
+            continue
+        kept.append(candidate)
+    target_position = _window_position(target, stack, lowest=True)
+    if not stack or target_position is None:
+        return tuple(kept)
+    return tuple(
+        candidate
+        for candidate in kept
+        if not isinstance(candidate, UIElement)
+        or (position := _window_position(candidate, stack, lowest=False)) is None
+        or position >= target_position
+    )
+
+
 class TargetResolver:
     """Deterministic target resolution over observed elements (section 43).
 
@@ -272,6 +425,10 @@ class TargetResolver:
             optimization ships disabled (section 4 rule 31). When supplied it
             still only feeds the ``text`` weight and can never override the
             ambiguity rule.
+        semantic_match_floor: Below this, a fuzzy score is not a text match.
+        cache: Optional section 43.1 cache. It is a traversal-order hint only:
+            a hit can never change a score, the candidate set or the ambiguity
+            verdict, so a disabled cache yields identical decisions.
         occlusion_threshold: Coverage above this is not actionable (section 46).
     """
 
@@ -282,14 +439,17 @@ class TargetResolver:
         semantic_scorer: Callable[[str, str], float] | None = None,
         semantic_match_floor: float = 100.0,
         occlusion_threshold: float = DEFAULT_OCCLUSION_THRESHOLD,
+        cache: ResolverCache | None = None,
     ) -> None:
         self.settings = settings
         self._semantic_scorer = semantic_scorer
         self._semantic_match_floor = semantic_match_floor
         self._occlusion_threshold = occlusion_threshold
+        self._cache = cache
         self._resolutions = 0
         self._ambiguous = 0
         self._not_found = 0
+        self._cache_hits = 0
 
     # -- Resolution -----------------------------------------------------------
 
@@ -299,6 +459,7 @@ class TargetResolver:
         elements: Sequence[UIElement],
         *,
         occluders: Sequence[Occluder] = (),
+        state: ScreenState | None = None,
     ) -> ResolutionResult:
         """Resolve ``query`` against ``elements`` (section 43).
 
@@ -308,7 +469,11 @@ class TargetResolver:
             elements: The elements to search, normally ``ScreenState.elements``.
             occluders: Objects known to sit above the target, for the section 46
                 check against the winning candidate.
+            state: The observation ``elements`` came from. Supplying it enables
+                the section 43.1 cache to *record* a successful resolution (and
+                to know the state's active window); it is never used for scoring.
         """
+        lookup = self._lookup(query, elements, state=state)
         considered = len(elements)
         scored: list[tuple[float, str, ElementCandidate, str | None]] = []
         for element in elements:
@@ -332,6 +497,7 @@ class TargetResolver:
                 reason="no visible element matched the requested target",
                 considered=considered,
                 occlusion=None,
+                cache=lookup,
             )
 
         # Deterministic order: score descending, then element id ascending.
@@ -341,7 +507,17 @@ class TargetResolver:
         kept = ranked[: self.settings.max_candidates]
 
         ambiguous, ambiguity_reason = self._check_ambiguity(scored)
-        occlusion = assess_occlusion(top.element, occluders, threshold=self._occlusion_threshold)
+        # Section 46: only objects *above* the winner can hide it. The caller's
+        # candidate list is everything it perceived, so it is narrowed to the
+        # windows stacked at or above the target's (never widened -- an unknown
+        # stacking order leaves the list exactly as it was).
+        occlusion = assess_occlusion(
+            top.element,
+            occluders_above(
+                top.element, occluders, state.window_stack if state is not None else ()
+            ),
+            threshold=self._occlusion_threshold,
+        )
 
         if ambiguous:
             self._ambiguous += 1
@@ -355,6 +531,7 @@ class TargetResolver:
                 matched_stage=top_stage,
                 ambiguity=True,
                 occlusion=occlusion,
+                cache=lookup,
             )
 
         if top_score < self.settings.act_threshold:
@@ -370,8 +547,10 @@ class TargetResolver:
                 considered=considered,
                 matched_stage=top_stage,
                 occlusion=occlusion,
+                cache=lookup,
             )
 
+        self._record(query, top.element, state=state)
         return ResolutionResult(
             status=ResolutionStatus.RESOLVED,
             query=query,
@@ -381,7 +560,54 @@ class TargetResolver:
             considered=considered,
             matched_stage=top_stage,
             occlusion=occlusion,
+            cache=lookup,
         )
+
+    # -- Section 43.1 cache (hint only) ---------------------------------------
+
+    def _lookup(
+        self,
+        query: ElementQuery,
+        elements: Sequence[UIElement],
+        *,
+        state: ScreenState | None,
+    ) -> CacheLookup | None:
+        """Consult the cache and re-verify its hint against the live elements.
+
+        A hint is only usable when the identity path it names is still present
+        in the observation being resolved against. A hint whose element is gone
+        is dropped here, and the resolution continues down the normal cascade --
+        the cache never stands in for a live lookup (section 43.1).
+        """
+        cache = self._cache
+        if cache is None:
+            return None
+        lookup = cache.lookup(
+            query,
+            active_window_id=None if state is None else state.active_window_id,
+        )
+        hint: IdentityHint | None = lookup.hint
+        if hint is None:
+            return lookup
+        if any(identity_path(element) == hint.identity_path for element in elements):
+            self._cache_hits += 1
+            return lookup
+        # The identity path is gone from this observation, so *this* entry is
+        # provably wrong and is dropped; other windows' hints for the same
+        # description are left alone.
+        cache.forget(query, hint)
+        return CacheLookup(
+            CacheOutcome.MISS,
+            reason="the hinted identity path is no longer present in this observation",
+        )
+
+    def _record(
+        self, query: ElementQuery, element: UIElement, *, state: ScreenState | None
+    ) -> None:
+        """Record a successful resolution in the cache, when there is one."""
+        if self._cache is None or state is None:
+            return
+        self._cache.record(query, element, state)
 
     # -- Scoring --------------------------------------------------------------
 
@@ -476,13 +702,35 @@ class TargetResolver:
             for value in (element.text, element.accessible_name):
                 if not value:
                     continue
-                fuzzy = self._semantic_scorer(raw, value)
+                fuzzy = self._fuzzy_score(raw, element, value)
+                if fuzzy is None:
+                    continue
                 if fuzzy >= self._semantic_match_floor:
                     # A fuzzy hit feeds the text weight, but is graded below any
                     # real textual match so it can never masquerade as exact.
                     consider(0.40 + 0.40 * (fuzzy / 100.0), "normalized_text")
 
         return best_score, best_stage
+
+    def _fuzzy_score(self, query_text: str, element: UIElement, label: str) -> float | None:
+        """The fuzzy score for one label, memoized when a cache is present.
+
+        The scorer is a pure function of the two strings and the memo key
+        includes the label itself, so a reused value is by construction the same
+        number the scorer would have returned (section 43.1).
+        """
+        scorer = self._semantic_scorer
+        if scorer is None:
+            return None
+        cache = self._cache
+        if cache is not None:
+            memo = cache.semantic_score(query_text, element.identity, label)
+            if memo is not None:
+                return memo
+        score = float(scorer(query_text, label))
+        if cache is not None:
+            cache.record_semantic_score(query_text, element.identity, label, score)
+        return score
 
     def _role_component(self, query: ElementQuery, element: UIElement) -> tuple[float, str | None]:
         """Role match: neutral when unconstrained, binary when constrained."""
@@ -580,6 +828,8 @@ class TargetResolver:
             "ambiguity_gap": self.settings.ambiguity_gap,
             "semantic_matching": self._semantic_scorer is not None,
             "occlusion_threshold": self._occlusion_threshold,
+            "cache_enabled": self._cache is not None and self._cache.enabled,
+            "cache_hits": self._cache_hits,
         }
 
 

@@ -129,7 +129,7 @@ def test_shift_is_pressed_and_released_around_a_shifted_character() -> None:
         ("key_release", ord("H")),
         ("key_release", SHIFT_KEYCODE),
     ]
-    assert backend.held_keys == []
+    assert backend.held_keys == ()
 
 
 def test_key_interval_sleeps_between_characters_only() -> None:
@@ -172,7 +172,7 @@ def test_non_ascii_uses_the_clipboard_when_available() -> None:
         ("key_press", CTRL_KEYCODE),
         ("key_press", V_KEYCODE),
     ]
-    assert backend.held_keys == []
+    assert backend.held_keys == ()
 
 
 def test_long_ascii_prefers_the_clipboard_but_still_works_without_one() -> None:
@@ -197,13 +197,56 @@ def test_a_failed_clipboard_paste_is_reported() -> None:
     assert clipboard.restore_calls == 0
 
 
+# -- Sections 42/55: credential text never reaches the clipboard --------------
+
+
+def test_sensitive_text_never_uses_the_clipboard() -> None:
+    """A password is not published to the clipboard just to make it typable."""
+    backend = _backend()
+    clipboard = FakeClipboard()
+    with pytest.raises(BlaxcyError) as excinfo:
+        _keyboard(backend, clipboard=clipboard).type_text("pässwörd", sensitive=True)
+    # Refused honestly rather than pasted: the clipboard is readable by every
+    # application, and a clipboard manager keeps it in history.
+    assert excinfo.value.code is ErrorCode.UNICODE_UNSUPPORTED
+    assert excinfo.value.details["sensitive"] is True
+    assert clipboard.set_calls == []
+    assert clipboard.restore_calls == 0
+    assert backend.payloads("key_press") == []
+
+
+def test_sensitive_ascii_text_is_still_typed_directly() -> None:
+    """The refusal is about the clipboard, not about typing credentials at all."""
+    backend = _backend()
+    clipboard = FakeClipboard()
+    result = _keyboard(backend, clipboard=clipboard).type_text("hunter2", sensitive=True)
+    assert result.ok is True
+    assert result.method == "xtest_direct"
+    assert clipboard.set_calls == []
+    assert len(backend.payloads("key_press")) == len("hunter2")
+
+
+def test_sensitive_text_ignores_the_length_shortcut_too() -> None:
+    """A long credential is typed directly; length alone never means 'paste it'."""
+    backend = _backend()
+    clipboard = FakeClipboard()
+    long_secret = "abcde" * 10
+    result = _keyboard(
+        backend,
+        settings=InputSettings(ascii_direct_max=2),
+        clipboard=clipboard,
+    ).type_text(long_secret, sensitive=True)
+    assert result.method == "xtest_direct"
+    assert clipboard.set_calls == []
+
+
 def test_a_mid_typing_failure_releases_every_held_key() -> None:
     """Section 52: an unexpected failure never leaves a key held."""
     backend = _backend(raise_on_key_press=2)
     with pytest.raises(BlaxcyError) as excinfo:
         _keyboard(backend).type_text("ab")
     assert excinfo.value.code is ErrorCode.INTERNAL_ERROR
-    assert backend.held_keys == []
+    assert backend.held_keys == ()
     assert "release_all" in backend.event_names()
 
 
@@ -299,7 +342,7 @@ def test_hotkey_holds_modifiers_around_the_key_and_releases_in_reverse() -> None
         ("key_release", SHIFT_KEYCODE),
         ("key_release", CTRL_KEYCODE),
     ]
-    assert backend.held_keys == []
+    assert backend.held_keys == ()
 
 
 def test_unknown_key_name_is_reported_not_ignored() -> None:

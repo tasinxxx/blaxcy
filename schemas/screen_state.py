@@ -25,6 +25,24 @@ from schemas.enums import CHANGE_CLASS_SEVERITY, ChangeClass, CoordinateSpace
 from schemas.geometry import MonitorLayout, Rect, Size
 
 
+class WindowStackEntry(BaseModel):
+    """One top-level window's identity, in stacking order (bottom to top).
+
+    The section 46 occlusion rule has to know which window an element belongs to
+    and where that window sits. Identity is carried as the two things a window can
+    be matched on: the **pid** that created it, which both the accessibility tree
+    and EWMH report exactly, and its **title**, which is only a heuristic (a browser
+    publishes a decorated title to the window manager and a differently decorated
+    one to accessibility) and is therefore used as a fallback.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    window_id: int
+    title: str | None = None
+    pid: int | None = None
+
+
 class ChangeRegion(BaseModel):
     """One changed region and how structural the change was (section 34)."""
 
@@ -98,6 +116,15 @@ class ScreenState(BaseModel):
         description="Dimensions of the associated thumbnail, if one was produced.",
     )
     capture_backend: str | None = None
+    window_stack: tuple[WindowStackEntry, ...] = Field(
+        default=(),
+        description=(
+            "The top-level windows in stacking order, bottom to top, as the window "
+            "manager reported them for this observation. Empty means the order is "
+            "*unknown*, which the section 46 occlusion rule must treat "
+            "conservatively rather than as \"nothing is above anything\"."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate_elements(self) -> ScreenState:

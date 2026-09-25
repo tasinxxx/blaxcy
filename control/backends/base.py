@@ -131,19 +131,53 @@ class InputBackend(ABC):
     def key_release(self, keycode: int) -> None:
         """Release a keycode and clear it from the held set."""
 
+    # -- Ownership reporting (sections 63, 64, 78) ----------------------------
+
+    @property
+    @abstractmethod
+    def held_keys(self) -> tuple[int, ...]:
+        """Every keycode this backend currently holds down, in press order.
+
+        Section 64 requires explicit ownership (``owned_keys_down``); a backend
+        that cannot say what it is holding cannot be reliably cleaned up.
+        """
+
+    @property
+    @abstractmethod
+    def held_buttons(self) -> tuple[PointerButton, ...]:
+        """Every pointer button this backend currently holds down."""
+
     # -- Synchronisation and cleanup ------------------------------------------
 
     @abstractmethod
     def flush(self) -> None:
         """Flush queued input so the server has actually processed it."""
 
-    @abstractmethod
+    def release_buttons(self) -> None:
+        """Release every held pointer button (section 63 step 3).
+
+        Buttons are released before keys so a drag in progress is ended by
+        letting go of the button rather than by dropping a modifier mid-drag.
+        """
+        for button in tuple(self.held_buttons):
+            self.release_button(button)
+
+    def release_keys(self) -> None:
+        """Release every held key/modifier, most recent first (section 63 step 4)."""
+        for keycode in reversed(tuple(self.held_keys)):
+            self.key_release(keycode)
+
     def release_all(self) -> None:
         """Release every key and button this backend is holding.
 
         This is the section 52 modifier-hygiene hook and the section 63
-        emergency-stop hook: after it, no BLAXCY-owned input remains held.
+        emergency-stop hook: after it, no BLAXCY-owned input remains held. A
+        backend may override it to make the release robust when the underlying
+        connection is already gone; the ordering (buttons, then keys) must not
+        change.
         """
+        self.release_buttons()
+        self.release_keys()
 
     @abstractmethod
     def close(self) -> None:

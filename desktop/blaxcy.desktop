@@ -1,0 +1,23 @@
+# BLAXCY desktop entry (specification sections 26, 73).
+#
+# This file is the single source of truth for the entry's fields. install.sh copies
+# it into <prefix>/share/applications/ and rewrites exactly two lines: `Exec` gets
+# the *absolute* path of the installed launcher (the bare `blaxcy` below is only
+# correct for a system-wide install where it is on PATH), and `X-BLAXCY-Version` is
+# set to the version that was actually installed.
+#
+# `StartupWMClass` is deliberately absent: it can only be set truthfully by reading
+# the running window's WM_CLASS, and nothing in this project has verified that on a
+# real display. A guessed value would be a fake claim in a file the desktop trusts.
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=BLAXCY
+GenericName=AI computer-control Body
+Comment=Linux-native AI computer-control body: perception, control, policy, verification, recovery
+Exec=blaxcy gui
+Icon=blaxcy
+Terminal=false
+Categories=Utility;Accessibility;
+Keywords=automation;accessibility;desktop;assistant;
+StartupNotify=true

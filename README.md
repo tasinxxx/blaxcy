@@ -16,12 +16,15 @@ RECOVERY  decides WHETHER A SAFE RETRY IS POSSIBLE
 
 ## Status
 
-The project is in **Phase 0 — repository, harness, and probes**. No physical
-input is implemented yet; BLAXCY currently reports what this machine can
-actually do, honestly, and refuses to claim anything it has not probed.
+**Phases 1-13 are implemented**: perception, calibration, the input layer, the
+policy/executor/verifier pipeline, the safety gate (emergency stop, takeover,
+recovery), the Brain/tool boundary, batching, visual grounding, the GUI, and the
+installer. BLAXCY reports what this machine can actually do, honestly, and
+refuses to claim anything it has not probed.
 
-See `CONTINUATION_STATE.md` for the current phase, evidence, and next action,
-and `knowledge.md` for orientation.
+See `CONTINUATION_STATE.md` for the current phase, verbatim evidence, and next
+action; `knowledge.md` for orientation; `docs/installation.md` for installing it
+as a menu application.
 
 ## Requirements
 
@@ -32,7 +35,19 @@ and `knowledge.md` for orientation.
 - Optional runtime tools: `xdotool`, `xclip`, `tesseract-ocr`,
   `tesseract-ocr-eng`, `wmctrl`
 
-## Quickstart
+## Install (menu application)
+
+```bash
+./install.sh              # into ~/.local; no root needed
+```
+
+BLAXCY then appears in the desktop menu, with a launcher at `~/.local/bin/blaxcy`
+and a manifest of every file it wrote. `./install.sh --dry-run` shows what would
+happen and changes nothing; `./update.sh` and `./uninstall.sh` are the other two.
+See `docs/installation.md` for the prefix layout, the section 73 step order,
+rollback, and the one-Body-per-desktop rule.
+
+## Quickstart (from a checkout)
 
 The virtualenv must be able to see the system GI/AT-SPI packages:
 
@@ -48,6 +63,8 @@ Then run:
 python main.py probe      # functional capability report (no input injected)
 python main.py session    # detected session / environment facts
 python main.py config     # resolved configuration and its source path
+python main.py status     # assemble the whole Body and report its live state
+python main.py gui        # the window (§71); add --offscreen on a headless host
 ```
 
 `make check` runs lint, type-check, and tests.

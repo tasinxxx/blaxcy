@@ -1,0 +1,216 @@
+# BLAXCY — Installation
+
+> `installer/` implements specification section 73. It is **standard library
+> only**, because it runs before the virtualenv it is creating can be imported.
+> It never claims a step it did not take (section 80).
+
+## Install
+
+```bash
+./install.sh                 # into ~/.local (no root needed)
+```
+
+That is the whole install. BLAXCY lands in the desktop menu as **BLAXCY**, with
+a launcher on `~/.local/bin`, and a manifest recording every file it wrote.
+
+`~/.local` is the default *because* it is what makes this a menu application
+without root: the desktop entry goes to `~/.local/share/applications`, which the
+desktop environment already reads. A system prefix needs `--system` and write
+access:
+
+```bash
+./install.sh --prefix /usr --system
+```
+
+See what would happen, changing nothing:
+
+```bash
+./install.sh --dry-run       # a dry run writes no file at all
+```
+
+## Where things go
+
+Inside the prefix (default `~/.local`):
+
+| Path | What it is |
+|---|---|
+| `lib/blaxcy/` | the application tree (the packages listed in `APP_PACKAGES` plus `main.py`) |
+| `lib/blaxcy-venv/` | the virtualenv, deliberately **beside** the app tree so an update can replace one without discarding the other |
+| `bin/blaxcy` | the launcher (`POSIX sh`, execs the interpreter on `lib/blaxcy/main.py`, forwards `"$@"`) |
+| `share/icons/hicolor/256x256/apps/blaxcy.png` | the icon |
+| `share/applications/blaxcy.desktop` | the menu entry |
+| `share/blaxcy/install-manifest.json` | the manifest: every path, its sha256, the step record |
+| `share/blaxcy/backups/<run>/` | anything of yours that an install replaced, until it is proved good (one directory per run) |
+
+The desktop entry is generated from `desktop/blaxcy.desktop`, which is the single
+source of truth for its fields. The installer rewrites only the two things that
+depend on where it installed: `Exec=` (pointing at the launcher) and
+`X-BLAXCY-Version=`. The maintainer comments in the template are stripped, so the
+installed file is clean for `desktop-file-validate`.
+
+## The step order (section 73)
+
+Every run reports its steps, in this order, with `[ok]`, `[skip]` or `[FAIL]`:
+
+```text
+preflight -> detect package manager -> install system dependencies -> create venv
+-> install python dependencies -> install application files -> install icon
+-> install desktop entry -> create manifest/checksums -> validate runtime
+-> rollback on failure
+```
+
+Three of those steps deserve a note:
+
+- **preflight** decides whether the install is possible *before* the first write:
+  platform, Python version, source tree, prefix, writability, package manager and
+  optional tools. A preflight that ran after the first write would not be a
+  preflight. It is also exposed on its own: `./install.sh --dry-run` or
+  `python -m installer preflight`.
+- **validate runtime** is a real subprocess run of the *installed* copy
+  (`main.py session`, from `lib/blaxcy/`), plus `desktop-file-validate` on the
+  installed entry. Its exit status decides the outcome; nothing is assumed.
+- **rollback on failure** runs if any step fails. Every action that touches an
+  existing file moves it into `share/blaxcy/backups/<run>/` first, so rollback can
+  put the machine back and hand your own files back untouched.
+
+## The manifest
+
+`share/blaxcy/install-manifest.json` is what makes update and uninstall exact
+rather than approximate:
+
+```json
+{
+  "manifest_schema_version": 1,
+  "version": "0.1.0",
+  "prefix": "/home/you/.local",
+  "python": "/home/you/.local/lib/blaxcy-venv/bin/python",
+  "checksum_algorithm": "sha256",
+  "files": [{ "path": "...", "sha256": "..." }],
+  "backups": [{ "path": "...", "backup": "..." }],
+  "steps": [{ "name": "preflight", "status": "ok", "detail": "..." }],
+  "ok": true
+}
+```
+
+An uninstall removes **only** the paths it lists. Nothing sweeps a directory: an
+uninstaller that cleared `share/applications` would delete other applications'
+entries. A file the install replaced from the backups directory is **restored
+verbatim**, not deleted.
+
+## Update
+
+```bash
+./update.sh                  # same flags as install
+```
+
+An update is an install over an existing one (`require_existing`): it refuses if
+nothing is installed at the prefix, backs up what it replaces, and rolls back to
+the previous version on any failure. The new manifest records
+`updated_from` and `previous_file_count`. Backups of BLAXCY's *own* previous
+files are discarded once the new install validates -- keeping them would make a
+later uninstall resurrect the version it just replaced.
+
+## Uninstall
+
+```bash
+./uninstall.sh
+```
+
+Removes the files the manifest lists and deletes the manifest. A path recorded in
+`backups` is restored instead. Directories this run made are removed only when
+they are empty, so a prefix shared with other applications is never disturbed.
+
+`share/applications/mimeinfo.cache` may remain: that file belongs to the desktop,
+not to BLAXCY, and is regenerated by `update-desktop-database`.
+
+## One Body per desktop
+
+A second launch is **refused deliberately** (`core/single_instance.py`,
+sections 72/85). Two Bodies would each hold their own record of the keys and
+buttons they own, each inject input believing it had the whole state, and neither
+could release the other's held input.
+
+The mechanism is an advisory `flock` on `$XDG_RUNTIME_DIR/blaxcy/instance.lock`,
+not a pid-file heuristic: the kernel drops an `flock` when the process dies, so a
+crashed Body can never leave a lock behind that blocks the next launch. There is
+no stale-lock case to get wrong. The lock file records the holder (pid, start
+time, command) so the refusal can name who holds it:
+
+```text
+error: another BLAXCY instance (pid 75765, .../main.py gui --offscreen,
+started 4s ago) already owns this desktop session [lock:
+/run/user/1000/blaxcy/instance.lock]; refusing to start a second Body.
+```
+
+The lock guards the *launch boundary*, so `gui` and `run` take it and the
+read-only commands (`probe`, `session`, `config`, `status`) deliberately do not.
+Override the path with `--lock-path`. A lock that cannot be created at all fails
+**closed**: refusing to start a second Body, never silently running without the
+guarantee.
+
+## System dependencies
+
+The installer never implies a package-manager change. Pass `--system-deps` to run
+it (via `sudo`):
+
+```bash
+./install.sh --system-deps
+```
+
+That installs section 27's dependencies: `python3-gi`, `gir1.2-atspi-2.0`,
+`at-spi2-core`, `libxcb-cursor0`, `libsecret-1-0`, `python3-secretstorage`,
+`tesseract-ocr`, `tesseract-ocr-eng`, `xdotool`, `wmctrl`, `xclip`.
+
+Those names are **verified on this Debian-family host**. Only the verified family
+is listed: an invented package name for another distribution could install the
+wrong thing, so `dnf`/`pacman`/`zypper`/`apk` are *detected and told what
+capabilities are wanted* instead of being fed a guessed list.
+
+Optional tools (`tesseract`, `xdotool`, `wmctrl`, `xclip`) are reported as
+**DEGRADED**, never as install failures: BLAXCY probes every capability
+functionally at runtime.
+
+## Reusing an existing interpreter
+
+For a development install, or where the dependencies are already installed:
+
+```bash
+./install.sh --python /path/to/.venv/bin/python   # implies --reuse-python
+./install.sh --reuse-python                       # use the running interpreter
+```
+
+The interpreter is probed first for the modules the application needs, so a
+missing dependency is reported *before* the install rather than surfacing as a
+traceback from the validation step. A reused interpreter that cannot even run is
+a preflight failure.
+
+## Verifying the install
+
+```bash
+desktop-file-validate ~/.local/share/applications/blaxcy.desktop
+~/.local/bin/blaxcy session      # a real run of the installed copy
+python -m installer preflight
+```
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | success |
+| `1` | a step failed; the run was rolled back |
+| `2` | usage error |
+
+`--json` emits the whole report as JSON, including every step and every file
+checksum, for scripting.
+
+## What the installer refuses to do
+
+- **Half-install.** Any failing step rolls back every change the run made.
+- **Guess.** A package name it cannot verify on this distribution is reported, not
+  invented.
+- **Sweep.** Only the file list, the launcher, the icon and the entry are
+  touched; only empty directories are pruned.
+- **Install into a prefix inside the source tree**, or into a system prefix
+  without `--system`.
+- **Claim success from an assumption.** Validation is a real subprocess run whose
+  exit status decides.

@@ -18,11 +18,12 @@ from core.target_resolver import (
     TargetResolver,
     assess_occlusion,
     bind_lease,
+    occluders_above,
 )
 from schemas.elements import ElementQuery, UIElement
 from schemas.enums import CoordinateSpace, PerceptionSource, UIRole
 from schemas.geometry import MonitorGeometry, MonitorLayout, Rect
-from schemas.screen_state import ScreenState
+from schemas.screen_state import ScreenState, WindowStackEntry
 
 _BOX = Rect(x=0.0, y=0.0, width=100.0, height=40.0, space=CoordinateSpace.DESKTOP)
 
@@ -363,3 +364,218 @@ def test_stats_reports_configuration_and_counters() -> None:
     assert stats["resolutions"] == 2
     assert stats["not_found"] == 1
     assert stats["semantic_matching"] is False
+
+
+# -- Occluder narrowing by window stacking (section 46) -----------------------
+
+#: A full-screen background element, the shape that made every real target read
+#: as fully covered before the stacking rule existed.
+_SCREEN = Rect(x=0.0, y=0.0, width=1920.0, height=1080.0, space=CoordinateSpace.DESKTOP)
+
+
+def _windowed(element_id: str, window: str | None, **overrides: object) -> UIElement:
+    """An element that knows which window it belongs to, by title."""
+    return _element(element_id, owner_window_title=window, **overrides)
+
+
+def _pid_windowed(element_id: str, pid: int, **overrides: object) -> UIElement:
+    """An element that knows which process owns its window."""
+    return _element(element_id, owner_app_pid=pid, **overrides)
+
+
+def _stack(*titles: str | None) -> tuple[WindowStackEntry, ...]:
+    """A stacking order, bottom to top, matched by title only."""
+    return tuple(
+        WindowStackEntry(window_id=index + 1, title=title) for index, title in enumerate(titles)
+    )
+
+
+def _pid_stack(*windows: tuple[str | None, int]) -> tuple[WindowStackEntry, ...]:
+    """A stacking order, bottom to top, in which every window reports its pid."""
+    return tuple(
+        WindowStackEntry(window_id=index + 1, title=title, pid=pid)
+        for index, (title, pid) in enumerate(windows)
+    )
+
+
+def test_occluders_below_the_target_are_dropped() -> None:
+    """Section 46 is about what is *in front*: a window behind cannot hide a target.
+
+    This is the regression the rule exists for. On a real desktop the desktop
+    background and every other running window overlap the target, so counting them
+    made every target unclickable.
+    """
+    stack = _stack("Desktop", "Editor", "Target Window")
+    target = _windowed("t", "Target Window")
+    background = _windowed("bg", "Desktop", bbox=_SCREEN)
+    behind = _windowed("behind", "Editor", bbox=_SCREEN)
+    same_window = _windowed("overlay", "Target Window", bbox=_SCREEN)
+
+    kept = occluders_above(target, [background, behind, same_window], stack)
+
+    ids = {element.element_id for element in kept if isinstance(element, UIElement)}
+    assert "bg" not in ids, "the desktop background is behind the target and cannot occlude it"
+    assert "behind" not in ids, "a window below the target cannot occlude it"
+    assert "overlay" in ids, "an overlay in the target's own window really can cover it"
+
+
+def test_an_occluder_above_the_target_is_kept_and_still_blocks() -> None:
+    """A window genuinely in front must keep blocking, or this rule would be a bypass."""
+    stack = _stack("Desktop", "Target Window", "Dialog On Top")
+    target = _windowed("t", "Target Window")
+    in_front = _windowed("front", "Dialog On Top", bbox=_SCREEN)
+
+    kept = occluders_above(target, [in_front], stack)
+    assert [element.element_id for element in kept if isinstance(element, UIElement)] == ["front"]
+    assessment = assess_occlusion(target, kept)
+    assert assessment.blocked is True
+    assert assessment.is_actionable is False
+
+
+def test_unknown_stacking_order_narrows_nothing() -> None:
+    """A missing stacking list must never become a permission."""
+    target = _windowed("t", "Target Window")
+    guesses = [_windowed("bg", "Desktop", bbox=_SCREEN)]
+
+    # No stack at all: the candidate list comes back exactly as it was.
+    assert occluders_above(target, guesses, ()) == tuple(guesses)
+    # A stack that does not mention the target's window: same, still conservative.
+    assert occluders_above(target, guesses, _stack("Some Other Window")) == tuple(guesses)
+
+
+def test_an_occluder_with_no_window_identity_is_kept() -> None:
+    """An element we cannot place is treated as if it could be in front."""
+    target = _windowed("t", "Target Window")
+    anonymous = _element("anon", bbox=_SCREEN)
+    rect_only = _SCREEN
+
+    kept = occluders_above(target, [anonymous, rect_only], _stack("Desktop", "Target Window"))
+    assert len(kept) == 2, "an unplaceable occluder must be kept, not assumed harmless"
+
+
+def test_browser_style_title_suffixes_still_join() -> None:
+    """Titles come from two sources and are not always byte-identical."""
+    stack = _stack("Desktop", "Example - Google Chrome", "Target Window")
+    target = _windowed("t", "Target Window")
+    # The accessibility tree publishes the base title; the window manager gets the
+    # browser's decorated version.
+    chrome = _windowed("chrome", "Example - Google Chrome - Audio playing", bbox=_SCREEN)
+
+    assert occluders_above(target, [chrome], stack) == ()
+
+
+def test_a_duplicated_title_is_resolved_conservatively() -> None:
+    """Two windows may share a title, and we cannot tell which one an element is in.
+
+    The topmost reading is used, so the occluder is *kept*: an ambiguity about which
+    window an element belongs to must widen the check, never narrow it.
+    """
+    stack = _stack("Untitled", "Target Window", "Untitled")
+    target = _windowed("t", "Target Window")
+    twin = _windowed("twin", "Untitled", bbox=_SCREEN)
+
+    kept = occluders_above(target, [twin], stack)
+    assert [element.element_id for element in kept if isinstance(element, UIElement)] == ["twin"]
+
+
+def test_resolution_uses_the_states_window_stack() -> None:
+    """The wiring: a caller that passes every element no longer blocks itself."""
+    target = _windowed("t", "Target Window", text="Send")
+    background = _windowed("bg", "Desktop", text="something else", bbox=_SCREEN)
+    stack = _stack("Desktop", "Target Window")
+    elements = [target, background]
+
+    blocked = _resolver().resolve(ElementQuery(text="Send"), elements, occluders=elements)
+    assert blocked.is_actionable is False, "without stacking the rule stays conservative"
+
+    state = ScreenState(
+        frame_id=1,
+        state_version=1,
+        generation=1,
+        timestamp=1000.0,
+        monotonic=1000.0,
+        layout=MonitorLayout(
+            monitors=(MonitorGeometry(monitor_id=0, width=1920, height=1080, is_primary=True),)
+        ),
+        elements=tuple(elements),
+        window_stack=stack,
+    )
+    resolved = _resolver().resolve(ElementQuery(text="Send"), elements, occluders=elements, state=state)
+    assert resolved.is_resolved is True
+    assert resolved.is_actionable is True
+    assert resolved.occlusion is not None
+    assert resolved.occlusion.ratio == 0.0
+
+
+def test_an_ancestor_container_is_never_an_occluder() -> None:
+    """A container cannot hide what it contains (section 46).
+
+    On a real desktop the target's own window frame and the ``desktop[0]`` root are
+    handed over as occluders, and both completely cover the target. They are its
+    *ancestors* in the accessibility tree, which is the structural fact that makes
+    them not occluders -- and unlike window identity it needs no stacking order.
+    """
+    target = _windowed("t", "Target Window", atspi_path="/desktop[0]/25/0/1")
+    frame = _windowed("frame", "Target Window", bbox=_SCREEN, atspi_path="/desktop[0]/25")
+    root = _element("root", bbox=_SCREEN, atspi_path="/desktop[0]")
+
+    kept = occluders_above(target, [frame, root], _stack("Target Window"))
+
+    assert kept == (), "the target's own frame and the desktop root cannot occlude it"
+
+
+def test_ancestry_is_compared_segment_by_segment() -> None:
+    """``desktop[0]/2`` is not an ancestor of ``desktop[0]/25``.
+
+    A plain string-prefix test calls those related and silently drops a real
+    occluder, so the comparison walks path segments rather than characters.
+    """
+    target = _windowed("t", "Target Window", atspi_path="/desktop[0]/25/0/1")
+    sibling = _windowed("sib", "Target Window", bbox=_SCREEN, atspi_path="/desktop[0]/2")
+
+    kept = occluders_above(target, [sibling], _stack("Target Window"))
+
+    assert [element.element_id for element in kept if isinstance(element, UIElement)] == ["sib"]
+
+
+def test_a_matching_pid_places_a_window_whose_title_does_not_match() -> None:
+    """The pid is the exact join; the title is only the fallback.
+
+    A browser publishes one decorated title to the window manager and a different
+    one to accessibility, so title matching alone fails to place its window -- and
+    an unplaceable occluder is conservatively *kept*, which is what left every
+    target on a real desktop reading as fully covered.
+    """
+    target = _pid_windowed("t", 100, owner_window_title="Target")
+    chrome = _pid_windowed("chrome", 200, owner_window_title="Example - Google Chrome - Audio")
+    stack = _pid_stack(("Desktop", 1), ("Example - Google Chrome", 200), ("Target", 100))
+
+    kept = occluders_above(target, [chrome], stack)
+
+    assert kept == (), "pid 200 is below pid 100, so that window cannot occlude the target"
+
+
+def test_a_pid_owning_several_windows_still_uses_titles_to_break_the_tie() -> None:
+    """One process may own several windows, and the title then decides which one."""
+    target = _pid_windowed("t", 100, owner_window_title="Panel")
+    twin = _pid_windowed("twin", 100, owner_window_title="Dialog", bbox=_SCREEN)
+    stack = _pid_stack(("Panel", 100), ("Dialog", 100))
+
+    kept = occluders_above(target, [twin], stack)
+
+    assert [element.element_id for element in kept if isinstance(element, UIElement)] == ["twin"]
+
+
+def test_an_ambiguous_pid_without_titles_widens_the_check() -> None:
+    """Two untitled windows from one pid: the target reads lowest, the occluder highest.
+
+    Both directions widen the occluder set, which is the only direction a safety
+    check may err in.
+    """
+    target = _pid_windowed("t", 100)
+    twin = _pid_windowed("twin", 100, bbox=_SCREEN)
+    stack = _pid_stack((None, 100), (None, 100))
+
+    kept = occluders_above(target, [twin], stack)
+
+    assert [element.element_id for element in kept if isinstance(element, UIElement)] == ["twin"]

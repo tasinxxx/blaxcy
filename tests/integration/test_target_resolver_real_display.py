@@ -40,7 +40,7 @@ from schemas.elements import ElementQuery, UIElement
 from schemas.enums import CoordinateSpace, UIRole
 from schemas.errors import BlaxcyError
 from schemas.geometry import MonitorGeometry, MonitorLayout, Rect
-from schemas.screen_state import ScreenState
+from schemas.screen_state import ScreenState, WindowStackEntry
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("DISPLAY"),
@@ -126,6 +126,22 @@ def _labelled_with_geometry(elements: list[UIElement]) -> UIElement:
         if element.bbox is not None and _label(element) and not element.occluded:
             return element
     pytest.skip("no labelled element with geometry on this desktop")
+
+
+def _live_window_stack() -> tuple[WindowStackEntry, ...]:
+    """The real window manager's stacking order, or a skip when it is unknown."""
+    from control.window_manager import WindowManager
+
+    try:
+        windows = WindowManager().stacked_windows()
+    except Exception as exc:  # pragma: no cover - depends on the host
+        pytest.skip(f"live window stacking is unavailable: {exc!r}")
+    if not windows:
+        pytest.skip("the window manager publishes no stacking order on this desktop")
+    return tuple(
+        WindowStackEntry(window_id=window.window_id, title=window.title, pid=window.pid)
+        for window in windows
+    )
 
 
 def _live_layout() -> MonitorLayout:
@@ -319,6 +335,54 @@ def test_live_resolution_reports_occlusion_but_is_not_actionable() -> None:
     assert result.occlusion is not None
     assert result.occlusion.blocked is True
     assert result.is_actionable is False
+
+
+# -- Section 46: the full live path (window stacking + every element as occluder) --
+
+
+def test_live_target_is_actionable_through_the_real_occlusion_path() -> None:
+    """A real target is actionable through the exact call every production caller makes.
+
+    This is the regression lock for the defect the unit tests could not see: every
+    caller passes ``occluders=state.elements``, so the desktop background and the
+    windows *behind* the target are all offered as occluders. Without the window
+    manager's stacking order, a maximized window or the desktop root covered every
+    real target completely, so ``is_actionable`` was always ``False`` on a live
+    desktop and no input could ever be injected.
+
+    The unit tests build synthetic elements and therefore never reproduced it. This
+    one drives the live AT-SPI observation, the live ``stacked_windows()`` order and
+    the resolver exactly as :mod:`control.executor` and :mod:`ai.tool_protocol` do.
+    It injects no input: resolution is arithmetic over observations.
+    """
+    elements = _live_elements()
+    target = _unique_actionable_target(elements)
+    label = target.text or target.accessible_name
+    assert label and target.bbox is not None
+
+    state = ScreenState(
+        frame_id=1,
+        state_version=1,
+        generation=1,
+        timestamp=time.time(),
+        monotonic=time.monotonic(),
+        layout=_live_layout(),
+        elements=tuple(elements),
+        window_stack=_live_window_stack(),
+    )
+    result = TargetResolver(ResolverSettings()).resolve(
+        ElementQuery(text=label), elements, occluders=elements, state=state
+    )
+
+    assert result.status is ResolutionStatus.RESOLVED
+    assert result.element is not None
+    assert result.element.element_id == target.element_id
+    assert result.ambiguity is False
+    assert result.occlusion is not None and result.occlusion.assessed is True
+    # The point of the regression: a genuinely visible, unobstructed control is
+    # actionable even though the whole element list was offered as occluders.
+    assert result.occlusion.blocked is False
+    assert result.is_actionable is True
 
 
 def test_bind_lease_stamps_a_live_resolution() -> None:
