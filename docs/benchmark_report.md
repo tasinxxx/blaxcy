@@ -202,6 +202,7 @@ Command (2026-09-25):
 ```bash
 . .venv/bin/activate
 python -m bench.real_desktop                                  # read-only
+python -m bench.real_desktop --samples 30                     # read-only, figures below
 python -m bench.real_desktop --confirm-real-input \
     --samples 200 --input-samples 50 --sequence-samples 20     # injects real input
 ```
@@ -219,6 +220,10 @@ XTEST, XFCE X11).
 | Measurement | Target | Actual | Notes |
 |---|---|---|---|
 | Accessibility query (live AT-SPI refresh) | none set | p50 **760.58 ms**, p95 **1080.42 ms**, min 606.57, max 1614.32 (n = 200) | traversal budget raised to 8000 ms to reach the fixture (section 35); 395–621 elements |
+| Accessibility query, re-run (live AT-SPI refresh) | none set | p50 **852.28 ms**, p95 **1078.94 ms**, min 742.13, max 1111.86 (n = 30) | same 8000 ms budget; 372 elements in the last live traversal |
+| Perception cycle, **warm** (capture → delta → cached AT-SPI → OCR → accept) | ≤ 1500 ms (derived) | p50 **10.61 ms**, p95 **15.22 ms**, min 7.75, max 16.65 (n = 30) | the AT-SPI read is served from the section 35 cache (2 s TTL), so this is the steady-state path; 372 elements accepted |
+| Perception cycle, **cold** (forced live AT-SPI traversal + capture/OCR/accept) | ≤ 1500 ms (derived) | p50 **830.78 ms**, p95 **922.81 ms**, min 576.37, max 928.79 (n = 30) | includes a fresh traversal — the cost once the 2 s cache TTL expires; 372 elements accepted |
+| GUI refresh (`MainWindow.refresh` over the live Body) | ≤ 50 ms (derived) | p50 **0.39 ms**, p95 **1.09 ms**, min 0.37, max 1.23 (n = 30) | offscreen Qt; a full `status()` re-read + panel re-render, against the window's own 500 ms timer |
 | Target resolution (live elements, `occluders=all`) | none set | p50 **2.51 ms**, p95 **4.34 ms** (n = 200) | `'Applications'` over 395 live elements |
 | Lease revalidation (section 45 checklist, 11 checks) | ≤ 25 ms | p50 **1.04 ms**, p95 **2.16 ms** (n = 200) | genuinely **met** on a real desktop |
 | End-to-end click (resolve→lease→revalidate→click→verify) | none set | p50 **220.20 ms**, p95 **1332.77 ms** (n = 50) | **5/50 VERIFIED**; 45 refused `VERIFICATION_UNVERIFIED` |
@@ -230,6 +235,30 @@ XTEST, XFCE X11).
 
 Interpretation, stated narrowly and honestly:
 
+- **The perception cycle is deliberately reported twice, because one number would
+  mislead.** `BlaxcyApplication.perceive()` reads AT-SPI through the accessibility
+  service's cache, which serves its last traversal for a 2 s TTL (section 35), so a
+  tight measurement loop sees the **warm** path (p50 **10.61 ms**). Once the TTL
+  expires the same cycle must pay a real traversal: the **cold** figure (p50
+  **830.78 ms**) forces one inside the timed window. Both are true production
+  costs, and the ~78× gap is exactly why section 35 insists a cached read is a
+  hint and never the live tree — quoting only the warm number as "the perceive
+  cycle" would present a cache as perception. A cold cycle still lands inside the
+  section 76 `<= 1500 ms` state-freshness window, which is what makes the section
+  43.1 cache and section 33.2 speculation worth having: they shorten the
+  *traversals*, which is where the time actually is.
+- **A live desktop is not a stable fixture, so the read-only figures vary run to
+  run.** Two consecutive `--samples 30` runs on this host agreed on every
+  conclusion while differing in detail: accessibility p50 **852.28** vs **794.64**
+  ms, warm cycle p50 **10.61** vs **8.41** ms, cold cycle p50 **830.78** vs
+  **814.49** ms, over **372** vs **489** live elements. Each number above is one
+  real run, and its element count is stated with it; a figure quoted without its
+  element count would not be reproducible on a desktop this size.
+- The `≤ 1500 ms` and `≤ 50 ms` targets on the three new rows are **derived
+  bounds, not section 76 targets**: 1500 ms is the section 45/76 action
+  state-age ceiling (a fresh observation must be obtainable within it), and 50 ms
+  is 10% of the window's own 500 ms refresh interval (`DEFAULT_REFRESH_MS`). The
+  GUI refresh at p50 **0.39 ms** is negligible against the interval it runs on.
 - The **lease revalidation target (≤ 25 ms) is met** on the real desktop, and the
   read-only Phase 8 numbers (resolution p50 ≈ 2.5 ms, revalidation p50 ≈ 1.0 ms)
   show the targeting layer is not the cost — capture/AT-SPI is. That is the real

@@ -29,13 +29,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import statistics
 import sys
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from ai.tool_protocol import ToolCall
 from config.settings import load_settings
@@ -131,6 +132,18 @@ def _percentile(ordered: Sequence[float], fraction: float) -> float:
         return float("nan")
     index = min(len(ordered) - 1, max(0, round(fraction * (len(ordered) - 1))))
     return ordered[index]
+
+
+class AppOwner(Protocol):
+    """What the read-only benchmarks need: an assembled Body, or none.
+
+    Declared structurally rather than as ``Environment`` so a read-only
+    measurement can be taken against a Body built *without* an input backend --
+    which is how the regression test proves these two benchmarks inject nothing
+    (section 4 rule 13) -- while ``Environment`` still satisfies it.
+    """
+
+    app: BlaxcyApplication | None
 
 
 class Environment:
@@ -306,12 +319,15 @@ def bench_accessibility(env: Environment, samples: int) -> Samples:
     assert env.app is not None
     result = Samples("accessibility query (live AT-SPI refresh)", "ms", None)
     service = env.app.accessibility
-    service.refresh()  # warm-up: a cold first traversal is not the steady state
+    elements = service.refresh()  # warm-up: a cold first traversal is not the steady state
     for _ in range(samples):
         started = time.perf_counter()
-        service.refresh()
+        elements = service.refresh()
         result.add(time.perf_counter() - started)
-    result.note = f"{len(list(env.app.cache.current.elements)) if env.app.cache.current else 0} elements in the cached state"
+    # Report what the traversal actually returned. The Body's *state* cache is a
+    # different thing and may still be empty here, so quoting it would describe a
+    # different measurement than the one timed above.
+    result.note = f"{len(elements)} elements in the last live traversal"
     return result
 
 
@@ -359,6 +375,111 @@ def bench_revalidation(env: Environment, samples: int) -> Samples:
         )
         result.add(time.perf_counter() - started)
     result.note = f"ok={outcome.ok} for {label!r}; checks={len(outcome.checks)}"
+    return result
+
+
+def bench_perceive_cycle(env: AppOwner, samples: int) -> Samples:
+    """Sections 33-43/65: one perception cycle, timed end to end.
+
+    This is the cost the executor actually pays before it can act: capture ->
+    change detection -> AT-SPI read (+ browser annotation) -> bounded OCR ->
+    assemble -> accept into the cache. It is read-only, so it runs without the
+    real-input opt-in.
+
+    The AT-SPI read is *cache-aware*: the accessibility service serves its last
+    traversal for a configurable TTL (2 s by default) and only re-traverses when
+    that expires (section 35). Callers in a tight loop therefore measure the
+    steady-state, warm cost -- the live traversal a cold cycle pays is the
+    accessibility-query benchmark, measured separately by
+    :func:`bench_perceive_cycle_cold`. Reporting the warm number as "the" cycle
+    would present a cache as the live tree, which section 35 forbids.
+    """
+    assert env.app is not None
+    result = Samples(
+        "perception cycle, warm (capture -> delta -> cached AT-SPI -> OCR -> accept)",
+        "ms",
+        "<= 1500 ms",
+    )
+    env.app.perceive()  # warm-up: a cold first capture is not the steady state
+    state = None
+    for _ in range(samples):
+        started = time.perf_counter()
+        state = env.app.perceive()
+        result.add(time.perf_counter() - started)
+    accepted = len(state.elements) if state is not None else 0
+    result.note = (
+        f"{accepted} elements accepted; AT-SPI read served from the section 35 "
+        "cache, so this is the warm path"
+    )
+    return result
+
+
+def bench_perceive_cycle_cold(env: AppOwner, samples: int) -> Samples:
+    """Sections 33-43/65: a perception cycle that must pay a live AT-SPI traversal.
+
+    The warm cycle above reuses the accessibility service's cached traversal; this
+    one forces a live traversal *inside* the timed window (``refresh()`` then
+    ``perceive()``), which is what a cycle costs once the TTL has expired. Both
+    are real production costs, and section 76 wants the orchestrator's perceive
+    cycle stated honestly rather than as whichever half flatters it. Read-only:
+    an accessibility traversal injects nothing.
+    """
+    assert env.app is not None
+    result = Samples(
+        "perception cycle, cold (forced live AT-SPI traversal + capture/OCR/accept)",
+        "ms",
+        "<= 1500 ms",
+    )
+    env.app.perceive()  # warm-up: open capture and prime the state cache
+    state = None
+    for _ in range(samples):
+        started = time.perf_counter()
+        env.app.accessibility.refresh()  # the traversal the TTL would otherwise skip
+        state = env.app.perceive()
+        result.add(time.perf_counter() - started)
+    accepted = len(state.elements) if state is not None else 0
+    result.note = (
+        f"{accepted} elements accepted; includes a fresh AT-SPI traversal "
+        "(the cost once the section 35 cache TTL expires)"
+    )
+    return result
+
+
+def bench_gui_refresh(env: AppOwner, samples: int) -> Samples:
+    """Section 71: the cost of one read-only GUI refresh over the live Body.
+
+    ``MainWindow.refresh`` re-reads ``BlaxcyApplication.status()`` and re-renders
+    the panels; it is what the window's 500 ms ``QTimer`` runs. It is measured on
+    an **offscreen** ``QApplication``, so it opens no visible window and injects
+    nothing. If Qt cannot provide a widget stack, the measurement is reported as
+    unmeasured with the reason rather than fabricated (section 4 rule 8).
+    """
+    result = Samples("GUI refresh (MainWindow.refresh over the live Body)", "ms", "<= 50 ms")
+    if env.app is None:
+        result.note = "not measured: no assembled Body"
+        return result
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    try:
+        from PySide6.QtWidgets import QApplication
+    except Exception as exc:  # pragma: no cover - depends on the host
+        result.note = f"not measured: PySide6.QtWidgets is not importable ({exc!r})"
+        return result
+    if QApplication.instance() is None:
+        QApplication([])
+
+    from gui.main_window import MainWindow
+
+    window = MainWindow(env.app)
+    try:
+        window.refresh()  # warm-up: the first render builds layout metrics
+        for _ in range(samples):
+            started = time.perf_counter()
+            window.refresh()
+            result.add(time.perf_counter() - started)
+    finally:
+        window.stop_refresh()
+        window.close()
+    result.note = f"offscreen Qt; full status() re-read + panel re-render; n over {samples} refreshes"
     return result
 
 
@@ -599,13 +720,16 @@ def run(
     with Environment(real_input=real_input, workload=workload) as env:
         print(f"# BLAXCY real-desktop benchmarks (samples: read-only={samples}, input={input_samples})")
         print()
-        print(f"- session: X11 {__import__('os').environ.get('DISPLAY')}")
+        print(f"- session: X11 {os.environ.get('DISPLAY')}")
         print(f"- real input: {real_input}")
         print(f"- workload: {workload}")
         print()
         results.append(bench_accessibility(env, samples).summary())
+        results.append(bench_perceive_cycle(env, samples).summary())
+        results.append(bench_perceive_cycle_cold(env, samples).summary())
         results.append(bench_resolution(env, samples).summary())
         results.append(bench_revalidation(env, samples).summary())
+        results.append(bench_gui_refresh(env, samples).summary())
         if real_input:
             results.append(bench_click(env, input_samples).summary())
             results.append(bench_keyboard(env, input_samples).summary())

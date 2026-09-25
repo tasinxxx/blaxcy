@@ -990,6 +990,17 @@
     against throwaway prefixes; no system-wide install was performed.
 
 ## Current task
+- **2026-09-25 (this bootstrap session): the remaining Phase 14 read-only numbers
+  are delivered and the half-applied edit is finished.** The tree carried an
+  uncommitted, untested edit to `bench/real_desktop.py` adding the orchestrator's
+  perceive-cycle and the section 71 GUI-refresh benchmarks. It was completed and
+  corrected: the accessibility read is now reported as what it is (a **warm**
+  cache-served cycle, with a separate **cold** cycle that forces a live AT-SPI
+  traversal inside the timed window — section 35's cache must never be presented
+  as the live tree), `bench_accessibility`'s note no longer quotes the *Body state*
+  cache instead of the traversal it timed, four tests were added, and the numbers
+  are recorded in `docs/benchmark_report.md` "Phase 14". Gate: **1104 passed, 6
+  skipped**; ruff + mypy clean (**173 files**).
 - **2026-09-25 (bootstrap session) update: the interrupted Phase 14 "verifiable
   workload" work is reconciled and its number is now measured.** The prior session
   had built the §76 verifiable workload (fixture `--bench-controls`,
@@ -1002,11 +1013,12 @@
   and — on the operator's go-ahead — ran the real-input verifiable benchmark:
   **20/20 five-step sequences completed**, p50 2505.23 ms. Recorded in
   `docs/benchmark_report.md`.
-- Task: Phase 13 is delivered and verified. The next concrete work is
-  **Phase 14 — benchmarks (§76)**, whose outstanding numbers are the
+- Task: **Phase 14 is delivered for every number it was blocked on.** The
   real-desktop end-to-end `run_sequence`, the Phase 8 modules
-  (resolution/lease/click), the orchestrator's perceive cycle, and the GUI refresh
-  cost.
+  (resolution/lease/click), the orchestrator's perceive cycle (warm **and** cold)
+  and the section 71 GUI-refresh cost are all measured and recorded in the section
+  76 form; the only outstanding number is the workflow-workload keyboard/click
+  pair, which has no targets on that layout and is reported `n = 0` with a reason.
 - **2026-09-25 update: §46 occlusion is RESOLVED and verified live** (see "Known
   failures"). The index's claim that its steps (a)/(b) were still pending was stale —
   both were already in the tree, confirmed working by a read-only live probe and
@@ -1046,7 +1058,13 @@
   a package install (see "Next concrete action") and therefore a human decision.
 
 ## Files being actively modified
-- (none mid-change; Phase 13 was closed out this session)
+- (none mid-change; the half-applied Phase 14 benchmark edit was completed and
+  verified this session)
+- Touched this session (complete, verified): `bench/real_desktop.py` (the read-only
+  `AppOwner` type, the warm/cold perceive-cycle split, the GUI-refresh benchmark,
+  the corrected accessibility note), `tests/unit/test_bench_real_desktop.py` (+1),
+  `tests/integration/test_bench_readonly_real_display.py` (new, 3 tests),
+  `docs/benchmark_report.md`, this file
 - Touched by Phase 13 (complete, verified): `installer/installer.py` (new),
   `installer/__init__.py` (new), `installer/__main__.py` (new), `install.sh` (new,
   executable), `update.sh` (new, executable), `uninstall.sh` (new, executable),
@@ -1078,6 +1096,17 @@
   `docs/environment_report.md` (regenerated)
 
 ## Last test results (verbatim, not paraphrased as "passed")
+- Command: `. .venv/bin/activate && ruff check . && mypy . && timeout 900 python -m pytest -o addopts="" -p no:pytest-qt -q`
+- Result (`2026-09-25`, this session, after finishing the half-applied Phase 14
+  benchmark edit): `1104 passed, 6 skipped, 4 warnings`; `ruff check .` ->
+  `All checks passed!`; `mypy .` -> `Success: no issues found in 173 source files`.
+- Command (read-only, **no input injected**, this session): `. .venv/bin/activate && python -m bench.real_desktop --samples 30`
+- Result (`2026-09-25`, real X11 desktop, XTEST, n = 30): accessibility p50
+  **852.28 ms** (372 elements); perception cycle **warm** p50 **10.61 ms** / p95
+  15.22; perception cycle **cold** (forced live AT-SPI traversal) p50 **830.78 ms**
+  / p95 922.81; resolution p50 1.64 ms; revalidation p50 **0.90 ms** (target
+  <= 25 ms met); GUI refresh p50 **0.39 ms** / p95 1.09. Recorded in
+  `docs/benchmark_report.md` "Phase 14".
 - Command: `. .venv/bin/activate && ruff check . && mypy . && timeout 600 python -m pytest -o addopts="" -p no:pytest-qt -q`
 - Result (`2026-09-25`, this session, after fixing the malformed `SETUP_TIMEOUT_SECONDS`
   line in `bench/real_desktop.py`, making `bench_keyboard` workload-aware, and adding
@@ -1546,9 +1575,12 @@
   *workflow-controls* result and is now explained rather than open: it was a workload
   limit, not a batching defect. Keyboard is `n = 0` with a reason on this workload
   (the verifiable layout hides the text fields by design).
-- Remaining Phase 14 polish (not blockers): the workflow-workload keyboard/click
-  numbers have no targets set, and the orchestrator's perceive cycle + GUI refresh
-  cost are still unmeasured in the section 76 form.
+- **Phase 14's read-only gaps are closed (this session):** the orchestrator's
+  perceive cycle is measured warm (p50 10.61 ms) and cold (p50 830.78 ms), and the
+  section 71 GUI refresh is measured (p50 0.39 ms) — each with its n and element
+  count stated, in `docs/benchmark_report.md`. What remains unmeasured is only the
+  workflow layout's keyboard/click pair (no targets on that layout; `n = 0` with a
+  reason).
 - **§46 and §43 are both resolved** (2026-09-25, see "Known failures"), and Phase 14's
   real-desktop numbers are recorded in `docs/benchmark_report.md`. The §75 injection
   paths pass (3/1). What remains genuinely open is not another benchmark run but a
@@ -1556,12 +1588,10 @@
   both still halt at step 1 on the §60 verification limit (the fixture's controls
   change only sub-`MEANINGFUL`-ly at their own boxes) — either build a workload whose
   controls repaint `MEANINGFUL`-ly at their own regions, or accept the honest halt.
-- **Phase 14 — benchmarks (§76)** is the next phase. Its outstanding numbers are the
-  real-desktop end-to-end `run_sequence`, the Phase 8 modules
-  (resolution/lease/click), the orchestrator's perceive cycle, and — new — the GUI
-  refresh cost. All of them must be recorded in the §76 form
+- **Phase 14 — benchmarks (§76)** is delivered for every number it was blocked on;
+  all of them are recorded in the §76 form
   (`target, actual, machine, desktop/session, backend, sample count`) in
-  `docs/benchmark_report.md`; a target stays a target until re-measured.
+  `docs/benchmark_report.md`, and a target stays a target until re-measured.
 - **One human command is still outstanding** (not a code task), and it is the only
   thing blocking the *documented* bare `pytest` command:
   ```bash
@@ -1935,7 +1965,7 @@
 
 ## Verification status snapshot
 - Build: N/A (interpreted Python; no build step yet)
-- Lint/typecheck: PASS (`ruff check .` clean; `mypy .` clean, **170 files**)
+- Lint/typecheck: PASS (`ruff check .` clean; `mypy .` clean, **173 files**)
 - Unit tests: PASS (incl. accessibility 21 + browser accessibility 12; event bus 12 +
   state cache 21; OCR 20 incl. one real-backend functional test; target resolver 26;
   mouse 16 + keyboard 23 + input backends 8; policy modes 9 + terminal guard 39 +
@@ -2022,7 +2052,10 @@
   `VERIFICATION_UNVERIFIED` rather than faking a happy path — see
   `docs/benchmark_report.md` "Phase 14". The only §76 target not met on this host is
   the real-desktop 5-step happy path, and the reason is verification (§60), not the
-  batching layer)
+  batching layer — **and this session added the orchestrator's perceive cycle
+  (warm p50 10.61 ms / cold p50 830.78 ms) and the section 71 GUI refresh (p50
+  0.39 ms), closing the read-only gaps**; the only unmeasured row left is the
+  workflow layout's keyboard/click pair, reported `n = 0` with a reason)
 
 - **Real-desktop `run_sequence` happy path is unachievable on the section 74 fixture —
   §60 verification refuses sub-`MEANINGFUL` changes** (found 2026-09-25 while running
@@ -2499,3 +2532,21 @@
   layout hides; `diagnose_fixture` diagnoses the active workload's controls), added
   the matching test, re-ran the gate (**1100 passed, 6 skipped**; ruff + mypy clean,
   172 files), then executed the approved real-input run above.
+- 2026-09-25 — next session, bootstrap: the index matched the tree except for one
+  **dirty file**: `bench/real_desktop.py` carried an uncommitted, untested edit
+  adding the orchestrator's perceive-cycle and the section 71 GUI-refresh
+  benchmarks — exactly the "still unmeasured" Phase 14 polish the index listed, from
+  a session that ended before finishing it. Re-verified the inherited tree first
+  (**1100 passed, 6 skipped**; ruff + mypy clean, 172 files), then finished the
+  work rather than trusting it: a read-only `AppOwner` type so a Body can be
+  benchmarked without an input backend; the perceive cycle split into **warm**
+  (cache-served, section 35) and **cold** (forces a live traversal) so the number
+  cannot present a cache as the live tree; `bench_accessibility`'s note corrected to
+  report the traversal it timed instead of the *Body state* cache (it printed "0
+  elements" while its own traversal returned hundreds); 4 new tests
+  (`tests/integration/test_bench_readonly_real_display.py` 3, incl. one that proves
+  the cold cycle really pays more than the warm one, plus 1 unit); and the real
+  read-only run recorded in `docs/benchmark_report.md`. Measured (n = 30): warm
+  cycle p50 **10.61 ms**, cold cycle p50 **830.78 ms**, GUI refresh p50 **0.39 ms**,
+  revalidation p50 0.90 ms (target <= 25 ms met). Gate: **1104 passed, 6 skipped**;
+  ruff + mypy clean (**173 files**). Still uncommitted on top of `30f0fa3`.

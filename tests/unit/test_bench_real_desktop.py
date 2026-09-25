@@ -20,6 +20,7 @@ from bench.real_desktop import (
     HAPPY_PATH_PLAN,
     VERIFIABLE_PLAN,
     Environment,
+    bench_gui_refresh,
     bench_keyboard,
 )
 
@@ -60,6 +61,24 @@ def test_verifiable_plan_is_five_distinct_clicks_on_the_bench_controls() -> None
 def test_the_two_workloads_do_not_share_controls() -> None:
     """A plan's targets must belong to the layout it is measured against."""
     assert not set(BENCH_CONTROL_NAMES) & set(FIXTURE_CONTROLS)
+
+
+def test_gui_refresh_is_unmeasured_without_an_assembled_body() -> None:
+    """No Body means no number: the honest path reports *why*, not a timing.
+
+    ``bench_gui_refresh`` returns before it imports Qt, so this needs neither a
+    display nor a widget stack. It asserts the property that matters for a
+    measurement harness -- a benchmark that cannot measure a thing says so
+    rather than inventing a value (section 4 rule 8).
+    """
+    env = Environment(real_input=False)
+    assert env.app is None
+
+    result = bench_gui_refresh(env, samples=5)
+
+    assert result.values_ms == []
+    assert result.summary() == {"name": result.name, "n": 0, "note": result.note}
+    assert "no assembled Body" in result.note
 
 
 def test_keyboard_benchmark_is_skipped_without_an_honest_target() -> None:
