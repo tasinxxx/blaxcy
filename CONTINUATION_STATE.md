@@ -990,6 +990,18 @@
     against throwaway prefixes; no system-wide install was performed.
 
 ## Current task
+- **2026-09-25 (bootstrap session) update: the interrupted Phase 14 "verifiable
+  workload" work is reconciled and its number is now measured.** The prior session
+  had built the §76 verifiable workload (fixture `--bench-controls`,
+  `bench/real_desktop.py --workload`) but left it untested, unmeasured, and with a
+  botched edit that glued the workload comment onto `SETUP_TIMEOUT_SECONDS = 30.0`.
+  This session: fixed that line, made the keyboard benchmark workload-aware (it is
+  skipped with a reason on the verifiable layout, which hides the text fields),
+  added 11 tests covering the fixture layout and the runner's workload selection,
+  re-ran the full gate (**1100 passed, 6 skipped**; ruff + mypy clean, 172 files),
+  and — on the operator's go-ahead — ran the real-input verifiable benchmark:
+  **20/20 five-step sequences completed**, p50 2505.23 ms. Recorded in
+  `docs/benchmark_report.md`.
 - Task: Phase 13 is delivered and verified. The next concrete work is
   **Phase 14 — benchmarks (§76)**, whose outstanding numbers are the
   real-desktop end-to-end `run_sequence`, the Phase 8 modules
@@ -1066,8 +1078,21 @@
   `docs/environment_report.md` (regenerated)
 
 ## Last test results (verbatim, not paraphrased as "passed")
+- Command: `. .venv/bin/activate && ruff check . && mypy . && timeout 600 python -m pytest -o addopts="" -p no:pytest-qt -q`
+- Result (`2026-09-25`, this session, after fixing the malformed `SETUP_TIMEOUT_SECONDS`
+  line in `bench/real_desktop.py`, making `bench_keyboard` workload-aware, and adding
+  11 tests for the §76 verifiable workload): `1100 passed, 6 skipped, 3 warnings`;
+  `ruff check .` -> `All checks passed!`; `mypy .` -> `Success: no issues found in
+  172 source files`. The new tests are `tests/integration/test_bench_workload_fixture.py`
+  (7) and `tests/unit/test_bench_real_desktop.py` (4).
+- Command (opt-in real input, this session): `. .venv/bin/activate && python -m bench.real_desktop --confirm-real-input --workload verifiable --samples 20 --input-samples 30 --sequence-samples 20`
+- Result (`2026-09-25`, real X11 desktop, XTEST): accessibility p50 **1027.30 ms**
+  (n=20, 446 elements); resolution p50 **2.59 ms**; revalidation p50 **1.04 ms**
+  (target ≤ 25 ms **met**); click p50 **225.85 ms**, **30/30 VERIFIED**;
+  **5-step `run_sequence` p50 2505.23 ms / p95 3671.94 ms, 20/20 completed all 5
+  steps** (target ≤ 4000 ms met at p50/p95). Recorded in `docs/benchmark_report.md`.
 - Command: `. .venv/bin/activate && timeout 900 python -m pytest -o addopts="" -p no:pytest-qt -q`
-- Result (`2026-09-25`, this session, after adding the §46 live regression test):
+- Result (`2026-09-25`, previous session, after adding the §46 live regression test):
   `1084 passed, 6 skipped, 3 warnings in 24.84s`; `ruff check .` ->
   `All checks passed!`; `mypy .` -> `Success: no issues found in 169 source files`.
   The count moved 1069 -> 1076 -> 1083 across the un-indexed §46 work, +1 for the new
@@ -1508,14 +1533,29 @@
     concrete action").
 
 ## Next concrete action
-- **§46 is resolved and Phase 14's real-desktop numbers are recorded** (2026-09-25,
-  see "Known failures" and `docs/benchmark_report.md`). The §75 injection paths pass
-  (3/1). What remains genuinely open is not another benchmark run but a **decision**:
-  the real-desktop 5-step `run_sequence` happy path cannot be demonstrated on the
-  section 74 fixture because §60 verification refuses sub-`MEANINGFUL` changes —
-  either build a workload whose controls change `MEANINGFUL`-ly at their own boxes,
-  or accept the honest halt result. A second decision is the §43 over-broad ambiguity
-  scope, which is what stops a realistic browser workflow (`"Search"`) here.
+- **§76 verifiable workload: RUN and recorded (2026-09-25).** With the operator's
+  go-ahead:
+  ```bash
+  . .venv/bin/activate && python -m bench.real_desktop --confirm-real-input --workload verifiable --samples 20 --input-samples 30 --sequence-samples 20
+  ```
+  Result: **20/20 five-step `run_sequence` runs completed**, p50 **2505.23 ms** /
+  p95 **3671.94 ms** (n = 20, inside the `<= 4000 ms` target at p50/p95; one max
+  4403.95 ms); click **30/30 VERIFIED**, p50 225.85 ms. The fixture's own counters
+  (`bench_target_1: 52`, `bench_target_2..5: 22`) prove the input landed. Recorded in
+  `docs/benchmark_report.md` "Phase 14". The earlier 0/20 halt stands as the
+  *workflow-controls* result and is now explained rather than open: it was a workload
+  limit, not a batching defect. Keyboard is `n = 0` with a reason on this workload
+  (the verifiable layout hides the text fields by design).
+- Remaining Phase 14 polish (not blockers): the workflow-workload keyboard/click
+  numbers have no targets set, and the orchestrator's perceive cycle + GUI refresh
+  cost are still unmeasured in the section 76 form.
+- **§46 and §43 are both resolved** (2026-09-25, see "Known failures"), and Phase 14's
+  real-desktop numbers are recorded in `docs/benchmark_report.md`. The §75 injection
+  paths pass (3/1). What remains genuinely open is not another benchmark run but a
+  **decision**: the real-desktop 5-step `run_sequence` happy path and the §74 workflow
+  both still halt at step 1 on the §60 verification limit (the fixture's controls
+  change only sub-`MEANINGFUL`-ly at their own boxes) — either build a workload whose
+  controls repaint `MEANINGFUL`-ly at their own regions, or accept the honest halt.
 - **Phase 14 — benchmarks (§76)** is the next phase. Its outstanding numbers are the
   real-desktop end-to-end `run_sequence`, the Phase 8 modules
   (resolution/lease/click), the orchestrator's perceive cycle, and — new — the GUI
@@ -1884,14 +1924,12 @@
   §75 fixture-app e2e suite once that harness can take real input. The unit tests
   cover the controller-to-paster contract and the integration tests cover the real
   selection transfer, so the untested seam is exactly the application's own paste.
-- §43 ambiguity **scope** (finding from the live resolver test, 2026-09-23): the
-  duplicate `label + role` rule currently counts *every* scored candidate, so a
-  **role-hinted** query on a desktop with duplicated role-matching controls
-  (this host has 11 `open launcher menu`/TOGGLE elements) returns `AMBIGUOUS`
-  even when the text match is decisive and unique. It fails closed, so it is safe,
-  but it is over-broad. Revisit whether the rule should consider only candidates
-  competitive with the top (or that matched the query's own text) — needs a human
-  decision, since narrowing it changes a §43 safety rule.
+- ~~§43 ambiguity **scope**~~ — **FIXED 2026-09-25** on explicit operator decision
+  (see "Known failures" for the real cause and evidence). The absolute and gap
+  rules are now judged over the candidates competitive with a *decisive* text match,
+  so role-only ties and unrelated duplicates can no longer veto a unique,
+  decisively-named target. Five new tests in `tests/unit/test_target_resolver.py`
+  cover the positive, negative, bypass and conservatism-preserved paths.
 - Full reproducibility: consider committing the current tree (Phases 2–3) for recovery
   checkpoints (needs user confirmation, §11).
 
@@ -2013,16 +2051,32 @@
     (b) build a benchmark workload whose controls produce `MEANINGFUL` changes at
     their own boxes (a large control that repaints at its own region), then
     re-measure. `bench/real_desktop.py` already parameterises the plan.
-- **§43 ambiguity scope is over-broad and blocks a realistic browser workflow**
-  (re-confirmed 2026-09-25 by the Phase 14 workflow benchmark; already tracked as an
-  Open TODO — recorded here with its real-desktop evidence)
-  - failure: the section 74 workflow (`Search` → type → `Submit` → …) halts at step 1
+- **§43 ambiguity scope was over-broad — RESOLVED 2026-09-25** (found 2026-09-23;
+  re-confirmed by the Phase 14 workflow benchmark and then fixed on explicit
+  operator decision)
+  - failure: the section 74 workflow (`Search` → type → `Submit` → …) halted at step 1
     with `TARGET_AMBIGUOUS` on `{"target": "Search", "role": "BUTTON"}`
-  - observed result: several desktop buttons share the name `Search`, so the
-    duplicate-`(label, role)` rule returns `AMBIGUOUS` even though the fixture's own
-    `Search` is uniquely identifiable by context
-  - current status: open (fails **closed**, so it is safe); needs the human decision
-    already noted in "Open TODOs"
+  - observed result before the fix: the fixture's decisive `"Search"` scored **0.990**
+    yet the result was `AMBIGUOUS` — the *real cause* (reproduced live with the
+    fixture running) was the **absolute duplicate rule firing on unrelated elements
+    elsewhere on the desktop**: two same-named `"Button Alpha"` buttons (plus other
+    duplicated panel/toolbar controls) share a `(label, role)` key and vetoed the
+    winner, even though none of them matched the requested text. It failed closed, so
+    it was safe, but wrong.
+  - fix: the absolute and gap rules are now judged over the candidates competitive
+    with a **decisive** text match (`core/target_resolver.py::_check_ambiguity` +
+    `DECISIVE_TEXT_FLOOR = 0.80`). A candidate that matched only the role is a weaker
+    cascade stage and cannot veto a real text match; unrelated duplicates elsewhere
+    likewise cannot. A role-only match scores at most 0.60 and a decisive text match
+    at least 0.94, so the winner is unchanged. A text-less query, or one whose only
+    matches are weak substring/fuzzy hits, judges every candidate **exactly as
+    before**, and two genuine matches of the requested text remain `AMBIGUOUS`.
+  - evidence: live `resolve(text="Search", role_hint=BUTTON)` is now `RESOLVED` at
+    0.990 (fixture running); the §74 workflow now gets past `w1` and halts on the §60
+    verification limit instead. Five new tests (positive / negative / bypass /
+    weak-match / conservatism-preserved); full gate **1089 passed, 6 skipped**.
+  - current status: **RESOLVED**; no safety guarantee weakened (fails closed as
+    before for every genuinely ambiguous case).
 
 ## Environment facts (verified this session)
 - Host: Kali GNU/Linux Rolling, kernel 7.1.5+kali-amd64, XFCE, X11 (`DISPLAY=:0.0`)
@@ -2401,3 +2455,47 @@
   clean; mypy clean (**170** source files, including the new `bench/real_desktop.py`). No
   production code changed this session — the work was verification, the missing
   regression lock, the Phase 14 runner, and correcting a materially stale index.
+- 2026-09-25 — same session, continued: committed the accumulated Phases 8-14 tree as
+  recovery checkpoint **`30f0fa3`** (131 files, +36183/-263) on the operator's
+  instruction, *then* made code changes on top. On explicit operator decision,
+  **narrowed the §43 ambiguity rule** (`core/target_resolver.py`). Reproduced the real
+  cause live with the fixture running: the fixture's decisive `"Search"` scored 0.990
+  yet was vetoed as `AMBIGUOUS` because the **absolute duplicate rule fired on two
+  unrelated `"Button Alpha"` buttons** elsewhere in the accessibility tree. The rule
+  now judges ambiguity over the candidates competitive with a **decisive** text match
+  (`DECISIVE_TEXT_FLOOR = 0.80`): a role-only match or an unrelated duplicate can no
+  longer veto a uniquely-named target, a role-only match scoring at most 0.60 against
+  at least 0.94 for a decisive text match. A text-less query, or one whose only matches
+  are weak substring/fuzzy hits, judges every candidate **exactly as before**, and two
+  genuine matches of the requested text remain `AMBIGUOUS`. Five new tests cover every
+  §19.2 path (positive, negative, bypass, weak-match, conservatism-preserved). One
+  full-suite failure improved the design: the ungated narrowing also resolved a *weak
+  substring* match in `test_a_primed_hint_is_verified_before_it_is_used`, so the gate
+  was tightened to a decisive match — a test failing for a real design reason, kept as
+  evidence. Verified live: `resolve(text="Search", role_hint=BUTTON)` is now `RESOLVED`
+  at 0.990, and the §74 workflow now clears `w1` (it halts instead on the §60
+  verification limit — the separate open finding). Gate: **1089 passed, 6 skipped**;
+  ruff clean; mypy clean (170 files). **These two changes are on top of `30f0fa3` and
+  are not yet committed.**
+- 2026-09-25 — next session, bootstrap: reconciled the interrupted Phase 14
+  "verifiable workload" work. Found and fixed a real defect from a half-applied edit:
+  `bench/real_desktop.py` had `SETUP_TIMEOUT_SECONDS = 30.0#: The section 76 ...`, a
+  workload comment glued onto the assignment (valid Python, but wrong). Added the
+  coverage the new feature was missing — `tests/integration/test_bench_workload_fixture.py`
+  (7: the bench layout is present only when requested, is sized `240x80` for the §34
+  thresholds, is distinctly named, each click really toggles its own control, and the
+  ordinary widgets are hidden but still state-readable) and
+  `tests/unit/test_bench_real_desktop.py` (3: `--workload` selects the right layout
+  and plan, the verifiable plan is five distinct description-only clicks, the two
+  workloads share no controls) — and updated `docs/benchmark_report.md` to state
+  honestly that the harness is built and tested but the real-desktop number is not yet
+  measured. Gate: **1099 passed, 6 skipped**; ruff clean; mypy clean (172 files). The
+  only remaining work was the opt-in real-input run — which the operator then
+  approved and it ran green: **20/20 five-step sequences completed**, p50 2505.23 ms,
+  recorded in `docs/benchmark_report.md`; keyboard is `n = 0` with a reason on this
+  workload.
+- 2026-09-25 — same session: made the harness honest for the verifiable workload
+  before running it (`bench_keyboard` no longer reports a number for a target the
+  layout hides; `diagnose_fixture` diagnoses the active workload's controls), added
+  the matching test, re-ran the gate (**1100 passed, 6 skipped**; ruff + mypy clean,
+  172 files), then executed the approved real-input run above.

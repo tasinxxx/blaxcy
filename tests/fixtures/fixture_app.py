@@ -48,6 +48,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
+    QGridLayout,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -64,6 +65,17 @@ DUPLICATE_ALPHA_NAME = "Button Alpha"
 
 #: The five workflow controls, in the order the run_sequence fixture expects.
 WORKFLOW_ORDER = ("search_icon", "search_input", "submit_button", "result_list", "play_button")
+
+#: Section 76 benchmark controls: laid out 2 columns x 3 rows so the whole set fits
+#: well inside any window position. Each is large enough that a repaint spans at
+#: least five thumbnail tiles wide and three tall (the section 34 ``MEANINGFUL``
+#: thresholds on a 1366x768 desktop), and the controls are separated by more than a
+#: tile so two controls' changes never merge into one component -- which the
+#: temporal layer would then reclassify ANIMATION.
+BENCH_CONTROL_WIDTH = 240
+BENCH_CONTROL_HEIGHT = 80
+BENCH_CONTROL_GAP = 50
+BENCH_CONTROL_HGAP = 20
 
 
 class CanvasWidget(QWidget):
@@ -104,9 +116,15 @@ def _make_icon() -> QIcon:
 class FixtureWindow(QMainWindow):
     """The fixture window: widget inventory, counters and command operations."""
 
-    def __init__(self, title: str) -> None:
+    def __init__(self, title: str, *, bench_controls: bool = False) -> None:
         super().__init__()
         self.setWindowTitle(title)
+        self._bench_controls = bench_controls
+        #: Per-control toggle state for the benchmark controls (specification
+        #: section 76). Kept separate from ``_counters`` so a benchmark can prove a
+        #: real click actually changed the control rather than only bumping a count.
+        self._bench_state: dict[int, bool] = {}
+        self._bench_buttons: list[QPushButton] = []
         self.setObjectName("fixture_window")
 
         self._counters: dict[str, int] = {}
@@ -192,7 +210,7 @@ class FixtureWindow(QMainWindow):
         self.play_button.setEnabled(False)
 
         # --- assembling the layout -------------------------------------------
-        for widget in (
+        widgets: list[QWidget] = [
             self.btn_alpha,
             self.btn_alpha_dup_1,
             self.btn_alpha_dup_2,
@@ -210,8 +228,33 @@ class FixtureWindow(QMainWindow):
             self.submit_button,
             self.result_list,
             self.play_button,
-        ):
-            layout.addWidget(widget, alignment=Qt.AlignmentFlag.AlignLeft)
+        ]
+        if bench_controls:
+            # Section 76 benchmark workload: a dedicated layout of large controls
+            # that repaint at their *own* region when clicked, so a real click
+            # produces a MEANINGFUL change overlapping the target and can actually
+            # be verified. The ordinary controls are excluded from this layout (and
+            # kept parented but hidden, so none becomes a stray top-level window);
+            # if they were included the column would over-constrain the window and
+            # Qt would compress the gaps, merging two controls' changes into one
+            # component that the temporal layer then reclassifies ANIMATION. Only
+            # built when the caller asks, so no existing fixture test sees them.
+            self._bench_buttons = [self._bench_button(index) for index in range(1, 6)]
+            grid = QGridLayout()
+            grid.setHorizontalSpacing(BENCH_CONTROL_HGAP)
+            grid.setVerticalSpacing(BENCH_CONTROL_GAP)
+            for index, button in enumerate(self._bench_buttons):
+                grid.addWidget(button, index // 2, index % 2)
+            layout.addLayout(grid)
+            layout.addStretch(1)
+            hidden = QWidget(root)
+            hidden.hide()
+            for widget in widgets:
+                widget.setParent(hidden)
+                widget.hide()
+        else:
+            for widget in widgets:
+                layout.addWidget(widget, alignment=Qt.AlignmentFlag.AlignLeft)
         self.setCentralWidget(root)
 
         # --- menu -------------------------------------------------------------
@@ -248,6 +291,41 @@ class FixtureWindow(QMainWindow):
     def _bump(self, name: str) -> None:
         """Record a state change for a named control."""
         self._counters[name] = self._counters.get(name, 0) + 1
+
+    def _bench_button(self, index: int) -> QPushButton:
+        """A large control that toggles its own background when clicked (section 76).
+
+        Sized so its repaint spans at least five thumbnail tiles wide and three
+        tall (the section 34 ``MEANINGFUL`` thresholds), and confined to its own
+        box so the change also *overlaps the target* -- which is what lets section
+        60 verification succeed for a real click on a real desktop.
+        """
+        button = QPushButton(f"Bench Target {index}")
+        button.setObjectName(f"bench_target_{index}")
+        button.setAccessibleName(f"Bench Target {index}")
+        button.setFixedSize(BENCH_CONTROL_WIDTH, BENCH_CONTROL_HEIGHT)
+        # Non-focusable on purpose: a focus ring toggling on another control as
+        # focus moves would add a *second* changed region near the target and make
+        # the temporal layer treat the neighbourhood as animation.
+        button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        button.setStyleSheet(self._bench_style(False))
+        button.clicked.connect(lambda _checked=False, i=index: self._toggle_bench(i))
+        self._bench_state[index] = False
+        return button
+
+    def _bench_style(self, on: bool) -> str:
+        """Two high-contrast styles, so a toggle is a large unambiguous change."""
+        if on:
+            return "background-color: #f5f5f5; color: #101010; font-size: 20px;"
+        return "background-color: #101418; color: #e0e0e0; font-size: 20px;"
+
+    def _toggle_bench(self, index: int) -> None:
+        """Flip one benchmark control's state and record the click."""
+        self._bench_state[index] = not self._bench_state.get(index, False)
+        self._bump(f"bench_target_{index}")
+        widget = self.find_control(f"bench_target_{index}")
+        if isinstance(widget, QPushButton):
+            widget.setStyleSheet(self._bench_style(self._bench_state[index]))
 
     def _on_focus_changed(self, _old: QWidget | None, now: QWidget | None) -> None:
         """Record the object name of the newly focused widget, if any."""
@@ -336,6 +414,7 @@ class FixtureWindow(QMainWindow):
             "workflow_present": all(
                 self.find_control(name) is not None for name in WORKFLOW_ORDER
             ),
+            "bench_targets": dict(self._bench_state),
             "destroyed": list(self._destroyed),
             "focused": self._focused_object_name(),
         }
@@ -533,9 +612,9 @@ class CommandPump:
             app.quit()
 
 
-def build_window(title: str) -> FixtureWindow:
+def build_window(title: str, *, bench_controls: bool = False) -> FixtureWindow:
     """Create and show the fixture window (does not start the event loop)."""
-    window = FixtureWindow(title)
+    window = FixtureWindow(title, bench_controls=bench_controls)
     window.show()
     return window
 
@@ -549,6 +628,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="force the Qt offscreen platform (no display server needed)",
     )
+    parser.add_argument(
+        "--bench-controls",
+        action="store_true",
+        help="add the section 76 large self-verifying benchmark controls",
+    )
     args = parser.parse_args(argv)
 
     if args.offscreen:
@@ -559,7 +643,7 @@ def main(argv: list[str] | None = None) -> int:
     if not isinstance(app, QApplication):
         app = QApplication(sys.argv[:1])
 
-    window = build_window(args.title)
+    window = build_window(args.title, bench_controls=args.bench_controls)
     pump = CommandPump(window)
     pump.start()
     return int(app.exec())

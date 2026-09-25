@@ -62,12 +62,20 @@ ACCESSIBILITY_BUDGET = {"deadline_ms": 8000, "max_nodes": 6000}
 #: How long to wait for the fixture to appear in perception.
 SETUP_TIMEOUT_SECONDS = 30.0
 
-#: A five-step plan whose every step is chosen to be *verifiable* on a real
-#: desktop: ``type_text`` establishes ``TEXT_PRESENT`` and ``click`` on the toggle
-#: changes the control surface itself, so the section 60 postcondition is actually
-#: met. A plan of plain-button clicks would be honest but unverifiable on a real
-#: desktop (a button that only changes focus produces no ``MEANINGFUL`` change),
-#: and section 76 asks for a *happy path*, not a halted one.
+#: The section 76 **verifiable** workload: five large controls whose repaint lands
+#: at their own region (see ``tests/fixtures/fixture_app.py::_bench_button``), so a
+#: real click really produces a ``MEANINGFUL`` change overlapping the target and
+#: section 60 can verify it. Only present when the fixture is launched with
+#: ``--bench-controls``.
+BENCH_CONTROL_NAMES: tuple[str, ...] = tuple(f"Bench Target {i}" for i in range(1, 6))
+VERIFIABLE_PLAN: list[dict[str, Any]] = [
+    {"step_id": f"s{index}", "tool": "click", "target": name}
+    for index, name in enumerate(BENCH_CONTROL_NAMES, start=1)
+]
+
+#: A workflow-shaped five-step plan over the ordinary fixture controls. Kept as the
+#: "honest halt" case: those controls change only sub-``MEANINGFUL``-ly at their own
+#: boxes, so every step is correctly ``UNVERIFIED`` and the sequence halts.
 HAPPY_PATH_PLAN: list[dict[str, Any]] = [
     {"step_id": "s1", "tool": "type_text", "target": "Search Box", "text": "bench"},
     {"step_id": "s2", "tool": "type_text", "target": "Text Input", "text": "bench"},
@@ -128,13 +136,28 @@ def _percentile(ordered: Sequence[float], fraction: float) -> float:
 class Environment:
     """The live fixture plus the assembled Body, with the cleanup they need."""
 
-    def __init__(self, *, real_input: bool) -> None:
+    def __init__(self, *, real_input: bool, workload: str = "workflow") -> None:
         self.real_input = real_input
+        self.workload = workload
         self.fixture: FixtureApp | None = None
         self.app: BlaxcyApplication | None = None
         self.backend: Any = None
         self.restore_pointer: tuple[int, int] | None = None
         self.notes: list[str] = []
+        # The workload selects which fixture layout and plan are used. The
+        # "verifiable" workload adds the section 76 large self-verifying controls.
+        self.verifiable = workload == "verifiable"
+        self.expected_controls = BENCH_CONTROL_NAMES if self.verifiable else FIXTURE_CONTROLS
+        self.focus_object = "bench_target_1" if self.verifiable else "text_input"
+        self.focus_accessible = BENCH_CONTROL_NAMES[0] if self.verifiable else "Text Input"
+        self.sequence_plan = VERIFIABLE_PLAN if self.verifiable else HAPPY_PATH_PLAN
+        self.click_target = BENCH_CONTROL_NAMES[0] if self.verifiable else "Toggle State"
+        # The verifiable layout hides the ordinary text fields on purpose (they would
+        # overlap the large controls), so there is no honest typing target to measure
+        # there. Reporting a number against a target the layout does not expose would
+        # be a harness artifact, not a Body result, so the keyboard benchmark is
+        # skipped with a note instead (section 4 rule 8).
+        self.keyboard_target = None if self.verifiable else "Text Input"
 
     def __enter__(self) -> Environment:
         selected = select_backend()
@@ -147,7 +170,11 @@ class Environment:
         self.restore_pointer = selected.get_pointer_position()
 
         if self.real_input:
-            self.fixture = FixtureApp(platform="xcb", start_timeout=SETUP_TIMEOUT_SECONDS).start()
+            self.fixture = FixtureApp(
+                platform="xcb",
+                start_timeout=SETUP_TIMEOUT_SECONDS,
+                bench_controls=self.verifiable,
+            ).start()
 
         base = self_excluded_settings(load_settings(None))
         settings = base.model_copy(
@@ -203,7 +230,7 @@ class Environment:
     def _wait_for_fixture(self) -> None:
         assert self.app is not None
         deadline = time.monotonic() + SETUP_TIMEOUT_SECONDS
-        wanted = set(FIXTURE_CONTROLS)
+        wanted = set(self.expected_controls)
         while time.monotonic() < deadline:
             self.app.perceive()
             if wanted <= self._perceived_names():
@@ -236,7 +263,7 @@ class Environment:
         assert self.app is not None and self.fixture is not None
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            self.fixture.set_focus("text_input")
+            self.fixture.set_focus(self.focus_object)
             state = self.app.perceive()
             if state is None:
                 time.sleep(0.25)
@@ -245,7 +272,8 @@ class Environment:
                 (
                     candidate
                     for candidate in state.elements
-                    if candidate.text == "Text Input" or candidate.accessible_name == "Text Input"
+                    if candidate.text == self.focus_accessible
+                    or candidate.accessible_name == self.focus_accessible
                 ),
                 None,
             )
@@ -348,7 +376,7 @@ def bench_click(env: Environment, samples: int) -> Samples:
         if not env.ensure_active():
             skipped += 1
             continue
-        call = ToolCall(name=ToolName.CLICK, arguments={"target": "Toggle State"})
+        call = ToolCall(name=ToolName.CLICK, arguments={"target": env.click_target})
         started = time.perf_counter()
         envelope = env.dispatch(call)
         result.add(time.perf_counter() - started)
@@ -369,6 +397,13 @@ def bench_click(env: Environment, samples: int) -> Samples:
 def bench_keyboard(env: Environment, samples: int) -> Samples:
     """Section 76: an end-to-end type_text on a real field, through the dispatcher."""
     result = Samples("end-to-end keyboard (type_text + verify)", "ms", None)
+    if env.keyboard_target is None:
+        result.note = (
+            "not applicable: the verifiable workload has no visible text field by "
+            "design (it would overlap the large controls); see the workflow workload "
+            "for the keyboard number"
+        )
+        return result
     verified = 0
     codes: dict[str, int] = {}
     reason = ""
@@ -379,7 +414,7 @@ def bench_keyboard(env: Environment, samples: int) -> Samples:
             continue
         call = ToolCall(
             name=ToolName.TYPE_TEXT,
-            arguments={"target": "Text Input", "text": f"bench{index}"},
+            arguments={"target": env.keyboard_target, "text": f"bench{index}"},
         )
         started = time.perf_counter()
         envelope = env.dispatch(call)
@@ -403,11 +438,13 @@ def diagnose_fixture(env: Environment) -> list[dict[str, Any]]:
 
     Read-only: it resolves each target with the exact call the executor makes and
     reports the verdict, so a refused benchmark is explained rather than guessed.
+    Diagnoses the *active workload's* controls, so a verifiable run explains the
+    large controls it actually clicked rather than the hidden ordinary ones.
     """
     assert env.app is not None
     state = env.live_state()
     rows: list[dict[str, Any]] = []
-    for name in FIXTURE_CONTROLS:
+    for name in env.expected_controls:
         result = env.app.resolver.resolve(
             ElementQuery(text=name), state.elements, occluders=state.elements, state=state
         )
@@ -430,9 +467,11 @@ def diagnose_fixture(env: Environment) -> list[dict[str, Any]]:
     return [{"stack": stack}, *rows]
 
 
-def bench_sequence(env: Environment, samples: int, *, halt_on_unknown: bool = False) -> Samples:
+def bench_sequence(env: Environment, samples: int) -> Samples:
     """Section 76: the real-desktop end-to-end five-step ``run_sequence``."""
-    result = Samples("end-to-end 5-step run_sequence (real desktop)", "ms", "<= 4000 ms warm")
+    plan = env.sequence_plan
+    suffix = " (verifiable workload)" if env.verifiable else " (workflow controls)"
+    result = Samples(f"end-to-end 5-step run_sequence{suffix}", "ms", "<= 4000 ms warm")
     completed = 0
     halted: dict[str, int] = {}
     skipped = 0
@@ -440,12 +479,12 @@ def bench_sequence(env: Environment, samples: int, *, halt_on_unknown: bool = Fa
         if not env.ensure_active():
             skipped += 1
             continue
-        call = ToolCall(name=ToolName.RUN_SEQUENCE, arguments={"steps": HAPPY_PATH_PLAN})
+        call = ToolCall(name=ToolName.RUN_SEQUENCE, arguments={"steps": plan})
         started = time.perf_counter()
         envelope = env.dispatch(call)
         result.add(time.perf_counter() - started)
         steps = _step_results(envelope)
-        if envelope.ok and len(steps) == len(HAPPY_PATH_PLAN) and all(
+        if envelope.ok and len(steps) == len(plan) and all(
             step.get("ok") for step in steps
         ):
             completed += 1
@@ -547,14 +586,22 @@ def _code(envelope: Any) -> str | None:
 # -- Entry point --------------------------------------------------------------
 
 
-def run(*, samples: int, input_samples: int, sequence_samples: int, real_input: bool) -> int:
+def run(
+    *,
+    samples: int,
+    input_samples: int,
+    sequence_samples: int,
+    real_input: bool,
+    workload: str = "workflow",
+) -> int:
     """Run the benchmark set and print a markdown report to stdout."""
     results: list[dict[str, Any]] = []
-    with Environment(real_input=real_input) as env:
+    with Environment(real_input=real_input, workload=workload) as env:
         print(f"# BLAXCY real-desktop benchmarks (samples: read-only={samples}, input={input_samples})")
         print()
         print(f"- session: X11 {__import__('os').environ.get('DISPLAY')}")
         print(f"- real input: {real_input}")
+        print(f"- workload: {workload}")
         print()
         results.append(bench_accessibility(env, samples).summary())
         results.append(bench_resolution(env, samples).summary())
@@ -563,7 +610,10 @@ def run(*, samples: int, input_samples: int, sequence_samples: int, real_input: 
             results.append(bench_click(env, input_samples).summary())
             results.append(bench_keyboard(env, input_samples).summary())
             results.append(bench_sequence(env, sequence_samples).summary())
-            results.append({"name": "section 74 workflow outcome", **bench_workflow_outcome(env)})
+            if not env.verifiable:
+                results.append(
+                    {"name": "section 74 workflow outcome", **bench_workflow_outcome(env)}
+                )
         if real_input:
             print("## fixture target diagnosis")
             print(json.dumps(diagnose_fixture(env), indent=2))
@@ -590,6 +640,16 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="opt in to the click/keyboard/sequence benchmarks (they inject real input)",
     )
+    parser.add_argument(
+        "--workload",
+        choices=("workflow", "verifiable"),
+        default="workflow",
+        help=(
+            "'workflow' uses the ordinary fixture controls (honest halt); "
+            "'verifiable' adds the section 76 large self-verifying controls so a "
+            "real 5-step run_sequence happy path can be measured"
+        ),
+    )
     args = parser.parse_args(argv)
     try:
         return run(
@@ -597,6 +657,7 @@ def main(argv: list[str] | None = None) -> int:
             input_samples=args.input_samples,
             sequence_samples=args.sequence_samples,
             real_input=args.confirm_real_input,
+            workload=args.workload,
         )
     except RuntimeError as exc:
         print(f"benchmark could not run: {exc}", file=sys.stderr)

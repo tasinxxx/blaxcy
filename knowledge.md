@@ -300,11 +300,15 @@ master specification for the full bootstrap procedure.
   only XTEST is implemented, and the xdotool path is explicitly not implemented
   (no dead stub). Every held key/button is tracked so `release_all` can undo it
   (§52/§63).
-- §43 ambiguity is deliberately conservative: the duplicate `label + role` rule
-  counts every scored candidate, so a **role-hinted** query on a desktop with
-  duplicated role-matching controls reports `AMBIGUOUS` even when a text match is
-  decisive. It fails closed (safe), but is over-broad; narrowing it is a §43
-  safety-rule change that needs an explicit decision.
+- §43 ambiguity is conservative but no longer over-broad (narrowed 2026-09-25 on
+  explicit operator decision): when the query names text and a candidate matches it
+  **decisively** (text component > 0.80 — exact / case-insensitive / normalized /
+  accessible-name, *not* the weak 0.55 substring or the ≤0.80 fuzzy signal), the
+  absolute and gap rules are judged over the text-matching candidates alone. A
+  role-only control, or an unrelated duplicate elsewhere on the desktop (e.g. two
+  same-named panel buttons), can no longer veto a unique, decisively-named target.
+  A text-less query, or one whose only matches are weak, behaves exactly as before,
+  and two genuine matches of the requested text are still `AMBIGUOUS`.
 - The §48 mouse sequence is ordered and fail-closed: transform+clamp → inject →
   flush → bounded readback/correction. An off-target readback after corrections
   makes the move **fail**, so a click can never follow a known-bad position;

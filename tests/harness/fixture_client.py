@@ -66,11 +66,13 @@ class FixtureApp:
         title: str = "BLAXCY Test Fixture",
         start_timeout: float = 20.0,
         command_timeout: float = 10.0,
+        bench_controls: bool = False,
     ) -> None:
         self._platform = platform
         self._title = title
         self._start_timeout = start_timeout
         self._command_timeout = command_timeout
+        self._bench_controls = bench_controls
         self._process: subprocess.Popen[str] | None = None
         self._lines: queue.Queue[Any] = queue.Queue()
         self._reader: threading.Thread | None = None
@@ -90,8 +92,11 @@ class FixtureApp:
         if self._platform is not None:
             env["QT_QPA_PLATFORM"] = self._platform
 
+        argv = [sys.executable, str(FIXTURE_APP), "--title", self._title]
+        if self._bench_controls:
+            argv.append("--bench-controls")
         self._process = subprocess.Popen(
-            [sys.executable, str(FIXTURE_APP), "--title", self._title],
+            argv,
             cwd=str(PROJECT_ROOT),
             env=env,
             stdin=subprocess.PIPE,

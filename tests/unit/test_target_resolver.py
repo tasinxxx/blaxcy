@@ -234,6 +234,82 @@ def test_clear_winner_is_not_ambiguous() -> None:
     assert result.element.element_id == "exact"
 
 
+def test_role_only_matches_cannot_veto_a_decisive_text_match() -> None:
+    """A unique text target wins even when many role-only controls tie (section 43).
+
+    This is the real-desktop shape the narrowing exists for: every unnamed panel
+    button matches a role hint and ties with its siblings at the same score. Before
+    the narrowing that tie made a uniquely-named control ``AMBIGUOUS``; a role-only
+    match scores at most 0.60 while any textual match scores at least 0.81, so the
+    text match is necessarily the winner.
+    """
+    target = _element("target", text="Search", atspi_path="/p/target")
+    panel = [_element(f"panel{i}", text=None, atspi_path=f"/p/panel{i}") for i in range(4)]
+
+    result = _resolver().resolve(
+        ElementQuery(text="Search", role_hint=UIRole.BUTTON), [target, *panel]
+    )
+
+    assert result.status is ResolutionStatus.RESOLVED
+    assert result.ambiguity is False
+    assert result.element is not None
+    assert result.element.element_id == "target"
+    assert result.matched_stage == "exact_text"
+
+
+def test_two_text_matches_with_a_role_hint_stay_ambiguous() -> None:
+    """The absolute rule still fires for two real matches of the requested text."""
+    a = _element("a", text="Search", atspi_path="/p/a")
+    b = _element("b", text="search", atspi_path="/p/b")
+
+    result = _resolver().resolve(ElementQuery(text="Search", role_hint=UIRole.BUTTON), [a, b])
+
+    assert result.status is ResolutionStatus.AMBIGUOUS
+    assert result.ambiguity is True
+    assert result.best is None
+
+
+def test_a_weaker_text_match_still_beats_a_role_only_tie() -> None:
+    """A weak (substring) text match still out-scores role-only candidates.
+
+    The narrowing is gated on a *decisive* text match, so this case is decided by
+    the ordinary scoring and gap rule -- which must still prefer the text match.
+    """
+    weak = _element("weak", text="Search settings", atspi_path="/p/weak")
+    panel = [_element(f"panel{i}", text=None, atspi_path=f"/p/panel{i}") for i in range(3)]
+
+    result = _resolver().resolve(
+        ElementQuery(text="Search", role_hint=UIRole.BUTTON), [weak, *panel]
+    )
+
+    assert result.status is ResolutionStatus.RESOLVED
+    assert result.element is not None
+    assert result.element.element_id == "weak"
+
+
+def test_role_only_query_with_duplicate_controls_stays_ambiguous() -> None:
+    """A text-less query keeps the original conservative behaviour."""
+    a = _element("a", text="Launcher", role=UIRole.TOGGLE, atspi_path="/p/a")
+    b = _element("b", text="Launcher", role=UIRole.TOGGLE, atspi_path="/p/b")
+
+    result = _resolver().resolve(ElementQuery(role_hint=UIRole.TOGGLE), [a, b])
+
+    assert result.status is ResolutionStatus.AMBIGUOUS
+    assert result.ambiguity is True
+
+
+def test_a_text_query_matching_nothing_keeps_the_conservative_rule() -> None:
+    """With no textual match at all, role-only ties are still ambiguous."""
+    panel = [_element(f"panel{i}", text=None, atspi_path=f"/p/panel{i}") for i in range(3)]
+
+    result = _resolver().resolve(
+        ElementQuery(text="Nonexistent", role_hint=UIRole.BUTTON), panel
+    )
+
+    assert result.status is ResolutionStatus.AMBIGUOUS
+    assert result.ambiguity is True
+
+
 # -- Occlusion (section 46) ---------------------------------------------------
 
 

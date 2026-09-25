@@ -15,7 +15,12 @@ callers:
   the same normalized text *and* the same role, the result is ``AMBIGUOUS`` --
   even under AUTONOMOUS policy, even with perfect confidence, even if a future
   resolver cache or visual-grounding source claims otherwise. Ambiguity is never
-  out-voted.
+  out-voted. The rule is judged over the candidates **competitive with a decisive
+  text match**: when the query names text and at least one candidate matched it
+  decisively, only the text-matching candidates are considered, so neither a
+  role-only control nor an unrelated duplicate elsewhere on the desktop can veto a
+  unique, decisively-named target. A text-less query, or a query whose only matches
+  are weak substring/fuzzy hits, judges every candidate exactly as before.
 * **Occlusion is not "element exists"** (section 46). A target more than 50%
   covered by a known occluder is not actionable, and BLAXCY never clicks
   "through" another window. With no geometry at all the target is not silently
@@ -72,6 +77,23 @@ CASCADE_STAGES: tuple[str, ...] = (
     "context",
     "dom_path",
 )
+
+#: The cascade stages that represent a match of the query's *own text* (section
+#: 43). A candidate whose stage is one of these actually matched the requested
+#: text; a candidate that matched only the role/context is a weaker stage and must
+#: not create an ambiguity against a decisive text match. ``normalized_text`` is
+#: included because the weak substring and section 43.1 fuzzy hits are graded
+#: below any real textual match but are still textual evidence, not role-only.
+TEXT_MATCH_STAGES: frozenset[str] = frozenset(
+    {"exact_text", "case_insensitive_text", "normalized_text", "accessible_name"}
+)
+
+#: A candidate whose text component is above this is a **decisive** textual match
+#: (exact, case-insensitive, normalized or accessible-name), as opposed to the
+#: weak substring (0.55) and section 43.1 fuzzy (at most 0.80) signals. Only a
+#: decisive match narrows the ambiguity rule to the text-matching candidates, so a
+#: genuinely weak match still obeys the full conservative rule.
+DECISIVE_TEXT_FLOOR: float = 0.80
 
 #: An object that can occlude a target: a perceived element, or a bare rect
 #: (e.g. a window known to sit above the target's window).
@@ -506,7 +528,7 @@ class TargetResolver:
         top_score, _, top, top_stage = scored[0]
         kept = ranked[: self.settings.max_candidates]
 
-        ambiguous, ambiguity_reason = self._check_ambiguity(scored)
+        ambiguous, ambiguity_reason = self._check_ambiguity(scored, query)
         # Section 46: only objects *above* the winner can hide it. The caller's
         # candidate list is everything it perceived, so it is narrowed to the
         # windows stacked at or above the target's (never widened -- an unknown
@@ -782,16 +804,41 @@ class TargetResolver:
         return 0.0
 
     def _check_ambiguity(
-        self, scored: Sequence[tuple[float, str, ElementCandidate, str | None]]
+        self,
+        scored: Sequence[tuple[float, str, ElementCandidate, str | None]],
+        query: ElementQuery,
     ) -> tuple[bool, str]:
         """Apply section 43's absolute and gap ambiguity rules.
 
         Deterministic and independent of confidence: two candidates that share a
         normalized label and a role are ambiguous no matter how sure perception
         is, and a near-tie at the top is ambiguous too.
+
+        Both rules are judged over the candidates **competitive with a decisive
+        text match**. When the query names text and at least one candidate matched
+        it decisively (a real textual match, not a weak substring or fuzzy hit),
+        the rule is applied to the text-matching candidates alone: a candidate
+        that matched only the role is a weaker cascade stage (section 43) and must
+        not create an ambiguity against the winner, and unrelated duplicates
+        elsewhere on the desktop (for example two same-named buttons in a panel)
+        must not veto a unique, decisively-named target either. A role-only match
+        scores at most ``0.60`` while a decisive text match scores at least
+        ``0.94``, so the winner is unchanged. When the query names no text, or
+        nothing matched its text decisively, every candidate is considered exactly
+        as before -- the rule is never weakened for a text-less or weak-match
+        query.
         """
+        considered: Sequence[tuple[float, str, ElementCandidate, str | None]] = scored
+        if query.normalized_text:
+            text_matches = [item for item in scored if item[3] in TEXT_MATCH_STAGES]
+            decisive = any(
+                item[2].breakdown.get("text", 0.0) > DECISIVE_TEXT_FLOOR for item in text_matches
+            )
+            if decisive:
+                considered = text_matches
+
         by_identity: dict[tuple[str, str], int] = {}
-        for _, _, candidate, _ in scored:
+        for _, _, candidate, _ in considered:
             label = _element_label(candidate.element)
             if not label:
                 continue
@@ -805,8 +852,8 @@ class TargetResolver:
                 f"two visible candidates share normalized text '{label}' and role {role}",
             )
 
-        if len(scored) >= 2:
-            gap = scored[0][0] - scored[1][0]
+        if len(considered) >= 2:
+            gap = considered[0][0] - considered[1][0]
             if gap <= self.settings.ambiguity_gap:
                 return (
                     True,

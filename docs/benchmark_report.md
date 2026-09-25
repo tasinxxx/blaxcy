@@ -223,8 +223,10 @@ XTEST, XFCE X11).
 | Lease revalidation (section 45 checklist, 11 checks) | ≤ 25 ms | p50 **1.04 ms**, p95 **2.16 ms** (n = 200) | genuinely **met** on a real desktop |
 | End-to-end click (resolve→lease→revalidate→click→verify) | none set | p50 **220.20 ms**, p95 **1332.77 ms** (n = 50) | **5/50 VERIFIED**; 45 refused `VERIFICATION_UNVERIFIED` |
 | End-to-end keyboard (`type_text` + verify) | none set | p50 **112.52 ms**, p95 **1179.69 ms** (n = 50) | **3/50 VERIFIED**; 47 refused `VERIFICATION_UNVERIFIED` |
-| 5-step `run_sequence`, real desktop | ≤ 4000 ms | p50 **99.01 ms**, p95 **133.31 ms**, min 66.76, max 1105.42 (n = 20) | **0/20 completed**: every run halts at step 1 with `VERIFICATION_UNVERIFIED` |
-| Section 74 workflow (`Search`→type→`Submit`→`Results`→`Play`), real desktop | n/a | **TARGET_AMBIGUOUS** at w1 (`13.25 ms`) | role-hinted `"Search"` matches several desktop buttons (section 43's rule fails closed) |
+| 5-step `run_sequence`, real desktop (workflow controls) | ≤ 4000 ms | p50 **99.01 ms**, p95 **133.31 ms**, min 66.76, max 1105.42 (n = 20) | **0/20 completed**: every run halts at step 1 with `VERIFICATION_UNVERIFIED` |
+| 5-step `run_sequence`, real desktop (**verifiable workload**) | ≤ 4000 ms | p50 **2505.23 ms**, p95 **3671.94 ms**, min 1064.24, max 4403.95 (n = 20) | **20/20 completed all 5 steps** — target met at p50/p95; one run's max exceeded it |
+| End-to-end click, real desktop (**verifiable workload**) | none set | p50 **225.85 ms**, p95 **1875.25 ms**, min 183.18, max 2070.86 (n = 30) | **30/30 VERIFIED** — the large control repaints at its own box |
+| Section 74 workflow (`Search`→type→`Submit`→`Results`→`Play`), real desktop | n/a | **`VERIFICATION_UNVERIFIED`** at w1 (`180 ms`) after the §43 fix — it was `TARGET_AMBIGUOUS` before | the narrow §43 rule lets the decisive `"Search"` resolve; the halt is now the same §60 verification limit as the sequence above |
 
 Interpretation, stated narrowly and honestly:
 
@@ -249,12 +251,36 @@ Interpretation, stated narrowly and honestly:
   happy-path number requires a workload whose controls produce `MEANINGFUL` changes
   at their own boxes; the section 74 fixture (small buttons, small fields) is not
   such a workload, and section 76 says a target stays a target until re-measured.
-- The workflow's `TARGET_AMBIGUOUS` is the known **over-broad section 43 ambiguity
-  scope** (recorded in `CONTINUATION_STATE.md`): the duplicate `(label, role)` rule
-  counts every scored candidate, so a role hint on a desktop with several
-  `"Search"`-named buttons is ambiguous even when the text match is decisive. It
-  fails closed, so it is safe, but it is why a realistic browser workflow cannot be
-  driven on this desktop.
+- **The verifiable workload is now measured and the happy path is achieved.**
+  The fixture's opt-in `--bench-controls` layout adds five large (`240x80`)
+  controls that toggle their own background at their own box, so a real click
+  produces a `MEANINGFUL` change overlapping the target; `bench/real_desktop.py`
+  exposes it as `--workload verifiable` (five `click` steps on `Bench Target 1..5`).
+  Measured on this host: **20/20 runs completed all five steps**, p50 **2505.23 ms**
+  / p95 **3671.94 ms** (n = 20), inside the section 76 `<= 4000 ms` target at p50 and
+  p95 (one run's max was 4403.95 ms). The click benchmark on the same layout is
+  **30/30 VERIFIED** (p50 225.85 ms). The input really landed: the fixture's own
+  counters after the run read `bench_target_1: 52`, `bench_target_2..5: 22`, so this
+  is a measured outcome, not a harness claim. This is the number the earlier
+  "workflow controls" run could not produce, and it confirms the earlier analysis:
+  the halt was a *workload* limit, not a batching defect. The harness is covered by
+  `tests/integration/test_bench_workload_fixture.py` (the layout is present only when
+  requested, sized for the section 34 thresholds, distinctly named, and each click
+  really toggles that control) and `tests/unit/test_bench_real_desktop.py` (the
+  workload selects the right layout and plan). The keyboard benchmark is reported as
+  `n = 0` with a reason on this workload, because the verifiable layout hides the
+  text fields by design and measuring a target the layout does not expose would be a
+  harness artifact rather than a Body result.
+- The workflow's earlier `TARGET_AMBIGUOUS` was the **over-broad section 43
+  ambiguity scope**, now fixed on explicit operator decision: the duplicate
+  `(label, role)` rule counted every scored candidate, so unrelated duplicates
+  elsewhere on the desktop (the live repro was **two same-named `"Button Alpha"`
+  buttons** in the fixture) vetoed a decisive, uniquely-named target. §43 now judges
+  ambiguity over the candidates competitive with a *decisive* text match; measured
+  live, `resolve(text="Search", role_hint=BUTTON)` is `RESOLVED` at score 0.990 where
+  it was `AMBIGUOUS`. The same workflow now gets past `w1` and halts instead on the
+  §60 verification limit described above. `bench/real_desktop.py` cannot be run for
+  the previous ambiguity number any more — the fix is the higher score.
 - Prerequisite fixed first (see `CONTINUATION_STATE.md`): section 46 occlusion used
   to refuse **every** real target (`ratio=1.00`), which is why the real-desktop
   numbers above could not be produced earlier. It is now resolved (ancestor
@@ -270,6 +296,7 @@ python -m pytest tests/integration/test_frame_engine_real_display.py -v   # stru
 python -m pytest tests/unit/test_ocr.py -v                              # OCR unit + real-backend test
 python -m pytest tests/integration/test_emergency_stop_real_display.py -v  # section 63, read-only
 python -m bench.real_desktop --confirm-real-input                       # Phase 14, real desktop
+python -m bench.real_desktop --confirm-real-input --workload verifiable # the section 76 happy-path workload
 # then re-run the inline capture/change-detection and OCR timing loops used above
 ```
 
