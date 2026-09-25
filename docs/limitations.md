@@ -13,7 +13,7 @@ created with `--system-site-packages`, real XTEST 2.2, live AT-SPI.
 
 | Gap | Status | Evidence / detail |
 |---|---|---|
-| **Realistic §74 workflow happy path** | Open | `--workload workflow-verifiable` completes **2/20** five-step sequences; halts on `s2:FOCUS_MISMATCH` ×8, `s2:VERIFICATION_CONTRADICTED` ×4, `s4:VERIFICATION_UNVERIFIED` ×6. The synthetic `verifiable` workload meets the §76 target (20/20). See `CONTINUATION_STATE.md` "Known failures". |
+| **Realistic §74 workflow happy path** | Open (one of three causes fixed, not re-measured) | `--workload workflow-verifiable` completed **2/20** five-step sequences; halted on `s2:FOCUS_MISMATCH` ×8, `s2:VERIFICATION_CONTRADICTED` ×4, `s4:VERIFICATION_UNVERIFIED` ×6. The `FOCUS_MISMATCH` cause is now **root-caused and fixed**: the §35 element cache did not subscribe to `object:state-changed:focused`, so a click that moved focus was invisible and §51's guard refused to type into a field that really was focused, for up to `cache_ttl_seconds` (2 s) — longer than the §45 action-state-age ceiling. The two remaining causes (the live AT-SPI read of a typed field lagging the injection, and a `LIST_ITEM` selection not repainting `MEANINGFUL`-ly at its own box) are unfixed. **The 2/20 number has not been re-measured** since the fix, so the row stays open. The synthetic `verifiable` workload still meets the §76 target (20/20). See `CONTINUATION_STATE.md` "Known failures". |
 | **Wayland** | Not implemented | There is no portal/`libei` input path. `Control` is X11/XTEST only. No Wayland support is claimed (§30, §79). |
 | `activate_element` | **Implemented** | `core/accessibility.py` invokes the application's own AT-SPI action; the executor reaches it only after policy → resolve → lease → revalidation, and verifies it like any other `MUTATING` tool. It injects **no** pointer or key input, which is the point: no coordinates and no pointer occlusion. Verified **live** on the §74 fixture (`tests/integration/test_workflow_controls_real_display.py::test_the_live_submit_control_is_really_activated_through_atspi`). A backend that lacks the optional `activate` capability reports a structured `UNAVAILABLE` rather than substituting a click. |
 | **Browser accessibility** | UNAVAILABLE | Runtime-probed and reported honestly; no browser was relaunched or configured. |
@@ -25,6 +25,12 @@ created with `--system-site-packages`, real XTEST 2.2, live AT-SPI.
 
 ## Environment blockers
 
+- **AT-SPI state-change subscriptions.** The element cache invalidates on any
+  observed AT-SPI event, so the subscription list decides which changes it can
+  see. It now includes the state changes an action gates on (`focused`,
+  `enabled`, `sensitive`, `editable`); `checked`/`selected` are still not
+  subscribed because no pre-input gate reads them. A focus/enabled change that
+  arrives as some other event type would still be missed.
 - **The documented bare `pytest` command does not run on this host.** PySide6
   6.10.3 (apt) ships QtCore/QtGui/QtWidgets but not `QtTest`, so the installed
   `pytest-qt` plugin aborts in `pytest_configure` before collecting anything.

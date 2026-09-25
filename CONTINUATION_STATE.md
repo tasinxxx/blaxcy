@@ -1021,6 +1021,7 @@ The `[logging]` config section is no longer a dead stub.
     against throwaway prefixes; no system-wide install was performed.
 
 ## Current task
+- **2026-09-25 (bootstrap session, continued): the `s2:FOCUS_MISMATCH` halts are ROOT-CAUSED and fixed at the source.** On the operator's choice ("investigate FOCUS_MISMATCH first") the recorded blocker was diagnosed read-only rather than accepted or papered over. The chain, all in the tree: `AccessibilityService.elements()` serves the §35 element cache for up to `cache_ttl_seconds` (2 s) unless `force=True`; `PerceptionOrchestrator.perceive()` calls it without `force`; the executor hands that same observation to §51's focus guard (`control/executor.py::_perform`, `state=state`); and `control/keyboard.py::check_focus` reads the `focused` flag off it. The cache invalidates on any *observed* AT-SPI event — but `AtspiBackend._subscribe` registered name/showing/visible/children/defunct and `window:activate/deactivate` **and not `object:state-changed:focused`**. A `setFocus()` on an already-active window emits a focus state-change and nothing else, so a click that moved focus was invisible for the whole TTL — and the TTL (2 s) is longer than the §45 action-state-age ceiling (1500 ms) that is supposed to bound action-relevant state. Result: §51 refused to type into a field that really *was* focused (`FOCUS_MISMATCH`), which is exactly what step `s2` does ~120 ms after step `s1` clicks the search icon. **Fix:** subscribe `object:state-changed:focused`/`:enabled`/`:sensitive`/`:editable` — every state this module reads into a field an action gates on (§51 focus, §45/§51 enabled+editability, §37's Qt `text`+`EDITABLE` refinement). The cache is documented as event-driven ("any observed AT-SPI event conservatively invalidates it"); it simply was not subscribed to the events that matter. Locked by `tests/unit/test_accessibility.py::test_state_events_that_gate_input_are_subscribed` (the pre-existing `test_an_observed_event_invalidates_the_cache` covers the mechanism; nothing covered the registration list). Gate: **1157 passed, 6 skipped**; ruff + mypy clean (179 files). **Not yet re-measured** — the two remaining workflow causes (the live read of a typed field lagging the injection, and a `LIST_ITEM` selection not repainting `MEANINGFUL`-ly) are unfixed, so a real-input re-run is what would show the effect. No safety property was weakened: a live-confirmed focus can only *permit* an action §51's cached check wrongly refused; it never permits one the guard would refuse.
 - **2026-09-25 (this session, continued): `activate_element` — the last unimplemented §66 tool — is now implemented and verified live.** §66 lists it as a required tool; the executor deliberately refused it with `BACKEND_UNAVAILABLE` because `core/accessibility.py` only ever *read* `Atspi.Action`, never invoked it. Delivered: `AccessibilityService.activate(path, action=None)` (marshalled to the single `T-A11Y` owner thread, descending the element path **live** rather than reusing a cached node, which would be exactly the stale target §45 exists to reject), the pure helpers behind it (`_descend_path`, `_select_action_index`, `_invoke_action`), `ActivationOutcome` as a shared typed result, the executor branch (an injected `activate=` hook, the same pattern as `perceive`/`resolve_fallback`), and the composition-root wiring. It is `MUTATING`, so it passes policy → resolve → lease → revalidation → verification exactly like a click, and it injects **no** pointer or key input. Because it is XTEST-free, it also works where a synthetic click is unreliable (no coordinates, no pointer occlusion). Activation is an *optional* backend capability: a backend without it reports a structured `UNAVAILABLE` rather than substituting a click.
 - **Two live/ordering defects were found by the new tests, not by reasoning.** (1) The first `activate` call raised `unknown accessibility request 'activate'` — `_dispatch` marshals through an explicit kind table and nothing had registered the new kind; the live integration test caught it immediately, which is precisely what a fake-only suite would have missed. (2) An existing safety test asserted that `activate_element` *always* reports `UNAVAILABLE`; once the tool is real that is no longer true (a late full-suite run reports `TARGET_STALE` because the harness's seeded state is past its 1500 ms maximum age), so the test was rewritten to pin the property that actually matters — a structured refusal, never a fabricated success, and nothing injected.
 - **2026-09-25 (this session, continued): §70 structured logging was entirely missing and is now implemented.** Reconciling the tree surfaced a real gap that is not a benchmark row: **no `logging` module was imported anywhere in the application**, while `config/settings.py` declared a `[logging]` section (`level`, `rotation_max_bytes`, `rotation_backups`, `redact_on_root_logger`) that no code consumed -- a §4 rule 10 dead stub, a §70 requirement, and the thing §85's "secrets never logged" criterion is about. Delivered: `security/redaction.py` (§26 names this module and it did not exist) with the redaction filter and a secret registry, and `core/logging_setup.py` with the JSON formatter, config-driven rotation and idempotent `configure_logging`. Wired into `main.py` (every command) and `core/application.py` (start/stop), with structured records at the `ToolDispatcher` chokepoint (tool, outcome, error code, verification, state version, frame, latency, task/step/sequence id) and on a sequence halt (`sequence_id`, `step_index`, `sequence_halt_reason`). `logging.redact_on_root_logger` was added to `SECURITY_INVARIANTS`, so a config that disables log redaction is now refused at load (§4 rule 25). **A real bug was found by the new tests and fixed:** the filter was first attached only to the *root logger*, where it never runs for a record propagated from a child logger (`blaxcy.core.executor` -> `blaxcy` -> root) -- so it redacted nothing that actually logs. It is now installed on the handler as well, which is what makes the §85 property true.
@@ -1095,8 +1096,13 @@ The `[logging]` config section is no longer a dead stub.
   a package install (see "Next concrete action") and therefore a human decision.
 
 ## Files being actively modified
-- (none mid-change; the un-indexed `workflow-verifiable` work was verified and
-  measured this session, and its numbers are now recorded)
+- (none mid-change; this session's focus-staleness fix is complete, tested and
+  green — `core/accessibility.py` + the unit test below)
+- Touched this session (the `s2:FOCUS_MISMATCH` root cause and fix):
+  `core/accessibility.py` (`AtspiBackend._subscribe` now registers the
+  action-gating state-change events), `tests/unit/test_accessibility.py` (the new
+  registration-list regression test), `docs/limitations.md` (the workflow row's
+  root cause + the subscription caveat), this file
 - Touched by the un-indexed session (complete, verified this session):
   `core/accessibility.py` (the Qt `text`+`EDITABLE` role refinement, the
   `Atspi.Text`-interface read), `core/target_resolver.py` (the
@@ -1560,6 +1566,17 @@ The `[logging]` config section is no longer a dead stub.
     `verify_text` uses a *containment* check (not exact match), so accumulated
     field content is not the cause. Section 60 is correctly refusing to call an
     unconfirmed change a success.
+  - **root cause of the `s2:FOCUS_MISMATCH` ×8 (found and fixed 2026-09-25, this
+    session; see "Current task"): the §35 element cache was never subscribed to
+    `object:state-changed:focused`, so a focus move was invisible and §51 refused a
+    legitimate type.** Evidence is code-level and complete: `elements()` serves the
+    cache for `cache_ttl_seconds` unless `force=True`; `perceive()` never forces;
+    the executor passes that observation to `check_focus`; and `_subscribe`'s event
+    tuple omitted focus. Adding `focused`/`enabled`/`sensitive`/`editable` makes the
+    cache invalidate on the change the guard depends on. That is one of the three
+    recorded halt reasons, not all of them: `s2:VERIFICATION_CONTRADICTED` ×4 and
+    `s4:VERIFICATION_UNVERIFIED` ×6 are the separate §51/§60 read-lag and
+    `LIST_ITEM`-repaint limits and remain open.
   - current status: **open**; the synthetic `verifiable` workload still meets the
     §76 5-step target (**20/20**, p50 2505.23 ms), so the target is met by one
     workload and not by the realistic one. Numbers and interpretation are in
@@ -1714,14 +1731,25 @@ The `[logging]` config section is no longer a dead stub.
     concrete action").
 
 ## Next concrete action
-- **A decision, not a benchmark run: what to do about the realistic §74 workflow's
-  2/20.** The measurement is delivered and recorded. The two candidate paths are in
-  the new "Known failures" entry: (a) accept it — the §76 5-step happy-path target is
-  already met by the synthetic `verifiable` workload (**20/20**), and the realistic
-  pipeline's honest partial result is recorded as such; or (b) make the workload
-  genuinely verifiable (a result-list selection highlight that repaints
-  `MEANINGFUL`-ly at the selected item's own box, plus a longer settle/re-perceive
-  window before the typed step's verification) and re-measure. Path (b) is
+- **Re-measure the realistic §74 workflow (opt-in real input), now that the
+  `s2:FOCUS_MISMATCH` cause is fixed.** The one-command measurement, which needs the
+  operator's explicit go-ahead because it injects real input:
+  ```bash
+  . .venv/bin/activate && python -m bench.real_desktop --confirm-real-input \
+    --workload workflow-verifiable --samples 20 --input-samples 30 --sequence-samples 20
+  ```
+  What to expect, stated before the run rather than after: the `s2:FOCUS_MISMATCH`
+  family should disappear (the guard now sees the focus change), while
+  `s2:VERIFICATION_CONTRADICTED` (the live AT-SPI read of the typed field lagging the
+  injection) and `s4:VERIFICATION_UNVERIFIED` (a `LIST_ITEM` selection not repainting
+  `MEANINGFUL`-ly at its own box) are independent and remain. A fixed number must be
+  re-measured, never asserted (§76), and §60 must not be loosened to make it nicer
+  (§4 rule 8). The synthetic `verifiable` workload (**20/20**) still carries the §76
+  happy-path target either way.
+- **Then the same decision as before, but narrower**: accept the honest residual
+  result, or make the workload genuinely verifiable (a result-list selection
+  highlight that repaints `MEANINGFUL`-ly at the selected item's own box, plus a
+  longer settle/re-perceive window before the typed step's verification). Path (b) is
   benchmark-harness work; it must not touch §60.
 - **Phase 14 is otherwise delivered.** Every other §76 number is measured and in the
   §76 form (`target, actual, machine, desktop/session, backend, sample count`) in
@@ -2152,6 +2180,15 @@ The `[logging]` config section is no longer a dead stub.
   never appear in the log file**, that the rotation bounds come from `[logging]`,
   and that a config cannot disable log redaction (it is now a §25 invariant).
   Verified live through the CLI (see "Last test results").
+- Focus-staleness fix (§35 vs §45/§51): PASS —
+  `tests/unit/test_accessibility.py::test_state_events_that_gate_input_are_subscribed`
+  asserts the backend registers `object:state-changed:focused`/`:enabled`/
+  `:sensitive`/`:editable`, the events the element cache must see for §51's focus
+  guard and §45's enabled/editability checks to act on current state (the file now
+  collects **26**). It is a *registration-list* lock by necessity: `ScriptedBackend`
+  returns a bool from `poll_events`, so it cannot distinguish which event types are
+  subscribed — no fake could have caught this, which is why it survived to the live
+  workflow benchmark.
 - Unit tests: PASS (incl. accessibility 21 + browser accessibility 12; event bus 12 +
   state cache 21; OCR 20 incl. one real-backend functional test; target resolver 26;
   mouse 16 + keyboard 23 + input backends 8; policy modes 9 + terminal guard 39 +
@@ -2828,5 +2865,28 @@ The `[logging]` config section is no longer a dead stub.
   so it was rewritten to assert the property that still matters — a structured
   refusal, never a fabricated success, nothing injected. Gate: **1156 passed, 6
   skipped**; ruff + mypy clean (**179 files**); `docs/limitations.md` updated
-  (`activate_element` is no longer listed as a gap). Every §66 tool now has a real
+  (  `activate_element` is no longer listed as a gap). Every §66 tool now has a real
   implementation. Nothing committed.
+- 2026-09-25 — next session, bootstrap: the tree reproduced this index exactly
+  (**1156 passed, 6 skipped**; ruff + mypy clean, 179 files), so this was a clean
+  resumption, not a drifted one. First action, on the operator's explicit choice:
+  **committed the verified tree as recovery checkpoint `686a022`** (31 files,
+  +2977/-97) — the §70 logging path, `security/redaction.py`, the three §26 docs,
+  `activate_element`, the workflow workload and its tests, all of which had been
+  green but unindexed since `5e06bc0`. Then, on the operator's next choice
+  ("investigate FOCUS_MISMATCH first"), diagnosed the realistic §74 workflow's
+  halts read-only and **found a real production defect**: the §35 element cache was
+  never subscribed to `object:state-changed:focused` (nor `enabled`/`sensitive`/
+  `editable`), so a focus change caused by a click was invisible for the whole
+  `cache_ttl_seconds` (2 s) — longer than §45's 1500 ms action-state-age ceiling —
+  and §51's focus guard refused to type into a field that really was focused. That
+  is the `s2:FOCUS_MISMATCH` ×8 in the recorded benchmark, and it survived every
+  unit test because `ScriptedBackend` reports events as a bool and cannot model
+  *which* events are registered; only the live workflow run could surface it. Fixed
+  by subscribing the action-gating state events, locked with a registration-list
+  test, and documented. Gate after the fix: **1157 passed, 6 skipped**; ruff + mypy
+  clean (179 files). Deliberately **not** re-measured: the effect needs an opt-in
+  real-input run, and the other two halt causes (`s2:VERIFICATION_CONTRADICTED`,
+  `s4:VERIFICATION_UNVERIFIED`) are independent and remain open.
+- 2026-09-25 — same session, continued: the fixes above are committed-ready; the
+  next step is the opt-in re-measure recorded under "Next concrete action".

@@ -837,10 +837,26 @@ class AtspiBackend:
         except Exception as exc:
             self._subscribe_error = repr(exc)
             return
+        # The cache invalidates on *any* observed event (see ``_poll_events``), so
+        # this list decides which changes the cache can actually see. It must
+        # therefore include every state this module reads into a field an action
+        # gates on: ``focused`` (section 51's focus guard -- without it a click
+        # that moves focus is invisible, and the guard refuses to type into a field
+        # that really is focused until the TTL expires), ``enabled``/``sensitive``
+        # (section 45 revalidation and section 51's editability check) and
+        # ``editable`` (the Qt ``text``+``EDITABLE`` role refinement, section 37).
+        # Omitting them was a real defect, not a tuning choice: focus changes are
+        # delivered as state-changed events and as nothing else, so the stale flag
+        # was frozen for ``cache_ttl_seconds`` -- longer than the section 45
+        # action-state-age ceiling it must respect.
         events = (
             "object:property-change:accessible-name",
             "object:state-changed:showing",
             "object:state-changed:visible",
+            "object:state-changed:focused",
+            "object:state-changed:enabled",
+            "object:state-changed:sensitive",
+            "object:state-changed:editable",
             "object:children-changed",
             "object:defunct",
             "window:activate",

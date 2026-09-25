@@ -632,3 +632,52 @@ def test_event_callback_tolerates_the_platform_call_signature() -> None:
     backend._on_event(object())  # pyatspi-style call
     backend._on_event(object(), object(), None)  # the live GI-style call
     assert backend._events_seen == 2
+
+
+class _RecordingListener:
+    """Stand-in for an ``Atspi.EventListener`` that records what is registered."""
+
+    def __init__(self) -> None:
+        self.registered: list[str] = []
+
+    def register(self, event: str) -> None:
+        self.registered.append(event)
+
+
+class _RecordingEventListener:
+    """Stand-in for ``Atspi.EventListener`` (only its ``new`` factory is used)."""
+
+    def __init__(self, listener: _RecordingListener) -> None:
+        self._listener = listener
+
+    def new(self, _callback: Any, _user_data: Any) -> _RecordingListener:
+        return self._listener
+
+
+def test_state_events_that_gate_input_are_subscribed() -> None:
+    """The cache invalidates on *any* observed event, so the subscription list is
+    what decides which changes the element cache can see (section 35).
+
+    Regression test for a defect found by diagnosing the realistic section 74
+    workflow's ``s2:FOCUS_MISMATCH`` halts: focus/``enabled``/``editable`` are
+    delivered *only* as ``object:state-changed`` events, so leaving them out froze
+    those flags for the whole ``cache_ttl_seconds`` (2 s) -- longer than the
+    section 45 action-state-age ceiling they must respect. A click that moves
+    focus was invisible, and section 51's guard then refused to type into a field
+    that really was focused. Each event below is read into a field an action gates
+    on: ``focused`` (51), ``enabled``/``sensitive`` (45, 51) and ``editable``
+    (37, 51).
+    """
+    listener = _RecordingListener()
+    backend = AtspiBackend(AccessibilitySettings())
+    backend._atspi = SimpleNamespace(EventListener=_RecordingEventListener(listener))
+
+    backend._subscribe()
+
+    for event in (
+        "object:state-changed:focused",
+        "object:state-changed:enabled",
+        "object:state-changed:sensitive",
+        "object:state-changed:editable",
+    ):
+        assert event in listener.registered, f"{event} is not subscribed; the cache cannot see it"
