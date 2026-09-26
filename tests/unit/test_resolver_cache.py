@@ -370,6 +370,30 @@ def test_a_second_resolution_reports_a_hit_and_re_scores_live() -> None:
     assert third.best.element.text == "Search now"
 
 
+def test_a_hit_is_possible_for_elements_the_traversal_did_not_attribute() -> None:
+    """Section 43.1 on a real desktop: an unattributed element must still be cached.
+
+    Measured live: every perceived element can arrive with
+    ``owner_window_id = None`` while the state carries a real
+    ``active_window_id``. If the hint is recorded under ``None`` but looked up
+    against the active window, the cache can never hit and is silently inert.
+    """
+    elements = tuple(
+        element.model_copy(update={"owner_window_id": None})
+        for element in workflow_elements()
+    )
+    state = make_state(elements=elements)  # active_window_id defaults to 42
+    resolver = _resolver(_cache())
+    query = ElementQuery(text="Search", role_hint=UIRole.BUTTON)
+
+    first = resolver.resolve(query, elements, state=state)
+    second = resolver.resolve(query, elements, state=state)
+
+    assert first.status is ResolutionStatus.RESOLVED
+    assert first.cache_hit is False  # nothing was known on the first pass
+    assert second.cache_hit is True
+
+
 def test_a_primed_hint_is_verified_before_it_is_used() -> None:
     """The section 33.2 prefetcher primes a hint; a lookup still re-verifies it."""
     from core.resolver_cache import IdentityHint

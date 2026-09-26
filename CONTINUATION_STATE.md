@@ -59,13 +59,20 @@
   ruff + mypy clean, 179 files), matching the "Current task" claim exactly.
 
 ## Current phase
-- Phase: **Phase 14 — Benchmarks (§76)**. Phases 0-13 are complete (Phase 12 and
-  Phase 13 are recorded under "Previous phases"). Every §76 number this host can
-  honestly produce is measured and recorded in `docs/benchmark_report.md`: frame
-  capture and change detection, OCR, stop latency, the Brain / tool-protocol
-  overhead, the Phase 10.1 batching overhead, and the real-desktop end-to-end set
-  (accessibility, perception cycle **warm and cold**, resolution, revalidation, GUI
-  refresh, click, keyboard, and the 5-step `run_sequence`).
+- Phase: **Phase 15 — Full matrix / soak / documentation** (started 2026-09-26).
+  Phases 0-14 are complete (Phase 12-14 are recorded under "Previous phases").
+  Phase 15 now has a **soak runner** (`bench/soak.py`) and a first run: 30
+  iterations of the section 74 workflow, **30/30 stable**, flat latency (−0.56 %
+  drift) and flat steady-state memory (0.004 MB/iteration), no stuck input, no
+  retained lease, no orphan thread — recorded in `docs/benchmark_report.md`.
+  **Still open for Phase 15:** the full environment/capability matrix, and a soak
+  longer than the ~40 iterations run so far.
+- **The soak surfaced and closed a real resolver-cache defect (2026-09-26).** The
+  §43.1 cache could never hit on a live desktop: every perceived element carries
+  `owner_window_id = None` (measured 146/146), so hints were keyed under `None`
+  while lookups filtered on the real `active_window_id` (`hits 0 / misses 150`).
+  It failed safe, but was inert. `TargetResolver._record` now passes the
+  observation's active window as the key fallback; re-measured hit rate **0.875**.
 - Cross-cutting gaps closed this session: **§70 structured JSON logging now
 exists** (`core/logging_setup.py` + `security/redaction.py`, with the root
 redaction filter and rotation from `[logging]`), and the **three missing §26 docs
@@ -1042,6 +1049,20 @@ The `[logging]` config section is no longer a dead stub.
     against throwaway prefixes; no system-wide install was performed.
 
 ## Current task
+- **2026-09-26: Phase 15 started — a soak runner is added and run, and it found a real
+  defect.** `bench/soak.py` repeats the section 74 workflow end to end on the live
+  desktop and reports **stability**, **drift** and **resource invariants** (held
+  input, retained leases, orphan threads, memory trend). First run, 30 iterations:
+  **30/30 stable, no halts**, latency p50 2207.63 / p95 2405.99 ms with −0.56 % drift,
+  RSS warm-up 154.7→248.8 MB but **steady-state 0.004 MB/iteration**, threads
+  1→6→1, held keys/buttons 0, leases 0. The soak then surfaced a **real §43.1 cache
+  defect**: every live element arrives with `owner_window_id = None` (146/146), so
+  hints were recorded under `None` while lookups filtered on the real
+  `active_window_id` — `hits 0 / misses 150`, i.e. the cache was inert (fails safe,
+  but useless). Fixed in `TargetResolver._record`; re-measured hit rate **0.875**.
+  Gate: **1181 passed, 6 skipped**; ruff + mypy clean (181 files). Recorded in
+  `docs/benchmark_report.md` "Phase 15". The analysis (`analyze`) is pure and
+  unit-tested in `tests/unit/test_soak.py` (10 tests).
 - **2026-09-26 (bootstrap session): the §51 focus-timing residual is fixed and the
   workflow now completes 20/20.** The last open §76 item was `s2:FOCUS_MISMATCH` in
   the sequence: `s1` clicked the search icon (whose handler focuses the field) and
@@ -1153,6 +1174,12 @@ The `[logging]` config section is no longer a dead stub.
 
 ## Files being actively modified
 - (none mid-change; this session's fixes are complete, tested and green)
+- Touched this session (the Phase 15 soak, 2026-09-26): `bench/soak.py` (new),
+  `tests/unit/test_soak.py` (new, 10 tests), `core/target_resolver.py`
+  (`_record` passes the observation's active window as the cache key fallback),
+  `tests/unit/test_resolver_cache.py` (the unattributed-element regression test),
+  `docs/benchmark_report.md` (the Phase 15 soak section), `docs/limitations.md`,
+  this file.
 - Touched this session (the §51 focus-timing fix, 2026-09-26): `control/executor.py`
   (`_focus_checked_state` + the `TYPE_TEXT` branch using it, and the
   `from control.keyboard import ... check_focus` import),
@@ -1243,6 +1270,22 @@ The `[logging]` config section is no longer a dead stub.
   `docs/environment_report.md` (regenerated)
 
 ## Last test results (verbatim, not paraphrased as "passed")
+- Command (`2026-09-26`, after the Phase 15 soak + the §43.1 cache fix):
+  `. .venv/bin/activate && ruff check . && mypy . && timeout 900 python -m pytest -o addopts="" -p no:pytest-qt -q`
+- Result: `1181 passed, 6 skipped, 4 warnings in 33.08s`; `ruff check .` ->
+  `All checks passed!`; `mypy .` -> `Success: no issues found in 181 source files`.
+  (One interim run showed a single failure in
+  `tests/integration/test_workflow_controls_real_display.py`, a fixture-startup flake
+  under load that was green on immediate re-run — see "Known failures".)
+- Command (`2026-09-26`, the Phase 15 soak, real input, operator-approved):
+  `. .venv/bin/activate && python -m bench.soak --confirm-real-input --iterations 30`
+- Result: **30/30 completed**, stability 1.0, no halts; latency p50 2207.63 ms /
+  p95 2405.99 ms; latency drift −0.56 %; RSS warm-up 154.7→248.8 MB with
+  **steady-state 0.004 MB/iteration**; threads 1→6→1 (no orphan); max held
+  keys/buttons 0; max leases after an iteration 0. Runner: 30 sequences, 150 steps,
+  0 halts, 0 refusals. Resolver cache `hits 0 / misses 150` **before** the fix and
+  **hit rate 0.875** (35/5 over 8 sequences) after it. Recorded in
+  `docs/benchmark_report.md` "Phase 15".
 - Command (`2026-09-26`, this bootstrap session — re-verifying the uncommitted
   unit before trusting it): `. .venv/bin/activate && ruff check . && mypy . && timeout 900 python -m pytest -o addopts="" -p no:pytest-qt -q`
 - Result: `1167 passed, 6 skipped, 4 warnings in 36.70s`; `ruff check .` ->
@@ -1626,6 +1669,44 @@ The `[logging]` config section is no longer a dead stub.
 
 ## Known failures
 *(structure per §12.1)*
+- **The §43.1 resolver cache could never hit on a live desktop — RESOLVED 2026-09-26**
+  (found by the new Phase 15 soak; fixed the same session)
+  - failure: `resolver_cache.hits == 0` while `misses` equalled the lookup count
+    (`0 / 150` over 30 sequences), despite 5 entries recorded
+  - environment: this host, XFCE X11, live AT-SPI, the section 74 fixture
+  - trigger: every perceived element arrives with `owner_window_id = None`
+    (measured read-only: **146/146**), while `state.active_window_id` is real
+  - observed result: `record()` keyed the hint's window component under `None`;
+    `lookup()` filtered on `active_window_id`; no candidate ever matched, so every
+    lookup missed with no invalidation counted
+  - expected result: a repeated description against an unchanged region is a hit
+  - likely cause: `TargetResolver._record` did not pass `active_window_id` to
+    `ResolverCache.record`, even though `record` accepts it and falls back to it when
+    the element names no window
+  - current status: **RESOLVED.** `_record` now passes `state.active_window_id`;
+    re-measured hit rate **0.875** (35 hits / 5 misses over 8 sequences). It failed
+    **safe** throughout — a miss runs the full cascade — so no safety property was
+    ever at stake. Regression test:
+    `test_a_hit_is_possible_for_elements_the_traversal_did_not_attribute`.
+  - next investigation: none — closed. Worth remembering that a hint must be keyed
+    by the same window source a lookup filters on.
+- **Fixture-startup flake under load — open, observed once**
+  - failure: `tests/integration/test_workflow_controls_real_display.py` fails during
+    fixture startup, the child exiting cleanly (`code 0`) before the first command
+  - environment: this host, immediately after a long real-input soak
+  - trigger: the fixture exits on stdin EOF; under load the handshake can lose its
+    pipe before the first command
+  - observed result: `FixtureError: fixture already exited (code 0)`; all 5 tests in
+    the file failed in one run, then all 5 passed on immediate re-run and in the next
+    full-suite run
+  - expected result: the fixture stays up for the test
+  - likely cause: real-desktop timing under load, not a code defect (the fixture
+    binary started and reported its inventory on every manual launch)
+  - current status: **open, not reproduced on demand**; not caused by the Phase 15
+    changes (resolver-only)
+  - next investigation: give the harness a bounded retry on an early child exit
+    before the first command, so a startup race is retried rather than reported as a
+    test failure*
 - **The realistic §74 workflow happy path — RESOLVED and met 2026-09-26**
   (`workflow-verifiable` reaches **20/20, p50 1342.94 ms / p95 1787.70 ms**, within
   the ≤ 4000 ms target). Kept for the record: it took four causes, each root-caused
@@ -1846,6 +1927,10 @@ The `[logging]` config section is no longer a dead stub.
     concrete action").
 
 ## Next concrete action
+- **Phase 15 (2026-09-26): a soak runner exists and has been run** —
+  `python -m bench.soak --confirm-real-input --iterations 30` (30/30 stable, flat
+  latency and steady-state memory; see "Current task"). Next: the full
+  environment/capability matrix, and a longer soak.
 - **DONE 2026-09-26 — the realistic §74 workflow now completes 20/20** (operator
   approved the real-input runs). Intermediate run: 5/20 with the halt set narrowed to
   `s2:FOCUS_MISMATCH` ×15. After the §51 focus re-check: **20/20, p50 1342.94 ms /
@@ -2390,7 +2475,8 @@ The `[logging]` config section is no longer a dead stub.
   `tests/integration/test_bench_workload_fixture.py` collects **11**. **The realistic
   5-step workflow now completes 20/20** (p50 1342.94 ms, ≤ 4000 ms met) after the
   §51 focus re-check — see "Current task".
-- Benchmark: PARTIAL (Phase 2 capture + change detection, Phase 5 OCR, the
+- Benchmark: PASS/COMPLETE (§76 met — Phase 2 capture + change detection, Phase 5
+  OCR, the
   Phase 9 stop latency, the Phase 10 tool-protocol overhead and the **Phase 10.1
   batching measurements** are recorded in `docs/benchmark_report.md`; Phase 11's
   grounder is deliberately **unbenchmarked** because every one of its costs is a
@@ -2525,7 +2611,14 @@ The `[logging]` config section is no longer a dead stub.
   a fresh live perception before accepting it (+3 tests; gate **1170 passed, 6
   skipped**; ruff + mypy clean, 179 files). Re-ran the workflow benchmark: **20/20
   completed, p50 1342.94 ms / p95 1787.70 ms**, within the ≤ 4000 ms target — the
-  realistic §74 happy path is now met and Phase 14 is COMPLETE.
+  realistic §74 happy path is now met and Phase 14 is COMPLETE. Then started
+  **Phase 15** with a new soak runner (`bench/soak.py` + `tests/unit/test_soak.py`,
+  10 tests): 30 iterations, **30/30 stable**, latency drift −0.56 %, steady-state
+  memory 0.004 MB/iteration, no stuck input / retained lease / orphan thread. The
+  soak surfaced a **real §43.1 defect** — the cache could never hit on a live
+  desktop (`owner_window_id = None` for all 146 elements, so the key's window
+  component never matched) — fixed in `TargetResolver._record` and re-measured at
+  hit rate **0.875**. Gate **1181 passed, 6 skipped**; ruff + mypy clean (181 files).
 - 2026-09-23 — implemented §50's clipboard paste path on request (the item Phase 7
   left open): `control/clipboard.py` `X11ClipboardPaster` (owns the CLIPBOARD
   selection, serves it on its own thread, captures and re-serves the previous

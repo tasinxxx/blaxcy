@@ -635,10 +635,18 @@ class TargetResolver:
     def _record(
         self, query: ElementQuery, element: UIElement, *, state: ScreenState | None
     ) -> None:
-        """Record a successful resolution in the cache, when there is one."""
+        """Record a successful resolution in the cache, when there is one.
+
+        The observation's active window is passed through as the window key's
+        fallback, because an element the accessibility traversal did not
+        attribute to a window carries ``owner_window_id = None`` (the common
+        case on a live desktop). Without this, the hint would be keyed under
+        ``None`` while a lookup filters on the real active window, so the entry
+        could never be found -- the cache would be silently inert (section 43.1).
+        """
         if self._cache is None or state is None:
             return
-        self._cache.record(query, element, state)
+        self._cache.record(query, element, state, active_window_id=state.active_window_id)
 
     # -- Scoring --------------------------------------------------------------
 

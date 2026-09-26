@@ -19,9 +19,10 @@ created with `--system-site-packages`, real XTEST 2.2, live AT-SPI.
 | **Browser accessibility** | UNAVAILABLE | Runtime-probed and reported honestly; no browser was relaunched or configured. |
 | **Visual grounding** | UNAVAILABLE | No Gemini API key is stored on this host. The implementation, gating and privacy rules exist and are tested; the capability is reported UNAVAILABLE with the reason. |
 | **`--system-deps`** | Reports only | It detects the package manager and states what is wanted; it installs nothing unattended. No system-wide install has been performed (verified installs use throwaway prefixes). |
-| **`RecoveryController.begin_task`/`begin_step`** | Uncalled | Per-task/per-step budget scoping has no caller yet; the loop guard is the binding constraint. |
+| **`RecoveryController.begin_task`/`begin_step`** | **Wired** | The composition root builds the controller (`core/application.py`) and passes it to both the executor and the `SequenceRunner`, which calls `begin_task`/`begin_step`/`end_step` so each step gets its own budget (§61). Corrected during the 2026-09-26 §85 walk: this row previously said "uncalled", which was stale. |
 | **Clipboard paste end-to-end** | Untested seam | The controller→paster contract and the real X11 selection transfer are tested; injecting `Ctrl+V` into a real application's own paste handler is not (that would inject into the live desktop, which the suite never does outside the fixture harness). |
 | **Flaky test** | Known | `tests/integration/test_clipboard_real_display.py::test_the_previous_content_is_served_during_the_restore_grace` fails roughly 1 run in 5 on this host, because `xfce4-clipman` races the restore grace. The mechanism is asserted deterministically in `tests/unit/test_clipboard.py`. |
+| **Flaky test (fixture startup)** | Known, observed once | Under load right after a long real-input soak, `tests/integration/test_workflow_controls_real_display.py` can fail during fixture startup: the child exits cleanly (`code 0`) before the first command, because the fixture exits on stdin EOF. Observed once on 2026-09-26, green on immediate re-run and in the next full-suite run; the fixture binary itself started and reported its inventory every time. |
 
 ## Environment blockers
 
@@ -39,6 +40,13 @@ created with `--system-site-packages`, real XTEST 2.2, live AT-SPI.
   injection is not positive evidence. The cost is paid only on a would-be failure;
   a `VERIFIED` verdict never waits. Set it to `0` to disable the re-check and get
   the old single-read behaviour.
+- **Live elements are often unattributed to a window.** On this host every
+  perceived element can carry `owner_window_id = None` (146/146 measured) while the
+  state has a real `active_window_id`. The section 43.1 cache therefore keys the
+  window component on the observation's active window as a fallback; before
+  2026-09-26 it keyed on the element alone and could never hit on a live desktop
+  (fixed — see `docs/benchmark_report.md` "Phase 15"). The same fact is why section
+  46 occlusion relies on the pid path rather than window titles.
 - **The documented bare `pytest` command does not run on this host.** PySide6
   6.10.3 (apt) ships QtCore/QtGui/QtWidgets but not `QtTest`, so the installed
   `pytest-qt` plugin aborts in `pytest_configure` before collecting anything.
@@ -73,7 +81,7 @@ unresolved item below prevents a claim of full completion.
 | **Engineering** — test coverage, strict typing, lint passes, no production TODO/FIXME/stubs, benchmarks documented, limitations documented | **Met** for lint/type/tests/benchmarks/limitations. Coverage is meaningful but is *not* reported as a percentage; no coverage gate exists. |
 | **Installation** — menu entry, startup, controlled second launch, uninstall, update/rollback | **Met**, verified against throwaway prefixes with a per-file sha256 manifest. |
 | **Phase 14 (§76 benchmarks)** | **Met.** Every read-only and real-input number is measured and recorded, and the realistic workflow happy path is 20/20 (above), inside the ≤ 4000 ms target. |
-| **Phase 15 (full matrix / soak / documentation)** | **NOT STARTED** beyond this documentation set. No soak run has been performed. |
+| **Phase 15 (full matrix / soak / documentation)** | **IN PROGRESS.** A soak runner now exists (`bench/soak.py`) and has been run: 30 iterations of the section 74 workflow, **30/30 stable**, flat latency and flat steady-state memory (see `docs/benchmark_report.md` "Phase 15"). Remaining Phase 15 scope: the full environment/capability matrix, and a longer soak than the ~40 iterations run so far. |
 | **Batching-layer safety-neutrality proof** | **Met** — walked feature by feature in the section below, with the code path and the test that pins each claim. |
 | **Git state / secrets in history** | Recovery checkpoint `372879a` (the three-halt-causes fix, re-measured) and the §51 focus re-check commit that follows it sit on top of `0b86d56`. No secret material is present in source, config or tests (the API key lives only in the OS keyring). |
 

@@ -487,6 +487,58 @@ Interpretation, stated narrowly:
   The synthetic `verifiable` workload (20/20, p50 2505.23 ms) still stands as its own
   measurement; both workloads now meet the five-step target.
 
+## Phase 15 — soak run (stability and drift)
+
+Command:
+
+```bash
+. .venv/bin/activate && python -m bench.soak --confirm-real-input --iterations 30
+```
+
+It repeats the section 74 workflow (`workflow-verifiable`, the default) end to end
+on the live desktop and reports stability, drift and resource invariants. Machine /
+session / backend identical to Phase 14: Kali GNU/Linux, XFCE on X11
+(`DISPLAY=:0.0`), Python 3.14.6, real XTEST 2.2, live AT-SPI, the section 74 fixture.
+
+| Metric | Value | n |
+|---|---|---|
+| workflow completions | **30/30 (stability 1.0)** | 30 |
+| halt reasons | none | 30 |
+| per-iteration latency p50 / p95 / min / max | 2207.63 / 2405.99 / 1761.32 / 2458.28 ms | 30 |
+| latency drift (second-half p50 vs first-half p50) | **−0.56 %** (flat) | 30 |
+| RSS, run start → end | 154.7 → 248.8 MB (warm-up) | 30 |
+| RSS steady-state growth (second half) | **0.004 MB/iteration** (flat) | 30 |
+| threads, before → during → after shutdown | 1 → 6 → 1 (no orphan) | — |
+| held keys / buttons at any check | 0 / 0 | 30 |
+| live leases retained after an iteration | 0 | 30 |
+| sequence-runner halts / refusals | 0 / 0 | 150 steps |
+
+Interpretation, stated narrowly:
+
+- **The Body is stable and bounded under repeated real-desktop execution.** Thirty
+  consecutive five-step workflows all completed and verified, latency did not creep
+  (second-half p50 within 1 % of the first), no key or button was left held, no lease
+  outlived its iteration, and no worker thread survived shutdown.
+- **The whole-run memory figure is warm-up, not a leak.** RSS climbs from 154.7 MB
+  to 248.8 MB across the run, but the *steady state* is flat: second-half growth is
+  0.004 MB/iteration. The report gives both numbers on purpose, and the verdict is
+  taken from the second half. A 40-iteration run showed the same flat series
+  (~244 MB).
+- **Speculation stayed bounded and never reached input.** 120 hints requested, 120
+  completed, `max_outstanding` 2, `outstanding` 0 at the end; every hint was
+  discarded by the section 34 change rule (the step before it changes the region), so
+  none was carried forward — which is the designed behaviour, not a miss.
+- **A real defect the soak surfaced, now fixed (2026-09-26): the §43.1 resolver
+  cache could never hit on a live desktop.** Measured read-only: every perceived
+  element arrives with `owner_window_id = None` (146/146 on this host) while the
+  state carries a real `active_window_id`. `record()` therefore keyed the hint under
+  `None` while `lookup()` filtered on the real active window, so all 150 lookups
+  missed (`hits 0 / misses 150`). It failed **safe** — a miss just runs the full
+  cascade — but the optimization was inert. `TargetResolver._record` now passes the
+  observation's active window through as the key's fallback window. Re-measured
+  after the fix: **hit rate 0.875** (35 hits / 5 misses over 8 sequences), with the
+  section 4 rule 31 decision-identity test still green.
+
 ## Reproducing
 
 ```bash
