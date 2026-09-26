@@ -13,6 +13,7 @@ dist/
 .ruff_cache/
 .coverage
 htmlcov/
+.packaging-check/
 
 # BLAXCY runtime artifacts (must never be committed)
 logs/

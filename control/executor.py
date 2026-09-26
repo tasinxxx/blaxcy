@@ -739,22 +739,32 @@ class Executor:
             {"lease_id": lease.lease_id, "element_id": lease.element_id, "frame_id": lease.frame_id},
         )
 
-        with self._tracker.tracking(
-            tool, lease=lease, task_id=task_id, step_id=step_id, sequence_id=sequence_id
-        ):
-            return self._act_and_verify(
-                planned=planned,
-                tool=tool,
-                element=element,
-                lease=lease,
-                resolution_data={
-                    **resolution.to_dict(),
-                    **({"reobservation": reobserved} if reobserved is not None else {}),
-                },
-                started=started,
-                sensitive=granted.sensitive,
-                require_verification=require_verification,
-            )
+        try:
+            with self._tracker.tracking(
+                tool, lease=lease, task_id=task_id, step_id=step_id, sequence_id=sequence_id
+            ):
+                return self._act_and_verify(
+                    planned=planned,
+                    tool=tool,
+                    element=element,
+                    lease=lease,
+                    resolution_data={
+                        **resolution.to_dict(),
+                        **({"reobservation": reobserved} if reobserved is not None else {}),
+                    },
+                    started=started,
+                    sensitive=granted.sensitive,
+                    require_verification=require_verification,
+                )
+        finally:
+            # Section 44: a lease authorizes exactly one action, so it is spent
+            # when that action concludes -- success, refusal or exception alike.
+            # It used to be left in the state cache until a structural change or
+            # its TTL happened to clear it, which left a spent lease behind on any
+            # path that produced no structural delta (a halt, or a step whose
+            # observation was non-structural). Dropping it here can only remove a
+            # spent authorization; revalidation already rejects an expired lease.
+            self._cache.drop_lease(lease.lease_id)
 
     # -- Pipeline stages ------------------------------------------------------
 
@@ -867,15 +877,22 @@ class Executor:
             return AttemptOutcome(failure, True, identity)
 
         # -- OBSERVE ----------------------------------------------------------
+        # Timed separately from verification on purpose: a slow action is far
+        # more often a cold post-action perception (a section 35 cache miss) than
+        # a slow verifier, and the two were indistinguishable in the envelope.
+        observe_started = time.monotonic()
         after = self._observe()
+        observe_ms = (time.monotonic() - observe_started) * 1000.0
         delta = self._delta_for(after)
 
         # -- VERIFY -----------------------------------------------------------
         outcome = self._verify(tool, planned, live_element, before, after, delta)
+        verify_calls = 1
         if outcome.state is not VerificationState.VERIFIED:
-            outcome, after = self._confirm_negative(
+            outcome, after, rechecks = self._confirm_negative(
                 outcome, tool, planned, live_element, before, after
             )
+            verify_calls += rechecks
         self._cache.set_verification(outcome.state)
         self._emit(
             EventType.VERIFICATION_RESULT,
@@ -887,7 +904,14 @@ class Executor:
                 "reason": outcome.reason,
             },
         )
-        data: dict[str, Any] = {"verification": outcome.to_dict()}
+        data: dict[str, Any] = {
+            "verification": outcome.to_dict(),
+            # Section 60 instrumentation: how long the post-action observation
+            # took, and how many verifier calls the verdict needed. A
+            # ``verify_calls`` above 1 means the section 60 settle window ran; a
+            # large ``observe_ms`` means the cost was perception, not verification.
+            "timing": {"observe_ms": round(observe_ms, 3), "verify_calls": verify_calls},
+        }
         if live_element is not None:
             data["target"] = _target_summary(live_element)
         if lease is not None:
@@ -1315,7 +1339,7 @@ class Executor:
         element: UIElement | None,
         before: ScreenState | None,
         after: ScreenState | None,
-    ) -> tuple[VerificationOutcome, ScreenState | None]:
+    ) -> tuple[VerificationOutcome, ScreenState | None, int]:
         """Give a negative verdict a bounded chance to be disproved (section 60).
 
         A failure is only reported once it has been re-checked against fresh,
@@ -1337,14 +1361,15 @@ class Executor:
         ``CONTRADICTED`` still requires a readable read that really disagrees.
         """
         if self._perceive_fresh is None or element is None:
-            return outcome, after
+            return outcome, after, 0
         settle_s = float(self._settings.verification.verify_settle_ms) / 1000.0
         if settle_s <= 0.0:
-            return outcome, after
+            return outcome, after, 0
         poll_s = float(self._settings.verification.verify_poll_ms) / 1000.0
         deadline = time.monotonic() + settle_s
         latest = outcome
         seen = after
+        rechecks = 0
         while time.monotonic() < deadline:
             if self._abort_code() is not None:
                 # A stop outranks a nicer verdict, exactly as it does everywhere.
@@ -1353,14 +1378,15 @@ class Executor:
             if fresh is None:
                 break
             seen = fresh
+            rechecks += 1
             latest = self._verify(tool, planned, element, before, fresh, self._delta_for(fresh))
             if latest.state is VerificationState.VERIFIED:
-                return latest, seen
+                return latest, seen, rechecks
             remaining = deadline - time.monotonic()
             if remaining <= 0.0:
                 break
             time.sleep(min(poll_s, remaining))
-        return latest, seen
+        return latest, seen, rechecks
 
     # -- Policy plumbing ------------------------------------------------------
 

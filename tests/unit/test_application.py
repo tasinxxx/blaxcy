@@ -449,6 +449,38 @@ def test_run_task_through_an_injected_brain_uses_the_whole_body(app_factory: App
     assert app._loops == []
 
 
+def test_a_brain_call_cannot_bypass_observe_on_the_real_body(app_factory: AppFactory) -> None:
+    """Section 56/67: the Brain's own tool call still goes through the Body's policy."""
+    app, _, backend = app_factory(elements=_elements())
+    app.perceive()
+    assert app.status()["mode"] == PolicyMode.OBSERVE.value
+    brain = ScriptedBrain(
+        [model_turn(calls=[("click", {"target": "Send"})]), model_turn(text="done")]
+    )
+
+    result = app.run_task("click Send", adapter=brain)
+
+    assert result.envelopes[0].ok is False
+    assert result.envelopes[0].error_code == ErrorCode.PERMISSION_DENIED.value
+    assert backend.events == []
+
+
+def test_an_unknown_brain_tool_is_refused_by_the_real_body(app_factory: AppFactory) -> None:
+    """An undeclared tool from the Brain is a structured refusal and injects nothing."""
+    app, _, backend = app_factory(elements=_elements())
+    app.set_mode(PolicyMode.ASSIST)
+    app.perceive()
+    brain = ScriptedBrain(
+        [model_turn(calls=[("download_the_internet", {})]), model_turn(text="done")]
+    )
+
+    result = app.run_task("do something silly", adapter=brain)
+
+    assert result.envelopes[0].ok is False
+    assert result.envelopes[0].error_code == ErrorCode.BACKEND_UNAVAILABLE.value
+    assert backend.events == []
+
+
 def test_status_is_a_measurement_with_honest_notes(app_factory: AppFactory) -> None:
     """Section 71: the GUI reads facts here, including the ones that are not good."""
     app, _, _ = app_factory(elements=_elements())

@@ -134,6 +134,10 @@ class MssBackend:
     surfaces as ``CAPTURE_FAILED`` rather than a fabricated success.
     """
 
+    #: Reported in the frame and stats, so a frame is never mislabelled as coming
+    #: from a backend that did not produce it.
+    name: str = CAPTURE_BACKEND_NAME
+
     def __init__(self) -> None:
         mss = importlib.import_module("mss")
         # ``mss.mss`` is deprecated in mss 10.x in favour of ``mss.MSS``; the
@@ -212,6 +216,7 @@ class FrameEngine:
         self._thumbnail_size = thumbnail_size
 
         self._backend: CaptureBackend | None = None
+        self._backend_label: str = CAPTURE_BACKEND_NAME
         self._frames: deque[Frame] = deque(maxlen=settings.max_full_frames)
         self._thumbnails: deque[npt.NDArray[np.uint8]] = deque(maxlen=settings.max_thumbnails)
 
@@ -238,12 +243,15 @@ class FrameEngine:
             return
         try:
             self._backend = self._backend_factory()
+            # A backend that names itself is reported by that name (mss, the
+            # ScreenCast portal, ...); an anonymous one keeps the default.
+            self._backend_label = str(getattr(self._backend, "name", CAPTURE_BACKEND_NAME))
         except Exception as exc:
             self._capture_failed = True
             raise BlaxcyError(
                 ErrorCode.CAPTURE_FAILED,
                 f"could not initialize the capture backend: {exc!r}",
-                details={"backend": CAPTURE_BACKEND_NAME, "fix_hint": _CAPTURE_FIX_HINT},
+                details={"backend": self._backend_label, "fix_hint": _CAPTURE_FIX_HINT},
             ) from exc
         self._capture_failed = False
         self._consecutive_errors = 0
@@ -331,14 +339,18 @@ class FrameEngine:
             raise BlaxcyError(
                 ErrorCode.CAPTURE_FAILED,
                 "screen capture has failed and input is disarmed until the backend recovers",
-                details={"backend": CAPTURE_BACKEND_NAME},
+                details={"backend": self._backend_label},
             )
 
         if self._backend is None:
             self.open()
         backend = self._backend
         if backend is None:  # pragma: no cover - open() guarantees a backend
-            raise BlaxcyError(ErrorCode.CAPTURE_FAILED, "capture backend is unavailable")
+            raise BlaxcyError(
+                ErrorCode.CAPTURE_FAILED,
+                "capture backend is unavailable",
+                details={"backend": self._backend_label},
+            )
 
         started = self._clock()
         try:
@@ -387,6 +399,17 @@ class FrameEngine:
         return self._capture_failed
 
     @property
+    def backend_name(self) -> str:
+        """The backend actually in use, by its own name (never a guess).
+
+        ``mss`` while the X11 backend is up; the portal capture backend's own
+        name when a Wayland session is being captured through ScreenCast. Before
+        any backend is opened this is the default label, which is exactly what a
+        caller should then display.
+        """
+        return self._backend_label
+
+    @property
     def input_disarmed(self) -> bool:
         """Alias for :attr:`capture_failed` -- the section 33 disarm signal."""
         return self._capture_failed
@@ -408,7 +431,7 @@ class FrameEngine:
     def stats(self) -> dict[str, Any]:
         """A JSON-shaped health/performance snapshot for logs and benchmarks."""
         return {
-            "backend": CAPTURE_BACKEND_NAME,
+            "backend": self._backend_label,
             "profile": self._profile.value,
             "target_interval_ms": self.target_interval_ms,
             "total_captures": self._total_captures,
@@ -470,7 +493,7 @@ class FrameEngine:
             image=image,
             thumbnail=thumbnail,
             latency_ms=latency_ms,
-            backend=CAPTURE_BACKEND_NAME,
+            backend=self._backend_label,
         )
         self._next_frame_id += 1
         return frame
@@ -495,7 +518,7 @@ class FrameEngine:
             ErrorCode.CAPTURE_FAILED,
             f"screen capture failed: {cause!r}",
             details={
-                "backend": CAPTURE_BACKEND_NAME,
+                "backend": self._backend_label,
                 "consecutive_errors": self._consecutive_errors,
                 "fix_hint": _CAPTURE_FIX_HINT,
             },
@@ -516,7 +539,7 @@ class FrameEngine:
                     ErrorCode.CAPTURE_FAILED,
                     "capture backend repeatedly failed to reinitialize; input is disarmed",
                     details={
-                        "backend": CAPTURE_BACKEND_NAME,
+                        "backend": self._backend_label,
                         "reinitialize_failures": self._reinitialize_failures,
                         "last_cause": repr(cause),
                     },

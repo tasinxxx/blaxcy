@@ -178,6 +178,55 @@ def test_a_brain_failure_is_a_structured_halt_not_a_crash() -> None:
     assert env.events[-1].event_type is EventType.ERROR
 
 
+# -- The Brain cannot bypass the Body's safety ---------------------------------
+
+def test_observe_mode_refuses_a_brain_mutating_call_and_injects_nothing() -> None:
+    """A Brain call still has to pass policy; OBSERVE refuses input entirely (section 56)."""
+    loop, _brain, env = build_loop_env(
+        turns=[model_turn(calls=[(ToolName.CLICK, {"target": "Send"})]), model_turn(text="done")],
+        state=BUTTON_STATE,
+        mode=PolicyMode.OBSERVE,
+    )
+    result = loop.run("click send")
+
+    assert result.envelopes[0].ok is False
+    assert result.verified == 0
+    # The whole point: no physical input happened, whatever the Brain asked for.
+    assert env.dispatch_env.env.backend.events == []
+
+
+def test_an_unknown_tool_from_the_brain_is_rejected_and_the_loop_continues() -> None:
+    """An undeclared tool is a structured refusal, never a crash or a fabricated success."""
+    loop, _brain, env = build_loop_env(
+        turns=[
+            model_turn(calls=[("download_the_internet", {})]),
+            model_turn(text="done"),
+        ],
+        **_assist_kwargs(),
+    )
+    result = loop.run("do something silly")
+
+    assert result.halted is False
+    assert result.envelopes[0].ok is False
+    assert result.envelopes[0].error_code == ErrorCode.BACKEND_UNAVAILABLE.value
+    assert env.dispatch_env.env.backend.events == []
+
+
+def test_a_malformed_call_argument_is_rejected_without_injecting() -> None:
+    """A call whose arguments do not validate fails closed at the dispatcher."""
+    loop, _brain, env = build_loop_env(
+        turns=[
+            model_turn(calls=[(ToolName.CLICK, {"target": 12345})]),
+            model_turn(text="gave up"),
+        ],
+        **_assist_kwargs(),
+    )
+    result = loop.run("click something odd")
+
+    assert result.envelopes[0].ok is False
+    assert env.dispatch_env.env.backend.events == []
+
+
 # -- Confirmation is always a human decision ---------------------------------
 
 def _destructive_turn() -> ModelTurn:

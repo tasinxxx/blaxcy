@@ -98,17 +98,21 @@ WORKFLOW_PLAN: list[dict[str, Any]] = [
 #: ``--workflow-controls``). Every step's own repaint clears the section 34
 #: ``MEANINGFUL`` thresholds, and the search field is named as a navigation field
 #: so sections 36/42/55 permit reading its content -- which is what makes the typed
-#: step verifiable instead of honestly ``UNVERIFIED``.
+#: step verifiable instead of honestly ``UNVERIFIED``. The search *control* is
+#: targeted by ``Workflow Search`` rather than ``Search`` because a browser running
+#: on the same desktop legitimately exposes its own "Search" button; the plan must
+#: not be ambiguous just because the desktop is busy (measured 2026-09-26).
 WORKFLOW_SEARCH_FIELD = "Search Address Bar"
+WORKFLOW_SEARCH_CONTROL = "Workflow Search"
 WORKFLOW_BENCH_CONTROL_NAMES: tuple[str, ...] = (
-    "Search",
+    WORKFLOW_SEARCH_CONTROL,
     WORKFLOW_SEARCH_FIELD,
     "Submit",
     "Results",
     "Play Button",
 )
 WORKFLOW_VERIFIABLE_PLAN: list[dict[str, Any]] = [
-    {"step_id": "s1", "tool": "click", "target": "Search", "role": "BUTTON"},
+    {"step_id": "s1", "tool": "click", "target": WORKFLOW_SEARCH_CONTROL, "role": "BUTTON"},
     {
         "step_id": "s2",
         "tool": "type_text",
@@ -742,6 +746,42 @@ def _halt_reason(envelope: Any, steps: list[dict[str, Any]]) -> str:
         if not step.get("ok"):
             return f"{step.get('step_id')}:{step.get('error_code') or step.get('verification')}"
     return _code(envelope) or "incomplete"
+
+
+def _halt_detail(steps: list[dict[str, Any]]) -> str | None:
+    """Diagnostic detail for the first failing step, or ``None`` when none failed.
+
+    A soak needs to tell an *environmental* refusal from a code fault without
+    weakening the refusal itself. When a step halts with ``TARGET_OCCLUDED``
+    (section 46), the executor's revalidation evidence already records the
+    coverage ratio and the identity of the covering objects; this surfaces that
+    evidence so a run can say "something genuinely sits on top of the target"
+    rather than only "the workflow halted again". Nothing here decides whether a
+    refusal was correct -- it reports what the refusal was based on.
+    """
+    for step in steps:
+        if step.get("ok"):
+            continue
+        code = step.get("error_code")
+        if code == "NOT_EXECUTED":
+            # The tail of a halted sequence carries no information about why it
+            # halted; the failing step before it is the one that matters.
+            continue
+        label = step.get("step_id")
+        detail = f"{label}:{code or step.get('verification') or 'failed'}"
+        data = step.get("data")
+        revalidation = data.get("revalidation") if isinstance(data, dict) else None
+        occlusion = revalidation.get("occlusion") if isinstance(revalidation, dict) else None
+        if isinstance(occlusion, dict):
+            covering = occlusion.get("covering") or []
+            ratio = occlusion.get("ratio")
+            ratio_text = f"{float(ratio):.2f}" if isinstance(ratio, (int, float)) else "?"
+            if occlusion.get("blocked"):
+                detail += f" occluded(ratio={ratio_text} covering={list(covering)})"
+            elif occlusion.get("declared_occluded"):
+                detail += " declared_occluded"
+        return detail
+    return None
 
 
 def _verification_state(value: Any) -> str | None:

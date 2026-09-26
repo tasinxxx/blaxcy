@@ -34,7 +34,7 @@ Brain tool call
   -> core/target_resolver.py  resolve (with resolver_cache as a hint)
   -> schemas/leases.py      fresh ElementLease
   -> control/executor.py    revalidate -> ensure visible -> act
-  -> control/backends/      XTEST / xdotool / unavailable
+  -> control/backends/      XTEST / RemoteDesktop portal / unavailable
   -> core/perception.py     observe
   -> control/verifier.py    verify
   -> control/recovery.py    bounded recovery, if permitted
@@ -51,6 +51,7 @@ parallel pipeline, so a sequence step cannot drift from a standalone call.
 | Area | Modules | Role |
 |---|---|---|
 | `core/` | `application.py` | **Composition root.** The one place the parts are constructed together. Needs no Qt, which is why `main.py status` and the tests can run the Body headless. |
+| | `portal_capture.py` | §30/§33 Wayland capture: the XDG ScreenCast portal session + a PipeWire frame source as a real `FrameEngine` capture backend, probe-gated, used when `mss` cannot see the compositor. |
 | | `perception.py` | `PerceptionOrchestrator`: `perceive()` (one ordinary cycle) and `enrich()` (the §43 fallback cascade). |
 | | `frame_engine.py`, `change_detector.py` | §33 capture (mss) and §34 change classification. |
 | | `accessibility.py` | The **single owner** of AT-SPI, on its own thread; bounded traversal, element cache, role mapping. |
@@ -61,18 +62,18 @@ parallel pipeline, so a sequence step cannot drift from a standalone call.
 | | `state_cache.py`, `event_bus.py` | §65 the versioned current-state authority and the one typed event bus. |
 | | `capability_probe.py`, `session_detector.py`, `calibration.py`, `single_instance.py` | §28/§29 functional capability probes, §31 calibration, §72 single instance. |
 | | `logging_setup.py` | §70 structured JSON logging. |
-| `control/` | `executor.py` | §59 state machine; the only physical-input path. |
+| `core/` extra | `portal_capture.py` | §30/§33 Wayland capture: ScreenCast portal session + PipeWire consumer as a `FrameEngine` backend. |
 | | `sequence_runner.py` | §66.1 `run_sequence`; halt conditions and the `NOT_EXECUTED` tail. |
 | | `verifier.py`, `recovery.py`, `takeover.py`, `emergency_stop.py`, `action_tracker.py` | §60–§63, §78 verification, bounded recovery, takeover, stop, ownership. |
 | | `mouse.py`, `keyboard.py`, `clipboard.py`, `window_manager.py` | §48–§53 input control and §47 window activation. |
-| | `backends/` | `xtest.py` (primary), `xdotool.py`, `unavailable.py` (fail-closed), `keys.py`. |
+| | `backends/` | `xtest.py` (X11 primary), `portal.py` (Wayland RemoteDesktop), `unavailable.py` (fail-closed), `keys.py`. `xdotool`/`ydotool` are §30 *fallbacks* and are not implemented; the capability report says so rather than claiming one works. |
 | `policy/` | `modes.py`, `action_classes.py`, `permissions.py`, `guards.py`, `terminal_guard.py` | §56–§58 mode gating, action classes, permission engine, fail-closed guards, §54 terminal submission. |
 | `ai/` | `brain_adapter.py`, `gemini_adapter.py`, `tool_protocol.py`, `context_manager.py`, `prompt_builder.py` | §66–§68 the abstract adapter, the Gemini implementation, the single tool dispatcher, and the §68/§68.1 context economy. |
 | `schemas/` | `geometry.py`, `screen_state.py`, `elements.py`, `leases.py`, `actions.py`, `errors.py`, `events.py`, `sequences.py`, `enums.py`, `capability.py` | Typed contracts. Coordinates are always space-tagged (§31). |
 | `gui/` | `app.py`, `main_window.py`, `status_panel.py`, `capability_panel.py`, `action_log.py`, `confirmation.py`, `emergency_stop_ui.py` | §71 PySide6 view **over** the composition root, never the owner of it. |
 | `security/` | `keyring_manager.py`, `redaction.py` | §69 key storage; §70 redaction filter and secret registry. |
 | `watchdog/` | `watchdog.py`, `protocol.py` | §64 heartbeat, ownership record, crash cleanup. |
-| `bench/` | `real_desktop.py` | §76 reusable real-desktop benchmark runner. |
+| `bench/` | `real_desktop.py`, `soak.py` | §76 reusable real-desktop benchmark runner, and the §84 repeat-until-drift soak (per-step latency, resource invariants). |
 | `installer/` | `installer.py`, `__main__.py` | §73 standard-library-only installer with manifest and rollback. |
 
 ## Concurrency and threads

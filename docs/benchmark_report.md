@@ -588,6 +588,123 @@ duration and is not counted as a fast zero), and a step that ran in only some
 iterations reports the count it really has. The report is emitted as
 `report.steps` in the JSON and as a short table before it. It is pure analysis
 over the samples, so it is unit-tested without a desktop
+(`tests/unit/test_soak.py`).
+
+Measured over the 60-iteration clean run below (n = 60 for every step):
+
+| step | p50 | p95 | max | drift |
+|---|---|---|---|---|
+| s1 (click the search control) | 1247.9 ms | 1343.8 ms | 1551.8 ms | −1.3 % |
+| s2 (type into the field) | 130.6 ms | 143.2 ms | 1222.0 ms | −1.8 % |
+| s3 (click Submit) | 1258.5 ms | 1355.8 ms | 1455.5 ms | +0.4 % |
+| s4 (click Result 1) | 1250.0 ms | 1343.1 ms | 1428.3 ms | +1.1 % |
+| s5 (click Play Button) | 216.4 ms | 1227.1 ms | 1413.3 ms | +0.2 % |
+
+The slowest step by `p50` is `s3`, and the three click steps (s1/s3/s4) sit at
+~1.25 s while the type step is ~130 ms — the clicks each pay one cold §35
+traversal (the post-action observation after a self-verifying control's own
+repaint invalidates the cached tree), which is exactly the attribution the
+envelope's `timing.observe_ms` datum records. Drift is within ±1.8 % on every
+step: no step creeps.
+
+### Phase 15 — the latency discrepancy explained, and instrumentation added
+
+The soak's whole-iteration p50 (2.2–4.1 ms across runs) exceeded the benchmark's
+sequence p50 (~1.35 s) by more than the click/keyboard rows could explain.
+Diagnostics against the live pipeline (`/tmp/diag_phases.py`, run during the
+completion pass) attributed it, and a permanent fix now reports it: the executor's
+envelope carries `data["timing"] = {"observe_ms", "verify_calls"}`.
+
+- **`observe_ms` separates perception cost from verification cost.** On the slow
+  steps the post-action §35 observation (`Executor._observe`) took 768–794 ms — a
+  cold §35 traversal after the target's own repaint — while on warm steps it took
+  28–51 ms. The verifier was called exactly once per step in the measured runs
+  (`verify_calls == 1`), so `verify_settle_ms` was *not* the cost.
+- **The verifier's re-check loop is now countable.** `_confirm_negative` returns
+  the number of re-checks it made, so an envelope with `verify_calls > 1` provably
+  used the §60 settle window, and one with `verify_calls == 1` provably did not.
+- **No threshold was changed.** The §60 settle window, §45 checks and §34
+  classification are untouched; the extra time was real work (a fresh observation
+  after a real repaint), not waste. The click p50 moved from 196 ms (audit-time
+  measurement, warm cache) to ~213 ms across this session's runs because the
+  benchmark interleaves cold observations it previously did not pay for in its
+  p50 — the envelope now says which.
+
+### Phase 15 — the lease-after-halt defect, and the fix the invariants prove
+
+The 150-iteration runs taken during the audit reported
+`no_live_lease_retained: false`: a spent lease survived its iteration when a step
+halted on a non-structural path. Root-caused during the completion pass:
+
+1. `StateCache.prune_expired_leases()` existed but no production caller invoked
+   it, and
+2. the executor left a lease in the cache after `_act_and_verify` returned — the
+   §44 "one lease, one action" spend was implicit, and a halt with no structural
+   delta left the spent authorization sitting in the live set.
+
+The fix: the executor drops the lease in a `finally` (a lease is spent on
+success, refusal or exception alike — it can only ever *remove* an authorization
+that revalidation would already reject), and the cache prunes expired leases on
+an ordinary accepted update, *after* any invalidation has reported the leases it
+clears (so a `LEASE_REJECTED` event is never swallowed by the prune). Tests:
+`test_a_spent_lease_is_dropped_after_a_non_structural_step`,
+`test_repeated_steps_never_accumulate_spent_leases`,
+`test_an_expired_lease_is_pruned_by_an_ordinary_update`,
+`test_generation_change_clears_leases_and_emits_rejection` (which pins the
+event-reporting order).
+
+### Phase 15 — soak diagnostics for environmental halts
+
+A soak that only says "halted" cannot distinguish an environmental occlusion
+from a code fault. Each sample now carries a `halt_detail`: the first failing
+step's id, code, and — for a §46 occlusion refusal — the coverage ratio and the
+covering objects from the executor's own revalidation evidence. The analysis
+aggregates them (`report.halt_details`). The refusal itself is untouched; only
+its *reporting* got sharper.
+
+### Phase 15 — three clean runs after the fixes (2026-09-26)
+
+Command (each run): `python -m bench.soak --confirm-real-input --iterations 60
+--pause-ms 250`. Machine/session identical to Phase 14; the fixture relaunches
+the desktop each run.
+
+Run 1 (60 iterations):
+
+| Metric | Value | n |
+|---|---|---|
+| workflow completions | **60/60 (stability 1.0)** | 60 |
+| halt reasons / halt details | none | 60 |
+| per-iteration latency p50 / p95 / min / max | 4119.9 / 5187.6 / 3015.3 / 5355.4 ms | 60 |
+| verdicts | `stable`, `no_stuck_input`, `no_live_lease_retained`, `no_orphan_threads`, `latency_stable`, `memory_bounded` — **all true** | 6 |
+| live leases retained after an iteration | **0** (max across every check) | 60 |
+| held keys / buttons | 0 / 0 | 60 |
+| threads before → during → after shutdown | 1 → 6 → 1 | — |
+| RSS late-phase growth | **0.001 MB/iteration** (flat) | 60 |
+| resolver-cache hit rate | **0.9933** (745 hits / 5 misses) | 750 |
+
+Run 2 (25 iterations): **25/25, stability 1.0, every verdict true**; per-step
+p50 s1 672.2 / s2 121.2 / s3 666.6 / s4 694.9 / s5 195.0 ms, drift within +3.0 %.
+Run 3 (25 iterations): **25/25, stability 1.0, every verdict true**; per-step
+p50 s1 677.4 / s2 116.3 / s3 691.0 / s4 693.0 / s5 195.7 ms, drift within ±4.5 %;
+resolver-cache hit rate 0.96. Across the three post-fix runs: **110 consecutive
+workflows, 0 halts, 0 stuck input, 0 retained leases, 0 orphan threads, flat
+memory and latency.** The earlier audit-time runs' halts (`TARGET_OCCLUDED`
+clusters, `no_live_lease_retained: false`) did not recur after the lease fix; the
+occlusion refusals were environmental (a window over the fixture during those
+runs) and are now *named* by `halt_details` when they occur, instead of being
+indistinguishable from a failure.
+
+### Phase 15 — per-step latency attribution (superseded numbers)
+
+The soak now reports each executed step's own `elapsed_ms` (from the step's tool
+envelope) alongside the whole-workflow figure, so a drift can be named rather than
+attributed to "the workflow". The breakdown is reported in plan order, with a
+per-step second-half-vs-first-half drift and the slowest step by `p50` called out.
+A step that was `NOT_EXECUTED` after a halt contributes nothing (it has no
+duration and is not counted as a fast zero), and a step that ran in only some
+iterations reports the count it really has. The report is emitted as
+`report.steps` in the JSON and as a short table before it. It is pure analysis
+over the samples, so it is unit-tested without a desktop
 (`tests/unit/test_soak.py`). Re-measured numbers are pending a real-input run.
 
 ### Phase 15 — the `s3` postcondition (mitigation)

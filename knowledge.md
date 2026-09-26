@@ -305,10 +305,12 @@ master specification for the full bootstrap procedure.
   `CONTINUATION_STATE.md` -> "Known failures".
 - Input backends (`control/backends/`) are the *how* only: they perform no
   policy, lease or revalidation check and never decide to act (§13/§30). A
-  backend is selected only after a **functional** probe (XTEST version query);
-  only XTEST is implemented, and the xdotool path is explicitly not implemented
-  (no dead stub). Every held key/button is tracked so `release_all` can undo it
-  (§52/§63).
+  backend is selected only after a **functional** probe (XTEST version query; the
+  portal's interface introspection). Two backends are implemented: `xtest.py`
+  (X11 primary) and `portal.py` (Wayland RemoteDesktop, §30). `xdotool` and
+  `ydotool` are §30 *fallbacks* and are deliberately not implemented; the
+  capability report names that honestly instead of claiming a fallback works.
+  Every held key/button is tracked so `release_all` can undo it (§52/§63).
 - §43 ambiguity is conservative but no longer over-broad (narrowed 2026-09-25 on
   explicit operator decision): when the query names text and a candidate matches it
   **decisively** (text component > 0.80 — exact / case-insensitive / normalized /
@@ -341,17 +343,16 @@ After any code change, run:
 - `.venv/bin/mypy .`
 - `.venv/bin/pytest`
 
-**On this host `pytest` currently needs one extra flag:** it must be run as
-`.venv/bin/pytest -p no:pytest-qt`, because PySide6 6.10.3 (apt) ships no `QtTest`
-module and the installed `pytest-qt` plugin aborts *every* pytest run at configure
-time, before a single test is collected. Add `-o addopts=""` when you want the
-honest final count (the default `-q` suppresses the summary line). Use the plain
-command again once QtTest is installed: `sudo apt-get install
-python3-pyside6.qttest` (6.10.3-3, the exact version of the installed
-`python3-pyside6.qtcore`) fixes it, and `pip install PySide6` into `.venv` is the
-no-sudo fallback. See `CONTINUATION_STATE.md` -> "Known failures" for the exact
-error. Do not "fix" this by editing test expectations: the suite itself is green
-either way; only the plugin's startup is broken.
+`pytest` is the plain, documented command. `pytest-qt` is **not** a default
+developer dependency: no test uses its `qtbot` fixture (the §71 GUI tests build
+their own offscreen `QApplication`, see `tests/harness/gui.py`), and on a host
+whose Qt binding ships no `QtTest` module the plugin aborts *every* pytest run in
+`pytest_configure` before a single test is collected -- which is exactly what
+apt's PySide6 6.10.3 did. If you add a `qtbot`-based test, install the opt-in
+extra instead: `pip install -e ".[gui-test]"` (your Qt binding must provide
+`QtTest`; on Debian/Ubuntu `sudo apt-get install python3-pyside6.qttest`). Do not
+re-add `pytest-qt` to the default set: `tests/unit/test_packaging.py` now pins
+that it stays optional and that no test requests `qtbot`.
 
 For anything touching safety code (policy/executor/verifier/recovery/takeover/
 emergency_stop/watchdog): also run `pytest tests/safety/` — those suites assert
@@ -396,16 +397,32 @@ genuinely in front of the fixture (the honest refusal, not the old defect).
 For the **Phase 14 real-desktop benchmarks (§76)**, run
 `python -m bench.real_desktop` for the read-only numbers, or
 `python -m bench.real_desktop --confirm-real-input` to add the click/keyboard/
-sequence ones (it injects real input into the section 74 fixture). Results are
-recorded in `docs/benchmark_report.md` -> "Phase 14". Note the honest limit there:
-a real-desktop 5-step `run_sequence` *happy path* is not achievable on that
-fixture, because §60 verification refuses its sub-`MEANINGFUL` changes, so the
-sequence halts at step 1 with `VERIFICATION_UNVERIFIED`.
+sequence ones (it injects real input into the section 74 fixture). Results are  recorded in `docs/benchmark_report.md` -> "Phase 14". The `--workload
+verifiable` and `--workload workflow-verifiable` plans lay the fixture out with
+§76 large self-verifying controls, so a real-desktop 5-step `run_sequence` happy
+path *does* complete (`python -m bench.soak --confirm-real-input`, §84) rather
+than halting at step 1 with `VERIFICATION_UNVERIFIED` as the original
+sub-`MEANINGFUL` `workflow` layout did.
 
 For anything touching the batching layer (sequence_runner/resolver_cache/
 speculative_perceiver): also run `pytest tests/safety/test_sequence_halts.py`
 and confirm disabling the feature flag reproduces identical (only slower)
 behavior.
+
+The same three commands are the CI gate (`.github/workflows/ci.yml`), which also
+runs the suite under a virtual display and enforces the branch-coverage floor
+(`make coverage`, §87). The `package` CI job builds the sdist/wheel and installs
+it into a clean environment; the deterministic half of that check is
+`tests/unit/test_packaging.py`. Run `make package` locally to do the full
+build/install/import/`--help`/uninstall round trip.
+
+For the **Phase 15 soak (§84)**, run
+`python -m bench.soak --confirm-real-input --iterations 150`. It repeats the
+§74 workflow, reports per-step latency and drift, and checks the resource
+invariants (no held input, no live lease, no orphan thread). On a halted
+iteration its `halt_details` names the first failing step and, for a §46
+refusal, the occlusion ratio and covering objects, so an environmental occlusion
+is distinguishable from a code fault without weakening the refusal.
 
 For anything touching the installer or the desktop entry, also run
 `pytest tests/unit/test_installer.py tests/integration/test_install_scripts.py`.

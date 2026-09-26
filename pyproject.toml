@@ -33,15 +33,26 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The default developer set is exactly what the test suite needs. ``pytest-qt``
+# is deliberately *not* here: the section 71 GUI tests build their own offscreen
+# ``QApplication`` (tests/harness/gui.py) and never request the ``qtbot`` fixture,
+# so no test needs the plugin -- while the plugin imports ``QtTest`` in its own
+# ``pytest_configure`` and aborts the whole session with an INTERNALERROR on any
+# host whose Qt binding lacks that module (Debian/Ubuntu ship PySide6 split into
+# per-module packages). Requiring an unused plugin that can crash collection is
+# what made a bare ``pytest`` fail; the ``gui-test`` extra below is opt-in for a
+# host that wants the fixture and has a Qt binding which really ships ``QtTest``.
 dev = [
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
-    "pytest-qt",
     "pytest-benchmark",
     "mypy",
     "ruff",
     "black",
+]
+gui-test = [
+    "pytest-qt",
 ]
 
 [project.scripts]
@@ -68,11 +79,48 @@ packages = [
 testpaths = ["tests"]
 addopts = "-q"
 pythonpath = ["."]
+# ``pytest-qt`` is optional (see the ``gui-test`` extra). When it is installed
+# on a host that ships ``QtTest`` it loads normally; nothing here disables it in
+# that case, and ``testpaths``/``addopts`` are the plain documented command.
 markers = [
     "safety: Phase 9 safety-critical tests (policy/executor/verifier/recovery/emergency stop)",
     "batching: Phase 10.1 batching layer tests (run_sequence/resolver cache/speculative perception)",
     "benchmark: performance benchmarks, not run by default",
     "gui: requires a Qt event loop",
+]
+
+[tool.coverage.run]
+# Branch coverage, over the shipped source packages (the tests package and the
+# desktop/installer scripts are excluded: one is the suite, the other is not
+# import-time source). ``source`` here is what a bare ``pytest --cov`` measures.
+branch = true
+source = [
+    "ai",
+    "bench",
+    "config",
+    "control",
+    "core",
+    "gui",
+    "installer",
+    "policy",
+    "schemas",
+    "security",
+    "watchdog",
+]
+
+[tool.coverage.report]
+# A floor, not a target. The whole tree sits at ~87% (branch) and every
+# safety-critical module -- policy/*, control/executor.py, control/verifier.py,
+# control/recovery.py, control/emergency_stop.py, control/takeover.py,
+# control/sequence_runner.py, core/state_cache.py, control/action_tracker.py -- is
+# at 91-100%. The gate exists to catch a silent collapse, not to chase a number.
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@overload",
+    "if __name__ == .__main__.:",
 ]
 
 [tool.ruff]

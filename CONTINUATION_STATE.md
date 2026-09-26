@@ -68,13 +68,95 @@
   ruff + mypy clean, 179 files), matching the "Current task" claim exactly.
 
 ## Current phase
-- Phase: **Phase 15 — Full matrix / soak / documentation** (started 2026-09-26).
-  Phases 0-14 are complete (Phase 12-14 are recorded under "Previous phases").
-  Phase 15 now has a **soak runner** (`bench/soak.py`; 30-iteration and
-  150-iteration runs, the latter **149/150**, with flat latency and flat
-  steady-state memory) and the **environment/capability matrix**
-  (`docs/capability_matrix.md`). **Still open for Phase 15:** verification on a
-  Wayland/XWayland session, which this host cannot provide (no Wayland compositor).
+- Phase: **Phase 15 — Full matrix / soak / documentation**, completion pass
+  (2026-09-26). Phases 0-14 are complete. **The audit's twelve-item completion
+  list has been implemented and verified** (see "Completion pass 2026-09-26"
+  below); the only remaining items are the ones this host genuinely cannot
+  provide: a Wayland compositor, a Gemini API key, and a browser exposing an
+  AT-SPI tree.
+
+### Completion pass 2026-09-26 (AUDIT MODE → IMPLEMENTATION MODE)
+
+Every item below was implemented, tested, and verified with the real gate
+(**ruff clean, mypy clean in 187 files, 1248 passed / 6 skipped**, coverage gate
+80.88 % branch over the shipped tree, opt-in e2e **4 passed**, packaging round
+trip green).
+
+1. **Brain e2e (item 1)** — the Brain→dispatcher→Body path was audited and
+   hardened with bypass tests: OBSERVE refuses a Brain click on the real Body
+   (`test_a_brain_call_cannot_bypass_observe_on_the_real_body`), an undeclared
+   tool is a structured refusal (`test_an_unknown_brain_tool_is_refused_by_the_real_body`),
+   and the loop-level equivalents in `tests/unit/test_brain_adapter.py`. The
+   adapter already fails closed (no key ⇒ `BACKEND_UNAVAILABLE`, automatic
+   function calling disabled, key redacted from every error). **Live Gemini run
+   remains externally blocked: no API key on this host** — the exact remaining
+   step is `python main.py keys set-gemini`, then `python main.py run "..."`.
+2. **Wayland input + capture (items 2/7)** — new `core/portal_capture.py`:
+   `PortalCaptureBackend` (a real `FrameEngine` capture backend),
+   `DbusScreencastTransport` (CreateSession→SelectSources→Start, consent left to
+   the portal), `GstPipeWireSource` (pipewiresrc→BGRA appsink), and a
+   non-invasive functional probe wired into `probe_capture` (no X display ⇒
+   ScreenCast probe; DEGRADED until consent). 9 unit tests over fake transports
+   (`tests/unit/test_portal_capture.py`). The frame engine now reports the
+   backend that actually produced each frame (`backend_name`, frame `backend`).
+   **Real capture is unverified here: no Wayland compositor.**
+3. **CI (item 3)** — `.github/workflows/ci.yml`: the real gate (ruff, mypy,
+   pytest + the 80 % coverage floor) under `xvfb-run dbus-run-session`, plus a
+   `package` job that builds, installs into a clean venv, imports, exercises
+   `blaxcy --help`, and uninstalls.
+4. **Latency discrepancy (item 4)** — root-caused: the post-action §35
+   observation (`observe_ms` 768–794 ms cold vs 28–51 ms warm), not the
+   verifier (`verify_calls == 1` on every measured step). The envelope now
+   carries `data["timing"] = {"observe_ms", "verify_calls"}` permanently; the
+   §60 re-check loop returns its recheck count. No threshold changed.
+5. **Soak hardening (item 5)** — real defect found and fixed: a spent lease
+   survived a halt. The executor now drops the lease in a `finally`; the cache
+   prunes expired leases on an ordinary accepted update, after any
+   invalidation's `LEASE_REJECTED` events (ordering pinned by test). Soak gains
+   `halt_details` (first failing step + §46 occlusion evidence: ratio,
+   covering). Regression tests added. **Post-fix: 3 consecutive soaks (60+25+25)
+   completed 110/110 workflows, every invariant true every time.**
+6. **pytest/QtTest (item 6)** — root cause: no test uses `pytest-qt`, and the
+   plugin aborts every run at `pytest_configure` when the host's Qt binding
+   lacks `QtTest` (a conftest guard cannot fire early enough — verified).
+   `pytest-qt` moved to an opt-in `gui-test` extra; `pytest-qt` uninstalled from
+   the venv; **bare `pytest` is now the documented, working command**.
+   `tests/unit/test_packaging.py` pins both halves of the decision.
+7. **Coverage gate (item 8)** — `[tool.coverage.run] branch=true` over the
+   shipped packages, `fail_under = 80`; measured **80.88 %**. Safety-critical
+   modules sit at 91–100 % (executor 87 % line / 91 % branch, verifier 95 %,
+   recovery 91 %, emergency_stop 95 %, takeover 95 %, sequence_runner 95 %,
+   state_cache 99 %, action_tracker 97 %, policy ≥ 94 %).
+8. **Packaging (item 9)** — wheel built; installed into a clean
+   `--system-site-packages` venv; all 13 packages import; `blaxcy --help` works;
+   uninstall removes everything. Locked by `tests/unit/test_packaging.py` and
+   the CI `package` job; `make package` reproduces it locally.
+9. **Browser accessibility (item 10)** — the §36 stage-4 OCR address-bar
+   fallback is now wired: `discover_contexts(..., ocr=..., frame=...)` reads
+   *only* the identified address bar's region, rejects placeholders via a URL
+   sanity check, records honest notes otherwise; `PerceptionOrchestrator` passes
+   the frame through. 4 new tests. **Live verification still needs a browser
+   that exposes an AT-SPI tree** (none on this host).
+10. **Docs drift (item 11)** — `docs/architecture.md` (backends list, bench
+    modules, portal capture), `README.md` (phase status, Wayland portals),
+    `knowledge.md` (pytest-qt guidance, soak/CI sections, backend list),
+    `docs/capability_matrix.md`, `docs/limitations.md`,
+    `docs/benchmark_report.md` all updated to the current tree.
+11. **xdotool/ydotool/libei (item 12)** — confirmed §30 *fallbacks*/*degraded*
+    paths, not required while XTEST/portal are implemented; the rationale is
+    documented in `control/backends/__init__.py` and `docs/capability_matrix.md`,
+    and the capability report already names them honestly.
+12. **Benchmark target ambiguity** — the `workflow-verifiable` plan's `s1`
+    (`Search`) had become genuinely `TARGET_AMBIGUOUS` on this desktop (Firefox
+    exposes its own `Search` button; measured live). The fixture's self-verifying
+    layout now names its search control `Workflow Search`, and the plan targets
+    that; the §74 ordinary layout still teaches the ambiguity rule and its tests
+    are unchanged. Re-measured: **5/5 completed** (`--sequence-samples 5`) and
+    the full workload run completed all steps, sequence p50 2005.96 ms ≤ 4000 ms,
+    click 30/30 and keyboard 30/30 VERIFIED.
+
+**Known-flaky watch:** `test_the_previous_content_is_served_during_the_restore_grace`
+(xfce4-clipman race) remains ~1-in-5; not touched this pass.
 - **The soak surfaced and closed a real resolver-cache defect (2026-09-26).** The
   §43.1 cache could never hit on a live desktop: every perceived element carries
   `owner_window_id = None` (measured 146/146), so hints were keyed under `None`

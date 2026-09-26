@@ -92,6 +92,14 @@ WORKFLOW_CONTROL_VGAP = 36
 #: ``UNVERIFIED`` and the workflow can never complete.
 WORKFLOW_SEARCH_FIELD_NAME = "Search Address Bar"
 
+#: The accessible name the workflow layout gives its search *control*. Distinct
+#: from "Search" on purpose: the §74 name collides with a browser's own "Search"
+#: button on a real desktop (measured on this host: Firefox exposes one), which
+#: makes the benchmark plan's opening step honestly TARGET_AMBIGUOUS. A workload
+#: that measures the §59 pipeline needs a target that is unique on the desktop;
+#: the §43 resolver's ambiguity rule is separately pinned by its own tests.
+WORKFLOW_SEARCH_CONTROL_NAME = "Workflow Search"
+
 
 class CanvasWidget(QWidget):
     """A non-trivial painted surface: present, visible and intentionally not a label."""
@@ -209,6 +217,14 @@ class FixtureWindow(QMainWindow):
         # --- section 74 workflow fixture (search -> type -> submit -> list -> play)
         self.search_icon = QPushButton()
         self.search_icon.setObjectName("search_icon")
+        # The accessible name is layout-dependent: in the self-verifying workflow
+        # layout the plan targets this control by the description "Search", and a
+        # browser that is *also* running on the desktop may expose its own "Search"
+        # button, which would make that description genuinely TARGET_AMBIGUOUS.
+        # Naming the fixture's control "Workflow Search" there keeps the target
+        # unique on a real desktop without changing what the ordinary §74 layout
+        # teaches (two identical "Search" buttons on one screen are ambiguous, and
+        # must be). See bench/real_desktop.py WORKFLOW_BENCH_CONTROL_NAMES.
         self.search_icon.setAccessibleName("Search")
         self.search_icon.setIcon(_make_icon())
         self.search_icon.setText("")
@@ -387,6 +403,12 @@ class FixtureWindow(QMainWindow):
         self.search_input.setAccessibleName(WORKFLOW_SEARCH_FIELD_NAME)
         for button in (self.search_icon, self.submit_button, self.play_button):
             self._make_self_verifying(button)
+        # In this layout the plan targets the search control by the unique name
+        # below rather than "Search": a browser elsewhere on the desktop may
+        # legitimately expose its own "Search" button, and the §43 resolver must
+        # stay free to call that ambiguity. The workload measures the pipeline,
+        # not the rest of the desktop.
+        self.search_icon.setAccessibleName(WORKFLOW_SEARCH_CONTROL_NAME)
         self.search_input.setFixedSize(WORKFLOW_CONTROL_WIDTH, WORKFLOW_CONTROL_HEIGHT)
         self.result_list.setFixedSize(WORKFLOW_CONTROL_WIDTH, WORKFLOW_CONTROL_HEIGHT * 2)
         # Selecting a row is a real, user-visible change in any application, but

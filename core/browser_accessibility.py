@@ -17,15 +17,17 @@ Two hard rules come straight from the specification:
 
 URL discovery follows the section 36 order: browser accessibility/document
 attributes first, then the address bar, then visible browser UI, then the OCR
-fallback. The OCR engine now exists (Phase 5, `core/ocr.py`) but this browser
-layer is not yet wired to it, so that stage is reported as
-unavailable rather than silently skipped.
+fallback. All four stages are wired: the OCR fallback (stage 4) reads *only* the
+identified address bar's own region -- never an unbounded scan -- and is skipped
+with an honest note when no OCR engine or no frame is available, rather than
+being reported as unavailable or silently dropped.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from enum import StrEnum
+from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -34,6 +36,48 @@ from schemas.capability import Capability
 from schemas.elements import UIElement
 from schemas.enums import CapabilityName, CapabilityStatus, ErrorCode, UIRole
 from schemas.errors import BlaxcyError
+from schemas.geometry import Rect
+
+
+class OcrRegionReader(Protocol):
+    """The one OCR method the section 36 address-bar fallback needs.
+
+    ``core.ocr.OcrEngine`` satisfies this structurally; it is declared here so the
+    browser layer does not have to import the OCR module (and its numpy/cv2
+    weight) just to talk about the one method it uses.
+    """
+
+    def read_text(
+        self,
+        frame: Any,
+        *,
+        rect: Rect,
+        frame_id: int | None = None,
+        generation: int | None = None,
+        excluded: Sequence[Rect] = (),
+    ) -> str | None:
+        """OCR exactly one region, returning its text or ``None``."""
+
+
+#: A callable that returns the current frame for the OCR stage, or ``None`` when
+#: no fresh pixels are available (in which case the OCR stage is skipped honestly).
+FrameProvider = Callable[[], Any | None]
+
+
+def _looks_like_url(text: str) -> bool:
+    """A lenient sanity check before treating OCR text as an address-bar URL.
+
+    An address bar also shows a placeholder ("Search or enter address") or, after
+    a bad OCR read, arbitrary glyphs. Requiring a non-empty, whitespace-free
+    string that contains a dot keeps a placeholder from being reported as a URL
+    while still accepting ordinary ``host/path`` forms. It can reject an unusual
+    URL, and when it does the URL is reported as undiscovered with a note -- an
+    honest absence, never a fabricated one.
+    """
+    stripped = text.strip()
+    if not stripped or any(character.isspace() for character in stripped):
+        return False
+    return "." in stripped
 
 #: Browser application names (lower-cased, as AT-SPI reports them) whose trees
 #: this module understands. Recognition is by name *and* by an actually observed
@@ -115,12 +159,26 @@ def is_address_bar(element: UIElement) -> bool:
     return any(hint in name for hint in NAVIGATION_FIELD_HINTS)
 
 
-def discover_contexts(elements: Sequence[UIElement]) -> list[BrowserContext]:
+def discover_contexts(
+    elements: Sequence[UIElement],
+    *,
+    ocr: OcrRegionReader | None = None,
+    frame: Any | None = None,
+) -> list[BrowserContext]:
     """Derive one :class:`BrowserContext` per observed browser application.
 
     The URL is discovered in the section 36 order. When only a weaker stage
     succeeds, the context records which stage it was and what it could not do,
     rather than presenting a guess as an observation.
+
+    Args:
+        elements: The elements the accessibility service already observed.
+        ocr: The section 40 OCR engine, used only for the last-resort
+            address-bar read (stage 4). ``None`` disables that stage (the
+            default, so the stage was previously "not wired" and now is).
+        frame: The current frame the OCR stage would read from. When either
+            ``ocr`` or ``frame`` is ``None`` the stage is skipped and the
+            context says so, rather than reporting a URL it did not read.
     """
     grouped: dict[str, list[UIElement]] = {}
     for element in elements:
@@ -129,11 +187,17 @@ def discover_contexts(elements: Sequence[UIElement]) -> list[BrowserContext]:
 
     contexts: list[BrowserContext] = []
     for app_name in sorted(grouped):
-        contexts.append(_context_for(app_name, grouped[app_name]))
+        contexts.append(_context_for(app_name, grouped[app_name], ocr=ocr, frame=frame))
     return contexts
 
 
-def _context_for(app_name: str, elements: list[UIElement]) -> BrowserContext:
+def _context_for(
+    app_name: str,
+    elements: list[UIElement],
+    *,
+    ocr: OcrRegionReader | None = None,
+    frame: Any | None = None,
+) -> BrowserContext:
     """Build the context for one browser from its observed elements."""
     document = next((e for e in elements if e.role in _DOCUMENT_ROLES), None)
     page_title = document.accessible_name if document is not None else None
@@ -160,13 +224,44 @@ def _context_for(app_name: str, elements: list[UIElement]) -> BrowserContext:
             address_bar_element_id=address_bar.element_id,
         )
 
-    # Stage 3 (visible browser UI) yields a title, not a URL; stage 4 (OCR) is
-    # not yet wired into this layer (the OCR engine itself exists as of Phase 5).
-    # Report what is true instead of inventing a URL from a title.
+    # Stage 4: the OCR address-bar fallback (section 36). It reads *only* the
+    # identified address bar's own region, so it cannot OCR an unbounded area; and
+    # it never invents a URL -- a placeholder, an unreadable box or an unlikely
+    # read leaves the URL undiscovered with a note.
     notes = ["the page URL could not be discovered from document attributes or the address bar"]
     if address_bar is not None:
         notes.append("an address bar was identified but its text was not readable")
-    notes.append("the OCR address-bar fallback engine exists (Phase 5) but is not yet wired here")
+        if ocr is not None and frame is not None and address_bar.bbox is not None:
+            try:
+                read = ocr.read_text(
+                    frame,
+                    rect=address_bar.bbox,
+                    frame_id=getattr(frame, "frame_id", None),
+                    generation=getattr(frame, "generation", None),
+                )
+            except Exception:  # pragma: no cover - defensive: OCR is best-effort
+                read = None
+            if read and _looks_like_url(read):
+                return BrowserContext(
+                    app_name=app_name,
+                    page_title=page_title,
+                    url=read.strip(),
+                    url_source=UrlSource.OCR,
+                    document_element_id=document.element_id if document is not None else None,
+                    address_bar_element_id=address_bar.element_id,
+                    notes=(
+                        "the URL was read by OCR from the address bar; an OCR read can "
+                        "mis-correct a character, so treat it as evidence, not proof",
+                    ),
+                )
+            notes.append(
+                "the OCR address-bar fallback was tried but produced no plausible URL"
+            )
+        elif ocr is None or frame is None:
+            notes.append(
+                "the OCR address-bar fallback is available but was not wired for this "
+                "observation (no OCR engine or no frame)"
+            )
     return BrowserContext(
         app_name=app_name,
         page_title=page_title,
@@ -186,8 +281,26 @@ class BrowserAccessibility:
     (section 35) is never violated and there is exactly one accessibility owner.
     """
 
-    def __init__(self, service: AccessibilityService) -> None:
+    def __init__(
+        self,
+        service: AccessibilityService,
+        *,
+        ocr: OcrRegionReader | None = None,
+        frame_provider: FrameProvider | None = None,
+    ) -> None:
+        """Wire the browser layer.
+
+        Args:
+            service: The AT-SPI owner (the single accessibility thread).
+            ocr: The section 40 OCR engine for the address-bar fallback. ``None``
+                (the default) leaves the OCR stage off.
+            frame_provider: Supplies the current frame for the OCR stage. ``None``
+                also leaves the stage off; a provider that returns ``None``
+                (no fresh pixels) skips it for that observation.
+        """
         self._service = service
+        self._ocr = ocr
+        self._frame_provider = frame_provider
 
     def contexts(self, *, force: bool = False) -> list[BrowserContext]:
         """Observe the current browser contexts.
@@ -203,7 +316,8 @@ class BrowserAccessibility:
                 details={"fix_hint": "start AccessibilityService and ensure at-spi2-core is running"},
             )
         elements = self._service.elements(force=force)
-        return discover_contexts(elements)
+        frame = self._frame_provider() if self._frame_provider is not None else None
+        return discover_contexts(elements, ocr=self._ocr, frame=frame)
 
     def capability(self) -> Capability:
         """Report browser-accessibility availability with its evidence."""
@@ -248,8 +362,12 @@ class BrowserAccessibility:
             details=details,
             reason=(
                 "a browser accessibility tree is present but the page URL could not be "
-                "discovered (the OCR address-bar fallback engine exists as of Phase 5 "
-                "but is not yet wired into this layer)"
+                "discovered (no document URL attribute and no readable address bar; the "
+                "section 40 OCR address-bar fallback was unavailable or produced no "
+                "plausible URL)"
             ),
-            fix_hint="enable a browser accessibility integration that exposes document attributes",
+            fix_hint=(
+                "enable the browser's own accessibility support so the document exposes a "
+                "URL, or supply the OCR engine and a frame so the address-bar fallback can run"
+            ),
         )

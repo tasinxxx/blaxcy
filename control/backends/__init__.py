@@ -5,10 +5,15 @@ portal under native Wayland. They are selected through :func:`select_backend`,
 which requires a passing *functional* probe (section 28 rule 12) -- a backend is
 never chosen because a binary or module merely exists.
 
-``xdotool`` is named in section 30 as a *fallback*, not the primary pointer and
-keyboard implementation, and no xdotool backend is implemented yet. When neither
-XTEST nor the portal probe passes, selection returns ``None`` and the capability
-report says so honestly rather than silently claiming a fallback works.
+Section 30 also names two *fallbacks* -- ``xdotool`` (X11) and ``ydotool``
+(Wayland, via a uinput daemon) -- which this package deliberately does not
+implement. They are secondary paths the specification does not require while the
+primary mechanism is available, and a subprocess-per-action backend with no
+owned modifier state would be weaker than the in-process XTEST path it would
+duplicate. When neither XTEST nor the portal probe passes, selection returns
+``None`` and the capability report names the exact reason honestly (and notes
+whether ``xdotool`` happens to be present) rather than silently claiming a
+fallback works.
 """
 
 from __future__ import annotations

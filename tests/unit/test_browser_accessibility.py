@@ -184,6 +184,92 @@ def test_address_bar_present_but_unreadable_is_recorded_in_notes() -> None:
     assert context.address_bar_element_id == "bar"
 
 
+# ---------------------------------------------------------------------------
+# Section 36 stage 4: the OCR address-bar fallback (now wired).
+# ---------------------------------------------------------------------------
+
+
+class _FakeOcr:
+    """A scripted OCR reader that records the region it was asked to read."""
+
+    def __init__(self, text: str | None) -> None:
+        self.text = text
+        self.calls: list[Rect] = []
+
+    def read_text(
+        self,
+        frame: Any,
+        *,
+        rect: Rect,
+        frame_id: int | None = None,
+        generation: int | None = None,
+        excluded: Any = (),
+    ) -> str | None:
+        self.calls.append(rect)
+        return self.text
+
+
+class _FakeFrame:
+    """A stand-in frame carrying just the identity stamps the reader needs."""
+
+    frame_id = 7
+    generation = 3
+
+
+def _address_bar_case() -> list[UIElement]:
+    """A browser with a document (no URL) and an identified address bar."""
+    return [
+        _el(UIRole.DOCUMENT, eid="doc", app="Firefox", name="Example"),
+        _el(UIRole.TEXT_INPUT, eid="bar", app="Firefox", name="Address and search bar"),
+    ]
+
+
+def test_ocr_fallback_reads_a_url_from_the_address_bar_region() -> None:
+    """Stage 4 reads *only* the address bar's own region, and records the source."""
+    ocr = _FakeOcr("example.com/page")
+    contexts = discover_contexts(_address_bar_case(), ocr=ocr, frame=_FakeFrame())
+
+    context = contexts[0]
+    assert context.url == "example.com/page"
+    assert context.url_source is UrlSource.OCR
+    assert context.address_bar_element_id == "bar"
+    assert ocr.calls == [_BBOX], "OCR must read the address bar's own box, never a wider area"
+
+
+def test_ocr_fallback_rejects_a_placeholder_address() -> None:
+    """A placeholder (or a bad read) is not reported as a URL."""
+    ocr = _FakeOcr("Search or enter address")
+    context = discover_contexts(_address_bar_case(), ocr=ocr, frame=_FakeFrame())[0]
+
+    assert context.url is None
+    assert context.url_source is UrlSource.NONE
+    assert any("no plausible URL" in note for note in context.notes)
+
+
+def test_ocr_fallback_is_skipped_honestly_without_engine_or_frame() -> None:
+    """With no OCR engine or frame the stage is skipped and the context says so."""
+    context = discover_contexts(_address_bar_case())[0]
+
+    assert context.url is None
+    assert any("was not wired for this observation" in note for note in context.notes)
+
+
+def test_browser_accessibility_passes_the_frame_provider_into_discovery() -> None:
+    """The service wrapper supplies the frame, so stage 4 can run there too."""
+    service = _browser_service(_address_bar_case())
+    service.start()
+    ocr = _FakeOcr("https://example.com/x")
+    try:
+        contexts = BrowserAccessibility(
+            service, ocr=ocr, frame_provider=_FakeFrame
+        ).contexts()
+    finally:
+        service.stop()
+
+    assert contexts[0].url == "https://example.com/x"
+    assert contexts[0].url_source is UrlSource.OCR
+
+
 def test_non_browser_applications_produce_no_context() -> None:
     elements = [_el(UIRole.DOCUMENT, eid="doc", app="my-editor", name="Untitled")]
     assert discover_contexts(elements) == []

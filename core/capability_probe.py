@@ -99,6 +99,11 @@ def probe_capture(session: SessionInfo) -> Capability:
             reason="mss module exposes neither MSS nor mss factory",
         )
 
+    # On a session with no X display, mss cannot see anything: the honest answer
+    # comes from the Wayland ScreenCast portal (section 30), probed non-invasively.
+    if not session.has_x_display:
+        return _portal_capture_capability(session)
+
     started = time.perf_counter()
     try:
         capture = factory()
@@ -146,6 +151,48 @@ def probe_capture(session: SessionInfo) -> Capability:
                 for m in physical
             ],
         },
+    )
+
+
+def _portal_capture_capability(session: SessionInfo) -> Capability:
+    """Capture via the XDG ScreenCast portal + PipeWire (no X display present).
+
+    The probe is functional and non-invasive: it asks the live portal whether the
+    ScreenCast interface exists, without creating a session, raising a consent
+    dialog or reading a single pixel. Until a user consents (at the first real
+    capture), the capability can only honestly say the *path* is present -- the
+    frame engine reports what actually happened on the first grab.
+    """
+    from core.portal_capture import probe_portal_capture
+
+    result = probe_portal_capture()
+    if not result.get("available"):
+        return _cap(
+            CapabilityName.CAPTURE,
+            CapabilityStatus.UNAVAILABLE,
+            backend="mss",
+            reason=(
+                "this session has no X display for mss, and the Wayland capture "
+                f"path is unavailable: {result.get('reason') or 'the portal did not answer'}"
+            ),
+            fix_hint=(
+                "use a Wayland session whose portal implements "
+                "org.freedesktop.portal.ScreenCast with PipeWire available"
+            ),
+            details={"portal": result},
+        )
+    return _cap(
+        CapabilityName.CAPTURE,
+        # The path is present but no consent has been given yet, so a first grab
+        # still has to succeed before this is AVAILABLE: report the honest
+        # in-between state rather than pre-crediting a dialog nobody answered.
+        CapabilityStatus.DEGRADED,
+        backend="portal-screencast",
+        reason=(
+            "the ScreenCast portal is present; capture begins after the user grants "
+            "the session (the consent dialog appears on the first capture)"
+        ),
+        details={"portal": result},
     )
 
 

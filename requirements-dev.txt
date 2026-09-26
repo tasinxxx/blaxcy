@@ -1,8 +1,13 @@
 -r requirements.txt
+# Default developer set -- exactly what the test suite needs.
+# ``pytest-qt`` is intentionally absent: no test uses its ``qtbot`` fixture (the
+# section 71 GUI tests build their own offscreen ``QApplication``), and on a host
+# whose PySide6 ships no ``QtTest`` module the plugin aborts every pytest run at
+# configure time. Add it explicitly only if you extend the GUI tests to use it
+# and your Qt binding provides ``QtTest``.
 pytest
 pytest-asyncio
 pytest-cov
-pytest-qt
 pytest-benchmark
 mypy
 ruff

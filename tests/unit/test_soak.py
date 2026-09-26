@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from bench.real_desktop import _halt_detail
 from bench.soak import SoakReport, SoakSample, _step_timings, analyze, main
 
 
@@ -19,6 +20,7 @@ def _sample(
     *,
     completed: bool = True,
     halt_reason: str | None = None,
+    halt_detail: str | None = None,
     ms: float = 100.0,
     rss_mb: float = 100.0,
     held_keys: int = 0,
@@ -33,6 +35,7 @@ def _sample(
         steps_completed=5 if completed else 2,
         total_steps=5,
         halt_reason=halt_reason,
+        halt_detail=halt_detail,
         wall_clock_ms=ms,
         rss_mb=rss_mb,
         threads=8,
@@ -242,6 +245,69 @@ def test_a_run_without_step_timings_reports_none() -> None:
     report = _breakdown_report([_sample(index) for index in range(4)])
     assert report.steps["steps"] == {}
     assert report.steps["slowest_step_by_p50"] is None
+
+
+def test_a_halt_detail_names_the_occluding_evidence() -> None:
+    """A section 46 refusal reports the coverage ratio and the covering objects.
+
+    This is the diagnostic that separates an environmental occlusion (something
+    really is on top of the target) from a code fault, without the soak having to
+    weaken the refusal to find out.
+    """
+    steps: list[dict[str, Any]] = [
+        {"step_id": "s1", "ok": True, "error_code": None, "elapsed_ms": 10.0},
+        {
+            "step_id": "s3",
+            "ok": False,
+            "error_code": "TARGET_OCCLUDED",
+            "data": {
+                "revalidation": {
+                    "occlusion": {
+                        "blocked": True,
+                        "declared_occluded": False,
+                        "ratio": 0.78,
+                        "covering": ["firefox-esr:window-2"],
+                    }
+                }
+            },
+        },
+        {"step_id": "s4", "ok": False, "error_code": "NOT_EXECUTED"},
+    ]
+
+    detail = _halt_detail(steps)
+
+    assert detail is not None
+    assert detail.startswith("s3:TARGET_OCCLUDED")
+    assert "ratio=0.78" in detail
+    assert "firefox-esr:window-2" in detail
+
+
+def test_a_halt_detail_is_none_when_nothing_failed() -> None:
+    """A clean run reports no halt detail rather than an invented one."""
+    assert _halt_detail([{"step_id": "s1", "ok": True}]) is None
+
+
+def test_analyze_aggregates_halt_details() -> None:
+    """Halt details are counted per distinct reason, so a pattern is visible."""
+    samples = [_sample(index) for index in range(8)]
+    samples.append(
+        _sample(8, completed=False, halt_reason="s3:TARGET_OCCLUDED", halt_detail="s3:occluded")
+    )
+    samples.append(
+        _sample(9, completed=False, halt_reason="s3:TARGET_OCCLUDED", halt_detail="s3:occluded")
+    )
+    report = analyze(
+        samples,
+        skipped=0,
+        rss_start_mb=100.0,
+        rss_end_mb=100.1,
+        threads_start=8,
+        threads_end=8,
+        threads_after_shutdown=8,
+    )
+
+    assert report.halt_details == {"s3:occluded": 2}
+    assert report.to_dict()["halt_details"] == {"s3:occluded": 2}
 
 
 def test_the_cli_refuses_without_explicit_real_input_consent(

@@ -250,7 +250,7 @@ class PerceptionOrchestrator:
             return self._cache.current
 
         delta = self._delta_for(frame)
-        elements = self._accessibility_elements(force=force)
+        elements = self._accessibility_elements(force=force, frame=frame)
         ocr_elements = self._ocr_pass(frame, delta)
         combined = elements + ocr_elements
         state = self._build_state(frame, combined)
@@ -383,8 +383,15 @@ class PerceptionOrchestrator:
 
     # -- Stages ----------------------------------------------------------------
 
-    def _accessibility_elements(self, *, force: bool = False) -> tuple[UIElement, ...]:
-        """The AT-SPI observation, annotated with any discovered browser URL."""
+    def _accessibility_elements(
+        self, *, force: bool = False, frame: Frame | None = None
+    ) -> tuple[UIElement, ...]:
+        """The AT-SPI observation, annotated with any discovered browser URL.
+
+        ``frame`` is passed through to the section 36 browser layer so its last
+        URL-discovery stage (the OCR address-bar fallback) can run. ``None``
+        simply leaves that stage off for this observation.
+        """
         if self._a11y is None:
             return ()
         try:
@@ -392,7 +399,7 @@ class PerceptionOrchestrator:
         except BlaxcyError as exc:
             self._counters.poison.append(f"accessibility query failed: {exc.code.value}")
             return ()
-        return _annotate_browsers(elements, self._counters)
+        return _annotate_browsers(elements, self._counters, frame=frame, ocr=self._ocr)
 
     def _ocr_pass(
         self,
@@ -690,7 +697,11 @@ def _candidate_regions(resolution: ResolutionResult) -> tuple[Rect, ...]:
 
 
 def _annotate_browsers(
-    elements: Sequence[UIElement], counters: _Counters
+    elements: Sequence[UIElement],
+    counters: _Counters,
+    *,
+    frame: Frame | None = None,
+    ocr: OcrEngine | None = None,
 ) -> tuple[UIElement, ...]:
     """Attach a discovered browser URL to that browser's elements (section 36).
 
@@ -698,11 +709,14 @@ def _annotate_browsers(
     AT-SPI itself, so there is still exactly one accessibility owner (section 35).
     An element is only annotated when a real URL was discovered -- never with a
     guessed one -- and the element's own geometry and provenance are untouched.
+
+    ``frame``/``ocr`` enable the section 36 OCR address-bar fallback. Without
+    them the fallback is skipped and the browser layer records that honestly.
     """
     if not elements:
         return ()
     try:
-        contexts = discover_contexts(elements)
+        contexts = discover_contexts(elements, ocr=ocr, frame=frame)
     except Exception:  # pragma: no cover - defensive: discovery is pure
         return tuple(elements)
     if not contexts:

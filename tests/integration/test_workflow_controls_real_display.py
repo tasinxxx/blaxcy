@@ -29,7 +29,7 @@ from collections.abc import Callable, Iterator
 
 import pytest
 
-from bench.real_desktop import WORKFLOW_SEARCH_FIELD
+from bench.real_desktop import WORKFLOW_SEARCH_CONTROL, WORKFLOW_SEARCH_FIELD
 from config.settings import load_settings
 from control.verifier import Postcondition, Verifier
 from core.application import BlaxcyApplication
@@ -187,7 +187,7 @@ def test_the_live_clickable_controls_are_large_perceivable_buttons(
     for element in inside:
         by_name.setdefault(element.accessible_name, []).append(element)
 
-    for name in ("Search", "Submit", "Play Button"):
+    for name in (WORKFLOW_SEARCH_CONTROL, "Submit", "Play Button"):
         matches = [e for e in by_name.get(name, []) if e.role is UIRole.BUTTON]
         assert matches, f"{name!r} is not perceived as a BUTTON inside the fixture window"
         assert matches[0].clickable, f"{name!r} is not clickable"

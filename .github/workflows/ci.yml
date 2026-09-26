@@ -1,0 +1,110 @@
+name: CI
+
+# The repository's real validation gate, run the same way a developer runs it:
+#
+#   ruff check .  &&  mypy .  &&  python -m pytest
+#
+# The gate needs a virtual display: the section 71 GUI tests build a real
+# offscreen ``QApplication`` and the section 74/75 integration tests drive the
+# assembled Body against a live AT-SPI tree, which is what ``xvfb`` +
+# ``dbus-run-session`` provide here. Tests that cannot run without a further
+# environment (a Wayland compositor, A111 backend, real API credential) skip with
+# an explicit reason rather than failing -- they are never silently green.
+#
+# The opt-in real-input end-to-end suite (``BLAXCY_E2E_REAL_DISPLAY=1``) is
+# deliberately NOT run here: it exists to be run by a human on a real desktop.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: lint, typecheck, tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies (GI/AT-SPI, X, OCR, virtual display)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3-gi \
+            gir1.2-atspi-2.0 \
+            gir1.2-gtk-3.0 \
+            at-spi2-core \
+            dbus-x11 \
+            xvfb \
+            x11-utils \
+            xdotool \
+            tesseract-ocr
+
+      - name: Create the documented virtualenv
+        # --system-site-packages is required: GI/AT-SPI resolve from the system
+        # Python, exactly as docs/installation.md describes.
+        run: python3 -m venv --system-site-packages .venv
+
+      - name: Install the package and its developer dependencies
+        run: |
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: make lint PY=.venv/bin/python
+
+      - name: Type-check (mypy)
+        run: make typecheck PY=.venv/bin/python
+
+      - name: Tests and coverage gate under a virtual display
+        # One run: the suite and the branch-coverage floor (pyproject.toml) are
+        # checked together, so a coverage collapse cannot hide behind a green
+        # test run and a test failure cannot hide behind the coverage step.
+        # QT_LINUX_ACCESSIBILITY_ALWAYS_ON keeps the Qt AT-SPI bridge up even
+        # without a running accessibility desktop session.
+        env:
+          QT_LINUX_ACCESSIBILITY_ALWAYS_ON: "1"
+          NO_AT_BRIDGE: "0"
+        run: |
+          xvfb-run -a dbus-run-session -- \
+            .venv/bin/python -m pytest -o addopts="" -q --cov --cov-report=term-missing
+
+  package:
+    name: build and install the distribution
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the build front-end
+        run: python3 -m pip install --upgrade build
+
+      - name: Build sdist and wheel
+        run: python3 -m build
+
+      - name: Install the wheel into a clean environment and exercise it
+        run: |
+          python3 -m venv --system-site-packages /tmp/blaxcy-install
+          /tmp/blaxcy-install/bin/pip install --no-deps dist/*.whl
+          # But the runtime deps must resolve too: install them from the wheel's
+          # own metadata, so a missing Requires-Dist fails the build.
+          /tmp/blaxcy-install/bin/pip install "$(ls dist/*.whl)"
+          /tmp/blaxcy-install/bin/python -c "import main, installer, control, core, policy, schemas, ai"
+          /tmp/blaxcy-install/bin/blaxcy --help
+
+      - name: Clean uninstall
+        run: |
+          /tmp/blaxcy-install/bin/pip uninstall -y blaxcy
+          if /tmp/blaxcy-install/bin/python -c "import main" 2>/dev/null; then
+            echo "blaxcy still importable after uninstall" >&2
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: blaxcy-dist
+          path: dist/
+          if-no-files-found: error

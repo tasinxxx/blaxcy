@@ -7,6 +7,8 @@ stream -- is verified rather than assumed.
 
 from __future__ import annotations
 
+import time
+
 from core.event_bus import EventBus
 from core.state_cache import StateCache, StateSnapshot
 from schemas.capability import Capability, CapabilityReport
@@ -210,15 +212,32 @@ def test_delta_is_restamped_to_cache_versions() -> None:
 # -- Fail-closed invalidation (sections 32, 34, 44) --------------------------
 
 
-def test_ordinary_update_keeps_leases() -> None:
-    """A normal update does not clear leases; they expire on their own TTL."""
+def test_ordinary_update_keeps_live_leases() -> None:
+    """A normal update does not clear a *live* lease; it expires on its own TTL."""
     cache = StateCache()
     cache.update_screen_state(_state(0))
-    cache.store_lease(_lease())
+    cache.store_lease(_lease(now_monotonic=time.monotonic()))
 
     cache.update_screen_state(_state(1))
 
     assert len(cache.leases) == 1
+
+
+def test_an_expired_lease_is_pruned_by_an_ordinary_update() -> None:
+    """Section 44: an expired lease is dropped instead of lingering.
+
+    Nothing used to prune expired leases on an ordinary update, so a run of
+    non-structural steps (e.g. typing) accumulated spent leases until a structural
+    change or a generation bump happened to clear them. Pruning can only remove a
+    lease revalidation would already reject.
+    """
+    cache = StateCache()
+    cache.update_screen_state(_state(0))
+    cache.store_lease(_lease(now_monotonic=0.0, ttl_ms=1))
+
+    cache.update_screen_state(_state(1))
+
+    assert cache.leases == ()
 
 
 def test_generation_change_clears_leases_and_emits_rejection() -> None:
@@ -263,12 +282,12 @@ def test_structural_change_clears_leases() -> None:
 
 
 def test_trivial_change_keeps_leases_but_announces_screen_change() -> None:
-    """A TRIVIAL change is not structural: leases survive, the change is reported."""
+    """A TRIVIAL change is not structural: live leases survive, the change is reported."""
     bus = EventBus()
     cache = StateCache(event_bus=bus)
     first = cache.update_screen_state(_state(0))
     assert first is not None
-    cache.store_lease(_lease())
+    cache.store_lease(_lease(now_monotonic=time.monotonic()))
 
     second = _state(1)
     cache.update_screen_state(

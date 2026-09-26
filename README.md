@@ -16,11 +16,12 @@ RECOVERY  decides WHETHER A SAFE RETRY IS POSSIBLE
 
 ## Status
 
-**Phases 1-13 are implemented**: perception, calibration, the input layer, the
+**Implemented through Phase 15**: perception, calibration, the input layer, the
 policy/executor/verifier pipeline, the safety gate (emergency stop, takeover,
-recovery), the Brain/tool boundary, batching, visual grounding, the GUI, and the
-installer. BLAXCY reports what this machine can actually do, honestly, and
-refuses to claim anything it has not probed.
+recovery), the Brain/tool boundary, batching and speculative perception, visual
+grounding, the GUI, the installer, the real-desktop benchmarks (§76), and the
+repeat-until-drift soak (§84). BLAXCY reports what this machine can actually do,
+honestly, and refuses to claim anything it has not probed.
 
 See `CONTINUATION_STATE.md` for the current phase, verbatim evidence, and next
 action; `knowledge.md` for orientation; `docs/installation.md` for installing it
@@ -29,11 +30,15 @@ as a menu application.
 ## Requirements
 
 - Linux with Python 3.12+
-- A desktop session (X11 primary; Wayland support is degraded until Phase 2/7)
+- A desktop session (X11 primary; Wayland input and capture are implemented
+  through the XDG portals and require a portal that advertises them)
 - System accessibility packages for AT-SPI: `python3-gi`, `gir1.2-atspi-2.0`,
   `at-spi2-core`
 - Optional runtime tools: `xdotool`, `xclip`, `tesseract-ocr`,
   `tesseract-ocr-eng`, `wmctrl`
+- Optional capture/input backends: a Wayland session's XDG ScreenCast and
+  RemoteDesktop portals (plus PipeWire) are used automatically where XTEST/mss
+  cannot see the compositor; the capability report names the backend in use
 
 ## Install (menu application)
 

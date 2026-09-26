@@ -234,6 +234,84 @@ def test_click_happy_path_is_verified_and_leases_first() -> None:
     assert env.backend.payloads("press"), "a click must actually be injected"
 
 
+def test_a_spent_lease_is_dropped_after_a_non_structural_step() -> None:
+    """Section 44: a lease authorizes exactly one action, then it is gone.
+
+    A step whose post-action change is TRIVIAL produces no invalidation, so
+    nothing else clears the lease. Before the executor dropped a spent lease
+    itself, a run of such steps accumulated spent authorizations in the cache --
+    exactly the leak a soak's ``no_live_lease_retained`` invariant exists to
+    catch. Issuance stamps the lease as live now, so the section 44 TTL prune
+    does not remove it: only the executor's own drop does.
+    """
+    element = make_element()
+    state = make_state(frame_id=5, elements=(element,))
+    env = _env(state=state)
+    after = make_state(frame_id=6, elements=(element,))
+    env.perceiver.script(
+        after, make_delta(before=state, after=after, change_class=ChangeClass.TRIVIAL)
+    )
+
+    env.executor.execute(PlannedAction(tool=ToolName.CLICK, target=_QUERY))
+
+    assert env.cache.leases == ()
+
+
+def test_repeated_steps_never_accumulate_spent_leases() -> None:
+    """Two steps leave two issued leases spent and zero live (the soak's invariant)."""
+    element = make_element()
+    state = make_state(frame_id=5, elements=(element,))
+    env = _env(state=state)
+    after = make_state(frame_id=6, elements=(element,))
+    for _ in range(2):
+        env.perceiver.script(
+            after, make_delta(before=state, after=after, change_class=ChangeClass.TRIVIAL)
+        )
+
+    for _ in range(2):
+        env.executor.execute(PlannedAction(tool=ToolName.CLICK, target=_QUERY))
+        assert env.cache.leases == ()
+
+    assert len(env.bus.history_of(EventType.LEASE_ISSUED)) == 2
+
+
+def test_the_envelope_reports_observe_time_and_verifier_calls() -> None:
+    """Section 60 instrumentation separates perception cost from verification.
+
+    A slow action is far more often a cold post-action perception than a slow
+    verifier; without this datum the two are indistinguishable in an envelope.
+    """
+    element = make_element()
+    state = make_state(frame_id=5, elements=(element,))
+    env = _env(state=state)
+    after = make_state(frame_id=6, elements=(element,))
+    env.perceiver.script(after, make_delta(before=state, after=after))
+
+    envelope = env.executor.execute(PlannedAction(tool=ToolName.CLICK, target=_QUERY))
+
+    assert envelope.ok is True
+    timing = envelope.data["timing"]
+    assert timing["verify_calls"] == 1
+    assert timing["observe_ms"] >= 0.0
+
+
+def test_a_settled_verdict_counts_its_rechecks() -> None:
+    """A verdict that needed the section 60 settle window reports more than one call."""
+    field = make_text_input()
+    state = make_state(frame_id=5, elements=(field,))
+    env = _env(state=state, with_perceive_fresh=True)
+    stale = make_state(frame_id=6, elements=(make_text_input(text=""),))
+    env.perceiver.script(stale, make_delta(before=state, after=stale))
+    assert env.fresh_perceiver is not None
+    landed = make_state(frame_id=7, elements=(make_text_input(text="hello"),))
+    env.fresh_perceiver.script(landed, None)
+
+    envelope = env.executor.execute(_type_hello())
+
+    assert envelope.verification is VerificationState.VERIFIED
+    assert envelope.data["timing"]["verify_calls"] >= 2
+
+
 def test_click_that_changes_nothing_reports_unverified_failure() -> None:
     """An unprovable outcome is a failure, not a success (sections 60, 85)."""
     element = make_element()

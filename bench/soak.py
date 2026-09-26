@@ -40,7 +40,13 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ai.tool_protocol import ToolCall
-from bench.real_desktop import Environment, _halt_reason, _percentile, _step_results
+from bench.real_desktop import (
+    Environment,
+    _halt_detail,
+    _halt_reason,
+    _percentile,
+    _step_results,
+)
 from schemas.actions import ToolName
 
 #: A latency drift above this fraction (second half vs first half) is reported as
@@ -77,6 +83,9 @@ class SoakSample:
     #: runner actually executed appear; a ``NOT_EXECUTED`` step carries no
     #: duration and must not be counted as a zero, which would invent a fast step.
     step_timings_ms: dict[str, float] = field(default_factory=dict)
+    #: Why the first failing step failed, with its occlusion evidence when the
+    #: refusal was a section 46 occlusion. ``None`` on a clean iteration.
+    halt_detail: str | None = None
 
 
 @dataclass
@@ -88,6 +97,7 @@ class SoakReport:
     completed: int
     stability: float
     halts: dict[str, int] = field(default_factory=dict)
+    halt_details: dict[str, int] = field(default_factory=dict)
     latency_ms: dict[str, float] = field(default_factory=dict)
     drift: dict[str, Any] = field(default_factory=dict)
     steps: dict[str, Any] = field(default_factory=dict)
@@ -102,6 +112,7 @@ class SoakReport:
             "completed": self.completed,
             "stability": round(self.stability, 4),
             "halts": dict(sorted(self.halts.items())),
+            "halt_details": dict(sorted(self.halt_details.items())),
             "latency_ms": {key: round(value, 3) for key, value in self.latency_ms.items()},
             "drift": self.drift,
             "steps": self.steps,
@@ -230,9 +241,12 @@ def analyze(
     ran = len(samples)
     completed = sum(1 for sample in samples if sample.completed)
     halts: dict[str, int] = {}
+    halt_details: dict[str, int] = {}
     for sample in samples:
         if sample.halt_reason is not None:
             halts[sample.halt_reason] = halts.get(sample.halt_reason, 0) + 1
+        if sample.halt_detail is not None:
+            halt_details[sample.halt_detail] = halt_details.get(sample.halt_detail, 0) + 1
 
     latencies = [sample.wall_clock_ms for sample in samples]
     latency_ms: dict[str, float] = {}
@@ -315,6 +329,7 @@ def analyze(
         completed=completed,
         stability=(completed / ran) if ran else 0.0,
         halts=halts,
+        halt_details=halt_details,
         latency_ms=latency_ms,
         drift=drift,
         steps=steps,
@@ -383,6 +398,7 @@ def run(*, iterations: int, workload: str = "workflow-verifiable", pause_ms: int
                     steps_completed=sum(1 for step in steps if step.get("ok")),
                     total_steps=total_steps,
                     halt_reason=None if completed else _halt_reason(envelope, steps),
+                    halt_detail=None if completed else _halt_detail(steps),
                     wall_clock_ms=elapsed_ms,
                     rss_mb=_rss_mb(),
                     threads=_thread_count(),
@@ -422,6 +438,11 @@ def run(*, iterations: int, workload: str = "workflow-verifiable", pause_ms: int
         runner_stats=runner_stats,
     )
     print()
+    if report.halt_details:
+        print("halt details (why the first failing step failed):")
+        for detail, count in sorted(report.halt_details.items(), key=lambda item: -item[1]):
+            print(f"  {count}x {detail}")
+        print()
     if report.steps.get("steps"):
         print("per-step latency (ms):")
         for step_id in report.steps["order"]:

@@ -69,17 +69,20 @@ Probe result on this host: **AVAILABLE 9 · DEGRADED 0 · UNAVAILABLE 3**.
 |---|---|
 | `control/backends/xtest.py` | **implemented** — the primary X11 input path |
 | `control/backends/portal.py` | **implemented** — the XDG RemoteDesktop portal input path (the spec's `portal_remote_desktop` role) |
-| `control/backends/xdotool.py` | **not implemented** — `xdotool` is a §30 fallback, and no fallback is silently substituted |
-| `control/backends/ydotool.py` | **not implemented** — Wayland degraded fallback |
+| `control/backends/xdotool.py` | **not implemented** — `xdotool` is a §30 *fallback*; the in-process XTEST path is the primary and no fallback is silently substituted. A subprocess-per-action path with no owned modifier state would duplicate — and weaken — XTEST, so it is not built while XTEST is available. |
+| `control/backends/ydotool.py` | **not implemented** — a §30 *degraded* Wayland fallback needing a privileged `ydotoold`/uinput daemon; the RemoteDesktop portal is the primary Wayland path and is implemented |
 | XShm / `ctypes` capture path | **not implemented** — `mss` is the measured primary; an XShm path is only warranted with benchmark evidence that it is needed (§33) |
-| XDG ScreenCast portal + PipeWire capture | **not implemented** — Wayland capture |
+| XDG ScreenCast portal + PipeWire capture | **implemented, not verified on this host** — `core/portal_capture.py` (`PortalCaptureBackend` + `DbusScreencastTransport` + GStreamer `pipewiresrc` consumer). The probe is functional and non-invasive (it asks the live portal whether ScreenCast is advertised; no session, no consent dialog, no pixels). Unit-tested over fake transports; real capture needs a Wayland compositor and user consent, so it is **unverified here** |
 | `security/secrets.py` | not present; the role is `security/keyring_manager.py` (§26 naming note) |
 | `core/eye.py` | not present; the role is `core/perception.py` + `core/frame_engine.py` |
 
 ## What is unsupported (the explicit list)
 
-- **Native Wayland capture** — no ScreenCast + PipeWire path. No Wayland capture
-  support is claimed (§79).
+- **Native Wayland capture is implemented but not verified here** — the ScreenCast
+  + PipeWire path exists (`core/portal_capture.py`) and is unit-tested over fake
+  transports, but this host has no Wayland compositor and its X11 portal does not
+  advertise `org.freedesktop.portal.ScreenCast`, so a real consented capture has
+  never run. No Wayland capture support is claimed (§79).
 - **Native Wayland input is implemented but not verified here** — the portal
   backend and its non-invasive functional probe exist and are unit-tested, but this
   host has no Wayland compositor, and its X11 portal does not expose
@@ -95,9 +98,11 @@ Probe result on this host: **AVAILABLE 9 · DEGRADED 0 · UNAVAILABLE 3**.
 - **Visual grounding and the remote Brain** — implemented and tested, but
   `UNAVAILABLE` until an API key is stored in the OS keyring
   (`python main.py keys set-gemini`).
-- **xdotool / ydotool fallbacks** — not implemented, so a session where both the
-  XTEST probe and the portal probe fail reports `mouse`/`keyboard` `UNAVAILABLE`
-  rather than pretending a fallback exists.
+- **xdotool / ydotool fallbacks** — deliberately not implemented (see the table
+  above: they are §30 *fallbacks*/*degraded* paths, weaker than the primary
+  XTEST/portal paths). A session where both the XTEST and the portal probe fail
+  reports `mouse`/`keyboard` `UNAVAILABLE`, naming the observed `xdotool` binary
+  as evidence, rather than pretending a fallback exists.
 
 Nothing above is inferred from an executable on `PATH`; each implemented capability
 is selected only after a functional probe, and each unimplemented one is reported

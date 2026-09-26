@@ -248,6 +248,16 @@ class StateCache:
                             },
                         )
                     )
+            else:
+                # Section 44: an expired lease is already invalid, so it must not
+                # keep occupying the live-lease set. Pruning on an otherwise
+                # ordinary update is what keeps a run of non-structural updates
+                # (e.g. typing, whose repaint is below MEANINGFUL) from
+                # accumulating spent leases; it can only ever remove a lease
+                # revalidation would already reject, and it runs only when no
+                # invalidation already reported the leases it removes. The lock is
+                # reentrant, so this reuses the same method callers can invoke.
+                self.prune_expired_leases()
 
             events.append(
                 Event.create(

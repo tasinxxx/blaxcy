@@ -20,6 +20,7 @@ from bench.real_desktop import (
     HAPPY_PATH_PLAN,
     VERIFIABLE_PLAN,
     WORKFLOW_BENCH_CONTROL_NAMES,
+    WORKFLOW_SEARCH_CONTROL,
     WORKFLOW_SEARCH_FIELD,
     WORKFLOW_VERIFIABLE_PLAN,
     Environment,
@@ -99,7 +100,7 @@ def test_the_workflow_verifiable_plan_is_the_five_pipeline_steps() -> None:
         "click",
     ]
     assert [step["target"] for step in WORKFLOW_VERIFIABLE_PLAN] == [
-        "Search",
+        WORKFLOW_SEARCH_CONTROL,
         WORKFLOW_SEARCH_FIELD,
         "Submit",
         "Result 1",
