@@ -44,7 +44,7 @@ from typing import Any
 from config.settings import Settings
 from control.action_tracker import ActionTracker
 from control.backends.base import PointerButton
-from control.keyboard import KeyboardController
+from control.keyboard import KeyboardController, check_focus
 from control.mouse import MouseController
 from control.recovery import RecoveryController
 from control.verifier import SELECTABLE_ROLES, VerificationOutcome, Verifier
@@ -1048,10 +1048,17 @@ class Executor:
                 # typed into (sections 42, 55). The controller refuses rather than
                 # pasting a secret, and the refusal is reported honestly.
                 sensitive = bool(element is not None and element.is_password)
+                expected_focus = element if element is not None and element.is_text_entry else None
+                # The section 51 guard fails closed, but the observation it is handed
+                # can be a section 35 cache-served read taken before a click moved
+                # focus. Give a would-be refusal the same bounded live re-check a
+                # would-be failed verification gets, so a field that really is
+                # focused is not refused on a stale observation.
+                focus_state = self._focus_checked_state(expected_focus, state)
                 self._keyboard.type_text(
                     str(planned.params.get("text", "")),
-                    expected_focus=element if element is not None and element.is_text_entry else None,
-                    state=state,
+                    expected_focus=expected_focus,
+                    state=focus_state,
                     sensitive=sensitive,
                 )
                 return None
@@ -1169,6 +1176,46 @@ class Executor:
                 f"could not make window {element.owner_window_id} active before input",
             )
         return None
+
+    def _focus_checked_state(
+        self, element: UIElement | None, state: ScreenState | None
+    ) -> ScreenState | None:
+        """The state the section 51 focus guard should be judged against.
+
+        The guard fails closed, but the observation handed to it can be a section
+        35 cache-served read taken *before* a click moved focus, so it can refuse to
+        type into a field that really is focused -- a false negative, not a safety
+        outcome. Before accepting that refusal, re-perceive *live* and re-check,
+        exactly as a would-be failed verification is re-checked
+        (``_confirm_negative``).
+
+        This can only turn a wrong refusal into a correct permission: a target that
+        is still not focused is still refused, a latched stop short-circuits it, and
+        the already-focused happy path costs nothing extra. The guard is only worth
+        re-checking when it is enabled at all, and ``verify_settle_ms = 0`` disables
+        the re-check.
+        """
+        if element is None or state is None or self._perceive_fresh is None:
+            return state
+        if not self._settings.input.guard_focus:
+            return state
+        if check_focus(element, state).ok:
+            return state
+        settle_s = float(self._settings.verification.verify_settle_ms) / 1000.0
+        if settle_s <= 0.0:
+            return state
+        poll_s = max(float(self._settings.verification.verify_poll_ms) / 1000.0, 0.0)
+        deadline = time.monotonic() + settle_s
+        while True:
+            if self._abort_code() is not None:
+                return state
+            fresh = self._perceive_fresh()
+            if fresh is not None and check_focus(element, fresh).ok:
+                return fresh
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.0:
+                return state
+            time.sleep(min(poll_s, remaining) if poll_s > 0.0 else remaining)
 
     # -- Observation ----------------------------------------------------------
 

@@ -361,6 +361,65 @@ def test_the_recheck_never_softens_a_real_contradiction() -> None:
     assert envelope.error_code is ErrorCode.VERIFICATION_CONTRADICTED
 
 
+def test_a_stale_unfocused_read_is_rechecked_before_the_focus_guard_refuses() -> None:
+    """Section 51: a stale focus read is not evidence that the field is unfocused.
+
+    The guard fails closed against the state it is handed, but that state can be a
+    section 35 cache-served read taken before a click moved focus -- exactly the
+    realistic section 74 workflow's ``s2:FOCUS_MISMATCH``. The executor re-perceives
+    live and re-checks before accepting the refusal, so a field that really is
+    focused is typed into rather than wrongly refused.
+    """
+    field = make_text_input(focused=False)
+    state = make_state(frame_id=5, elements=(field,))
+    env = _env(state=state, with_perceive_fresh=True)
+    assert env.fresh_perceiver is not None
+    focused = make_state(frame_id=6, elements=(make_text_input(focused=True),))
+    env.fresh_perceiver.script(focused, None)
+    landed = make_state(frame_id=7, elements=(make_text_input(text="hello"),))
+    env.perceiver.script(landed, None)
+
+    envelope = env.executor.execute(_type_hello())
+
+    assert envelope.ok is True, envelope.message
+    assert envelope.verification is VerificationState.VERIFIED
+    assert env.fresh_perceiver.calls == 1
+    assert env.backend.payloads("key_press"), "the text must actually be injected"
+
+
+def test_the_focus_recheck_never_overrides_a_real_focus_refusal() -> None:
+    """Live reads that keep disagreeing are still a refusal (section 51)."""
+    settings = Settings(
+        verification=VerificationSettings(verify_settle_ms=50, verify_poll_ms=10)
+    )
+    field = make_text_input(focused=False)
+    state = make_state(frame_id=5, elements=(field,))
+    env = _env(state=state, settings=settings, with_perceive_fresh=True)
+    # Nothing is scripted for the fresh observer, so every live read returns the
+    # cache's current state -- which still really is not focused.
+
+    envelope = env.executor.execute(_type_hello())
+
+    assert envelope.ok is False
+    assert envelope.error_code is ErrorCode.FOCUS_MISMATCH
+    assert not env.backend.payloads("key_press"), "nothing may be typed into a field that is not focused"
+
+
+def test_an_already_focused_field_never_triggers_a_fresh_read() -> None:
+    """The re-check only ever applies to a would-be refusal (section 45/51)."""
+    field = make_text_input()  # focused by default
+    state = make_state(frame_id=5, elements=(field,))
+    env = _env(state=state, with_perceive_fresh=True)
+    assert env.fresh_perceiver is not None
+    after = make_state(frame_id=6, elements=(make_text_input(text="hello"),))
+    env.perceiver.script(after, None)
+
+    envelope = env.executor.execute(_type_hello())
+
+    assert envelope.verification is VerificationState.VERIFIED
+    assert env.fresh_perceiver.calls == 0  # the happy path costs nothing extra
+
+
 def test_clicking_a_selectable_control_verifies_from_its_selected_state() -> None:
     """Section 60: a selection is stronger evidence than the pixels it repainted.
 

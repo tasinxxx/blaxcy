@@ -71,17 +71,20 @@ exists** (`core/logging_setup.py` + `security/redaction.py`, with the root
 redaction filter and rotation from `[logging]`), and the **three missing §26 docs
 are written** (`docs/architecture.md`, `docs/security.md`, `docs/limitations.md`).
 The `[logging]` config section is no longer a dead stub.
-- Phase status: **IN PROGRESS — one §76 row is measured but not met.** The
-  `workflow-verifiable` workload (the realistic §74 pipeline — search icon → type →
-  submit → result → play — laid out at self-verifying scale) was **re-measured
-  2026-09-26 after all three halt causes were fixed**: it now completes **5/20** runs
-  (was 2/20), and its halt set collapsed to a **single** cause, `s2:FOCUS_MISMATCH`
-  ×15 — `VERIFICATION_CONTRADICTED` and `s4:VERIFICATION_UNVERIFIED` no longer occur
-  (the standalone click and keyboard rows moved from `5/50`/`1/30` to **30/30
-  VERIFIED** each). The 5-step happy-path **target is met** by the synthetic
-  `verifiable` workload (**20/20**, p50 2505.23 ms / p95 3671.94 ms, ≤ 4000 ms), but
-  the *realistic* pipeline is not yet, and the residual is a focus-timing item, not
-  a batching or §60 defect (see "Known failures").
+- Phase status: **COMPLETE — every §76 row is now measured and met.** The realistic
+  §74 workflow (`workflow-verifiable`, search icon → type → submit → result → play)
+  was re-measured **2026-09-26**, in two steps: after the three earlier halt causes
+  were fixed it reached **5/20** (halt set narrowed to `s2:FOCUS_MISMATCH` ×15); then
+  after the §51 focus guard was made to re-check a would-be refusal against a fresh
+  live perception, it reached **20/20 completed, p50 1342.94 ms / p95 1787.70 ms
+  (≤ 4000 ms target met)**. The standalone click and keyboard rows are **30/30
+  VERIFIED** each. The synthetic `verifiable` workload also still meets the target
+  (**20/20**, p50 2505.23 ms). Both workloads are recorded in the §76 form in
+  `docs/benchmark_report.md`.
+- **Closed 2026-09-26: the workflow happy-path gap.** The §51 focus-timing residual
+  was the last open §76 item; it was fixed by re-checking the guard against a fresh
+  live observation before refusing (see "Current task"). No §60 threshold or §51
+  rule changed — a genuinely unfocused target is still refused by test.
 - **One environment item is still open, and it is a human action, not code**: this
   host's PySide6 6.10.3 (apt) ships QtCore/QtGui/QtWidgets but **not QtTest**, so
   the installed `pytest-qt` plugin aborts *every* pytest run at configure time. The
@@ -1039,6 +1042,23 @@ The `[logging]` config section is no longer a dead stub.
     against throwaway prefixes; no system-wide install was performed.
 
 ## Current task
+- **2026-09-26 (bootstrap session): the §51 focus-timing residual is fixed and the
+  workflow now completes 20/20.** The last open §76 item was `s2:FOCUS_MISMATCH` in
+  the sequence: `s1` clicked the search icon (whose handler focuses the field) and
+  `s2` typed ~120 ms later, but §51's guard judged the type against a §35 cache-served
+  observation taken before the focus change, so it wrongly refused. Fix: the executor
+  now re-checks a would-be focus refusal against a **fresh live** perception before
+  accepting it — mirroring `_confirm_negative`'s live re-check of a would-be failed
+  verification — via a new `Executor._focus_checked_state` (bounded by
+  `verify_settle_ms`, `verify_settle_ms = 0` disables it, skipped on the
+  already-focused happy path). **It can only turn a wrong refusal into a correct
+  permission**: a target that is genuinely still unfocused is still refused (locked by
+  `test_the_focus_recheck_never_overrides_a_real_focus_refusal`), a latched stop
+  short-circuits it, and no §60/§51 rule changed. Measured: the realistic workflow is
+  **20/20, p50 1342.94 ms / p95 1787.70 ms (≤ 4000 ms met)**; click and keyboard
+  30/30 each. Gate: **1170 passed, 6 skipped** (was 1167); ruff + mypy clean (179
+  files). Recorded in `docs/benchmark_report.md` "Phase 14 — the realistic workflow
+  after the section 51 focus re-check".
 - **2026-09-26 (bootstrap session): the post-fix re-measurement was run, on operator
   approval.** The three halt causes were fixed but unmeasured; the index's next
   concrete action was the opt-in real-input re-run, so it was executed rather than
@@ -1132,7 +1152,13 @@ The `[logging]` config section is no longer a dead stub.
   a package install (see "Next concrete action") and therefore a human decision.
 
 ## Files being actively modified
-- (none mid-change; this session's three fixes are complete, tested and green)
+- (none mid-change; this session's fixes are complete, tested and green)
+- Touched this session (the §51 focus-timing fix, 2026-09-26): `control/executor.py`
+  (`_focus_checked_state` + the `TYPE_TEXT` branch using it, and the
+  `from control.keyboard import ... check_focus` import),
+  `tests/unit/test_executor.py` (three focus tests),
+  `docs/benchmark_report.md` (the post-fix workflow table),
+  `docs/limitations.md`, this file. Committed alongside the checkpoint below.
 - Touched this session (the typed-field read lag and the result click):
   `core/perception.py` (the `force` parameter is now real),
   `core/application.py` (`_perceive_fresh` wiring), `control/executor.py`
@@ -1600,10 +1626,15 @@ The `[logging]` config section is no longer a dead stub.
 
 ## Known failures
 *(structure per §12.1)*
-- **The realistic §74 workflow happy path is built but NOT achieved on the real
-  desktop — `workflow-verifiable` completes 5/20 after the fixes** (found and
-  measured 2026-09-25; **re-measured 2026-09-26**; the two verification causes are
-  closed, **one focus-timing cause remains open**)
+- **The realistic §74 workflow happy path — RESOLVED and met 2026-09-26**
+  (`workflow-verifiable` reaches **20/20, p50 1342.94 ms / p95 1787.70 ms**, within
+  the ≤ 4000 ms target). Kept for the record: it took four causes, each root-caused
+  and fixed rather than tuned away. The first three (the AT-SPI focus-event
+  subscription, the typed-field read lag, and the `LIST_ITEM` selection
+  postcondition) were fixed on 2026-09-25/26; the last (§51 judging a would-be
+  refusal against a cache-served read taken before the click moved focus) was fixed
+  2026-09-26 by a live re-check before refusing. **No §60 threshold or §51 rule was
+  loosened** — a genuinely unfocused target is still refused, by test.
   - failure: with the fixture's `--workflow-controls` layout and
     `--workload workflow-verifiable`, only 2 of 20 five-step `run_sequence` runs
     completed all five steps; the rest halted at step `s2` (typing) or `s4`
@@ -1656,25 +1687,22 @@ The `[logging]` config section is no longer a dead stub.
     and keyboard **30/30 VERIFIED** (p50 679.40 ms), where the pre-fix run was
     `5/50` and `1/30`. Recorded in `docs/benchmark_report.md` "Phase 14 — the same
     workflow re-measured after the three fixes".
-  - current status: **open, narrowed to one cause.** The residual
-    `s2:FOCUS_MISMATCH` is **sequence-specific**: the standalone keyboard benchmark
-    types into the *same* Qt field and is 30/30, because it focuses the field and
-    confirms it through perception *before* the timed action. In the sequence, `s1`
-    clicks the search icon (whose handler calls `setFocus()` on the field) and `s2`
-    types ~120 ms later; §51's guard still refuses in 15/20 runs. This points at
-    focus-propagation timing between a synthetic click and the accessibility state
-    the guard reads — not at the guard's logic, which correctly fails closed. The
-    synthetic `verifiable` workload still meets the §76 5-step target (**20/20**,
-    p50 2505.23 ms). No safety guarantee was weakened: no §60 threshold changed, and
-    the selection path is positive-only evidence.
-  - next investigation: the focus-timing residual. The consistent direction is a
-    **fresh live re-check before refusing** (§45/§51): if the guard fails against a
-    cache-served state, re-perceive live and re-check, exactly as `_confirm_negative`
-    now does for a negative verification verdict — a re-check can only turn a wrong
-    refusal into a correct permission, never permit a refusal the guard would make.
-    (§35's element TTL of 2 s exceeds §45's 1500 ms action-state-age ceiling, which
-    is the underlying inconsistency.) Do **not** loosen §60 or the §51 guard to make
-    the number nicer (§4 rule 8); any fix must be re-measured, not asserted (§76).
+  - **FINAL RE-MEASUREMENT 2026-09-26 (after the §51 focus re-check): 20/20
+    completed all five steps**, p50 1342.94 ms / p95 1787.70 ms (≤ 4000 ms target
+    met). The halt set is empty. Recorded in `docs/benchmark_report.md` "Phase 14 —
+    the realistic workflow after the section 51 focus re-check".
+  - current status: **RESOLVED.** The residual `s2:FOCUS_MISMATCH` was
+    sequence-specific: the standalone keyboard benchmark types into the *same* Qt
+    field and was already 30/30, because it confirms focus through perception before
+    the timed action, whereas the sequence's `s1` click focused the field and `s2`
+    typed ~120 ms later while §51 read a §35 cache-served observation taken before
+    the change. The fix is a bounded live re-check before a refusal, not a relaxed
+    guard: a genuinely unfocused target is still refused
+    (`test_the_focus_recheck_never_overrides_a_real_focus_refusal`).
+  - next investigation: none — closed. The underlying inconsistency worth remembering
+    (§35's 2 s element TTL can exceed §45's 1500 ms action-state-age ceiling) is now
+    mitigated on the one path that acted on it, but the general TTL/age relationship
+    is still worth keeping in view if a future action gates on a cached read.
 - **pytest cannot run at all while `pytest-qt` is installed — PySide6 has no `QtTest`**
   - failure: every `python -m pytest ...` invocation ends in `INTERNALERROR` during
     `pytest_configure`, collecting zero tests; `main.py`, `ruff` and `mypy` are
@@ -1818,22 +1846,16 @@ The `[logging]` config section is no longer a dead stub.
     concrete action").
 
 ## Next concrete action
-- **DONE 2026-09-26 — the realistic §74 workflow was re-measured** (operator
-  approved the real-input run). Result: **5/20 completed**, single residual cause
-  `s2:FOCUS_MISMATCH` ×15; click and keyboard standalone both **30/30 VERIFIED**.
-  Recorded in `docs/benchmark_report.md`. The pre-run prediction was partly right
-  (`VERIFICATION_CONTRADICTED` and `s4` are gone) and partly wrong (`FOCUS_MISMATCH`
-  is not gone in the *sequence*, only in the standalone case) — which is exactly why
-  the number was measured rather than asserted (§76).
-- **Next: the focus-timing residual.** §51's guard correctly refuses when the state
-  it reads was captured before the click's focus change; §35's cache TTL (2 s) can
-  outlive §45's action-state-age ceiling (1500 ms). The direction is a fresh live
-  re-check before refusing (mirroring `_confirm_negative`), never a relaxed guard or
-  a §60 threshold change. **A fix must be re-measured, not asserted** (§76).
-  Adjacent cost to remember: `[verification] verify_settle_ms` adds up to 1 s to each
-  step that would otherwise fail, so a 5-step sequence with several sub-threshold
-  steps is slower than the ~2.5 s `verifiable` figure — the cost of not reporting a
-  stale read as a failure, tunable (`0` restores the old single-read behaviour).
+- **DONE 2026-09-26 — the realistic §74 workflow now completes 20/20** (operator
+  approved the real-input runs). Intermediate run: 5/20 with the halt set narrowed to
+  `s2:FOCUS_MISMATCH` ×15. After the §51 focus re-check: **20/20, p50 1342.94 ms /
+  p95 1787.70 ms (≤ 4000 ms met)**; click and keyboard standalone both **30/30
+  VERIFIED**. Recorded in `docs/benchmark_report.md`.
+- **Phase 14 is COMPLETE.** Every §76 number is measured and in the §76 form
+  (`target, actual, machine, desktop/session, backend, sample count`) in
+  `docs/benchmark_report.md`, and the one row that was open (the realistic workflow
+  happy path) is now met. A target stays a target until re-measured; the numbers here
+  were all re-measured, never asserted.
 - **Phase 14 is otherwise delivered.** Every other §76 number is measured and in the
   §76 form (`target, actual, machine, desktop/session, backend, sample count`) in
   `docs/benchmark_report.md`, including this session's third-workload run. A target
@@ -2286,7 +2308,8 @@ The `[logging]` config section is no longer a dead stub.
 - Unit tests: PASS (incl. accessibility 21 + browser accessibility 12; event bus 12 +
   state cache 21; OCR 20 incl. one real-backend functional test; target resolver 26;
   mouse 16 + keyboard 23 + input backends 8; policy modes 9 + terminal guard 39 +
-  guards 19 + permissions 26; action tracker 11 + verifier 17 + executor 30 +
+  guards 19 + permissions 26; action tracker 11 + verifier 17 + executor 33 (30 +
+  the three §51 focus re-check tests added 2026-09-26) +
   window manager 6; emergency stop 13 + takeover 7 + recovery 21 + watchdog 18;
   clipboard 10; brain adapter 19 + gemini adapter 20 + tool protocol 26 +
   tool dispatch 28 + sequence dispatch 11 + context manager 16 + keyring 9 +
@@ -2365,7 +2388,8 @@ The `[logging]` config section is no longer a dead stub.
   `tests/unit/test_accessibility.py` test functions (the file collects **25**, up
   from the `21` recorded); `tests/unit/test_bench_real_desktop.py` collects **9** and
   `tests/integration/test_bench_workload_fixture.py` collects **11**. **The realistic
-  5-step workflow is measured at 2/20** — see "Known failures".
+  5-step workflow now completes 20/20** (p50 1342.94 ms, ≤ 4000 ms met) after the
+  §51 focus re-check — see "Current task".
 - Benchmark: PARTIAL (Phase 2 capture + change detection, Phase 5 OCR, the
   Phase 9 stop latency, the Phase 10 tool-protocol overhead and the **Phase 10.1
   batching measurements** are recorded in `docs/benchmark_report.md`; Phase 11's
@@ -2380,10 +2404,9 @@ The `[logging]` config section is no longer a dead stub.
   real-desktop `run_sequence` that honestly halts at step 1 on
   `VERIFICATION_UNVERIFIED` rather than faking a happy path — see
   `docs/benchmark_report.md` "Phase 14". The real-desktop 5-step happy path **is
-  met by the synthetic `verifiable` workload (20/20, p50 2505.23 ms)**; what is not
-  met is the *realistic* §74 pipeline at the same scale (`workflow-verifiable`,
-  measured this session at **2/20**), and the reason is the live verification path
-  (§51/§60), not the batching layer — see "Known failures". **This session added the
+  now met by both workloads**: the synthetic `verifiable` at **20/20**, p50
+  2505.23 ms, and the *realistic* §74 pipeline (`workflow-verifiable`) at **20/20**,
+  p50 1342.94 ms / p95 1787.70 ms, after the §51 focus re-check. **This session added the
   orchestrator's perceive cycle (warm p50 7.39 ms / cold p50 640.65 ms) and the
   section 71 GUI refresh (p50 0.36 ms) on the workflow layout**; the one row that
   remains genuinely inapplicable on the *older* `verifiable` layout is its
@@ -2495,8 +2518,14 @@ The `[logging]` config section is no longer a dead stub.
   skipped**. Then, on operator approval, ran the opt-in real-input re-measurement of
   `--workload workflow-verifiable`: sequence **5/20 completed** (was 2/20), halt set
   now a single cause `s2:FOCUS_MISMATCH` ×15; click **30/30** and keyboard **30/30**
-  VERIFIED (were 5/50 and 1/30). Recorded in `docs/benchmark_report.md`; no code was
-  changed. Next: the sequence-specific focus-timing residual.
+  VERIFIED (were 5/50 and 1/30). Recorded in `docs/benchmark_report.md`. Committed
+  the uncommitted three-halt-causes unit as recovery checkpoint `372879a` (18 files,
+  operator-approved). Then fixed the remaining sequence-specific focus-timing cause:
+  `control/executor.py::_focus_checked_state` re-checks a would-be §51 refusal against
+  a fresh live perception before accepting it (+3 tests; gate **1170 passed, 6
+  skipped**; ruff + mypy clean, 179 files). Re-ran the workflow benchmark: **20/20
+  completed, p50 1342.94 ms / p95 1787.70 ms**, within the ≤ 4000 ms target — the
+  realistic §74 happy path is now met and Phase 14 is COMPLETE.
 - 2026-09-23 — implemented §50's clipboard paste path on request (the item Phase 7
   left open): `control/clipboard.py` `X11ClipboardPaster` (owns the CLIPBOARD
   selection, serves it on its own thread, captures and re-serves the previous

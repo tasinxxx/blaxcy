@@ -13,7 +13,7 @@ created with `--system-site-packages`, real XTEST 2.2, live AT-SPI.
 
 | Gap | Status | Evidence / detail |
 |---|---|---|
-| **Realistic §74 workflow happy path** | Open (narrowed to one cause; **re-measured 2026-09-26**) | Pre-fix, `--workload workflow-verifiable` completed **2/20** five-step sequences; halted on `s2:FOCUS_MISMATCH` ×8, `s2:VERIFICATION_CONTRADICTED` ×4, `s4:VERIFICATION_UNVERIFIED` ×6. After the three fixes it completes **5/20** and the halt set is a **single** cause, `s2:FOCUS_MISMATCH` ×15 (the standalone click and keyboard rows are both **30/30 VERIFIED**, up from `5/50` and `1/30`). The remaining item is sequence-specific focus timing: `s1` clicks the search icon (which focuses the field) and `s2` types ~120 ms later, and §51 reads a state captured before that change — §35's 2 s element TTL can outlive §45's 1500 ms action-state-age ceiling. All three causes are now root-caused and fixed: (a) the §35 element cache was never subscribed to `object:state-changed:focused`, so a click that moved focus was invisible and §51's guard refused to type into a field that really was focused; (b) verification judged typed text from a single read taken immediately after injection, which the element cache could serve *before* the action, so a lagging read was reported as a contradiction; (c) a result click's repaint was reclassified `ANIMATION` by the §34 temporal layer when the previous step had changed that region as a side effect, so a real selection was `UNVERIFIED`. The fixes are: subscribe the action-gating state changes (incl. `selected`); re-check a negative verdict against fresh, live observations for `verify_settle_ms` before reporting it (§60's `CONTRADICTED` needs positive evidence); and verify a click on a selectable control from the control's own `selected` state, positive-only, falling back to the pixel check. **Re-measured 2026-09-26**: 5/20, with the two verification causes gone and only the focus-timing residual left, so the row stays open but is narrowed. The synthetic `verifiable` workload still meets the §76 target (20/20). See `CONTINUATION_STATE.md` "Known failures". |
+| **Realistic §74 workflow happy path** | **Resolved 2026-09-26 — now met at 20/20** | Pre-fix, `--workload workflow-verifiable` completed **2/20** five-step sequences; halted on `s2:FOCUS_MISMATCH` ×8, `s2:VERIFICATION_CONTRADICTED` ×4, `s4:VERIFICATION_UNVERIFIED` ×6. After the first three fixes it reached **5/20**, the halt set narrowed to `s2:FOCUS_MISMATCH` ×15 (standalone click and keyboard both **30/30 VERIFIED**, up from `5/50` and `1/30`). All four causes are root-caused and fixed: (a) the §35 element cache was never subscribed to `object:state-changed:focused`, so a click that moved focus was invisible and §51's guard refused to type into a field that really was focused; (b) verification judged typed text from a single read taken immediately after injection, which the element cache could serve *before* the action, so a lagging read was reported as a contradiction; (c) a result click's repaint was reclassified `ANIMATION` by the §34 temporal layer when the previous step had changed that region as a side effect, so a real selection was `UNVERIFIED`. The fixes are: subscribe the action-gating state changes (incl. `focused`/`selected`); re-check a negative verdict against fresh, live observations for `verify_settle_ms` before reporting it (§60's `CONTRADICTED` needs positive evidence); verify a click on a selectable control from the control's own `selected` state, positive-only, falling back to the pixel check; and re-check a would-be §51 focus refusal against a fresh live perception before accepting it. **Re-measured 2026-09-26: 20/20 completed, p50 1342.94 ms / p95 1787.70 ms — the ≤ 4000 ms target is met.** No §60 threshold or §51 rule was loosened; a genuinely unfocused target is still refused. The synthetic `verifiable` workload still meets the §76 target (20/20). See `CONTINUATION_STATE.md` "Known failures". |
 | **Wayland** | Not implemented | There is no portal/`libei` input path. `Control` is X11/XTEST only. No Wayland support is claimed (§30, §79). |
 | `activate_element` | **Implemented** | `core/accessibility.py` invokes the application's own AT-SPI action; the executor reaches it only after policy → resolve → lease → revalidation, and verifies it like any other `MUTATING` tool. It injects **no** pointer or key input, which is the point: no coordinates and no pointer occlusion. Verified **live** on the §74 fixture (`tests/integration/test_workflow_controls_real_display.py::test_the_live_submit_control_is_really_activated_through_atspi`). A backend that lacks the optional `activate` capability reports a structured `UNAVAILABLE` rather than substituting a click. |
 | **Browser accessibility** | UNAVAILABLE | Runtime-probed and reported honestly; no browser was relaunched or configured. |
@@ -72,12 +72,50 @@ unresolved item below prevents a claim of full completion.
 | **Privacy** — protected content redacted, password fields never uploaded, secrets never logged, no continuous streaming | **Met**, and the logging half is newly implemented: `core/logging_setup.py` + `security/redaction.py`, enforced by tests that assert a registered secret and a password-named field never reach the log file. |
 | **Engineering** — test coverage, strict typing, lint passes, no production TODO/FIXME/stubs, benchmarks documented, limitations documented | **Met** for lint/type/tests/benchmarks/limitations. Coverage is meaningful but is *not* reported as a percentage; no coverage gate exists. |
 | **Installation** — menu entry, startup, controlled second launch, uninstall, update/rollback | **Met**, verified against throwaway prefixes with a per-file sha256 manifest. |
-| **Phase 14 (§76 benchmarks)** | **PARTIAL.** Every read-only and real-input number is measured and recorded; the realistic workflow happy path is 5/20 (above), halted only on the sequence focus-timing residual. |
+| **Phase 14 (§76 benchmarks)** | **Met.** Every read-only and real-input number is measured and recorded, and the realistic workflow happy path is 20/20 (above), inside the ≤ 4000 ms target. |
 | **Phase 15 (full matrix / soak / documentation)** | **NOT STARTED** beyond this documentation set. No soak run has been performed. |
-| **Batching-layer safety-neutrality proof** | **Met** by `tests/safety/test_sequence_halts.py` plus the resolver-cache and speculative-perceiver suites, which assert that no cached or speculative result reaches input without a fresh live resolution, lease and revalidation. |
-| **Git state / secrets in history** | The tree is **uncommitted** on `5e06bc0`; no secret material is present in source, config or tests (the API key lives only in the OS keyring). |
+| **Batching-layer safety-neutrality proof** | **Met** — walked feature by feature in the section below, with the code path and the test that pins each claim. |
+| **Git state / secrets in history** | Recovery checkpoint `372879a` (the three-halt-causes fix, re-measured) and the §51 focus re-check commit that follows it sit on top of `0b86d56`. No secret material is present in source, config or tests (the API key lives only in the OS keyring). |
+
+## §85 batching safety-neutrality proof
+
+Required by §85 ("the batching layer's own safety-neutrality proof"). The claim
+under test is that **no batching, caching, speculative or concurrency feature adds
+a path by which any action reaches the desktop without Policy → Resolve → Lease →
+Revalidate → Execute → Verify**. Each row below names the code that would have to
+be wrong for the bypass to exist, and the test that would catch it.
+
+**The container.** `control/sequence_runner.py::_run_step` dispatches through the
+**same** `ToolDispatcher` a standalone call uses, which routes to
+`Executor.execute` — there is no second pipeline to drift. `step_arguments()`
+strips only the runner's own bookkeeping (`step_id`, `tool`); `target`/`role` stay
+because they are *descriptions*. No coordinate, `element_id` or lease is ever
+carried between steps, and `run()` does `del confirmed`, so a plan can never arrive
+pre-authorised for a destructive step.
+
+| Feature | What it could bypass | Why it cannot | Pinned by |
+|---|---|---|---|
+| **§66.1 `run_sequence`** | reusing a lease or coordinate across steps | every step re-enters the dispatcher → executor, which issues a fresh lease from its own live resolution and runs the full §45 checklist | `tests/safety/test_sequence_halts.py` (11), `tests/unit/test_sequence_runner.py` (21), `tests/unit/test_sequence_dispatch.py` (11) |
+| **§43.1 resolver cache** | serving a stale target as authoritative | `TargetResolver._lookup` returns an identity-path hint only; `resolve()` still scores **every** element and applies the same ambiguity rule, `act_threshold` and occlusion. The lookup is attached as metadata. A hint whose path is gone is `forget`-ten. `PASSWORD_INPUT` is never stored (`_NEVER_CACHED_ROLES`) | `test_enabling_the_cache_cannot_change_any_targeting_decision` (status, winner, candidate order and every score, across fresh / disabled / enabled; §4 rule 31), `test_a_disabled_cache_stores_and_returns_nothing`, `test_a_new_generation_invalidates_every_hint` |
+| **§33.2 speculative perception** | using a pre-computed element for input | `speculate()` schedules read-side work only; `take()` is consulted only in `_take_speculation`, and its result is (a) an envelope `speculative_hint` *note* and (b) a `prime()` into the §43.1 cache — itself only a hint. Discarded on generation mismatch or a `MEANINGFUL`/`MAJOR` change; credentials are never speculated | `test_a_credential_description_is_never_speculated`, `test_a_structural_change_discards_a_hint_and_a_trivial_one_does_not`, `test_a_stale_generation_discards_the_hint`, `test_the_background_worker_never_blocks_the_caller` |
+| **§33.1 capture boost** | skipping a check to go faster | `with self._boost():` wraps the step loop and changes only the capture profile; it reverts on every exit path (halt and exception included) and runs no safety check | `SequenceRunner._boost` / `run` |
+| **§32.1 concurrent read-only dispatch** | letting a read substitute for fresh revalidation | `_dispatch_read_only` uses a separate bounded semaphore (a saturated path returns `RATE_LIMITED`, never queues forever) and a read lock; mutating work goes to `Executor.execute` on the single-writer path. Reads are preempted by a latched stop | `test_concurrent_read_only_calls_never_reorder_or_replace_physical_steps` (byte-for-byte the same input sequence as a sequential run), `test_read_only_tools_never_reach_the_executor`, `test_read_only_dispatch_is_bounded_by_configuration`, `test_a_latched_stop_preempts_a_read_only_call` |
+| **§68.1 round-trip economy** | fewer round-trips meaning weaker checks | it governs only what the Brain is told and how many calls carry it; it has no desktop-path code. `to_model_context()` suppresses unchanged state and protected-app element content | `ai/context_manager.py`, `ai/prompt_builder.py` |
+
+The 105 tests across `test_resolver_cache`, `test_speculative_perceiver`,
+`test_sequence_runner`, `tests/safety/test_sequence_halts`, `test_sequence_dispatch`
+and `test_tool_dispatch` pass. The real-desktop run recorded in
+`docs/benchmark_report.md` is itself evidence: the workflow completed **20/20**
+with the resolver cache, speculation, capture boost and read path all enabled, so
+every step still resolved, leased, revalidated and verified live while the
+optimizations were active.
+
+**Conclusion:** each feature is a scheduling / traversal-order / hint change. None
+removes or reorders a Policy, Resolve, Lease, Revalidate, Execute or Verify step,
+and the one place a hint could have become authority — the resolver — is proven
+decision-identical with the cache off.
 
 **Conclusion:** BLAXCY is a working, safety-gated Body with every §66 tool
-implemented. It is **not complete**: Phase 15 has not been run, one §76 row is
-measured but unmet, Wayland has no input path, and the documented `pytest`
-command is blocked on a host package.
+implemented. It is **not complete**: Phase 15 has not been run, Wayland has no
+input path, and the documented `pytest` command is blocked on a host package. Every
+§76 benchmark row is now measured and met.

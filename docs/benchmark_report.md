@@ -448,9 +448,44 @@ Interpretation, stated narrowly:
   positive-only evidence that falls back to the pixel check. A residual fix for the
   focus-timing item should likewise be a fresh live re-check before refusing, never
   a relaxed guard.
-- **The section 76 five-step happy-path target remains met by the synthetic
-  `verifiable` workload (20/20, p50 2505.23 ms)**, and is still not met by this
-  realistic workload. The target stays a target.
+- **At the time of that run the section 76 five-step happy-path target was met only
+  by the synthetic `verifiable` workload (20/20, p50 2505.23 ms)**, not by this
+  realistic workload. That was the intermediate result; the run below closes it.
+
+### Phase 14 — the realistic workflow after the section 51 focus re-check (2026-09-26)
+
+Same machine / session / backend and the same command as above, taken after the
+remaining `s2:FOCUS_MISMATCH` cause was fixed: the section 51 focus guard is now
+re-checked against a fresh live perception before it refuses, so a click that moved
+focus is no longer judged on a section 35 cache-served read taken before it.
+
+| Measurement | p50 | p95 | n | Target | Verdict |
+|---|---|---|---|---|---|
+| accessibility query (live AT-SPI refresh) | 376.52 ms | 408.42 ms | 20 | — | 172 elements |
+| perception cycle, warm | 5.83 ms | 10.93 ms | 20 | ≤ 1500 ms | met (cache-served) |
+| perception cycle, cold | 405.13 ms | 469.63 ms | 20 | ≤ 1500 ms | met (live traversal) |
+| target resolution | 1.07 ms | 1.78 ms | 20 | — | over 172 live elements |
+| lease revalidation | 0.41 ms | 0.43 ms | 20 | ≤ 25 ms | **met** |
+| GUI refresh | 0.36 ms | 0.43 ms | 20 | ≤ 50 ms | met |
+| end-to-end click | 196.12 ms | 696.35 ms | 30 | — | **30/30 VERIFIED** |
+| end-to-end keyboard | 527.22 ms | 580.52 ms | 30 | — | **30/30 VERIFIED** |
+| end-to-end 5-step `run_sequence` | 1342.94 ms | 1787.70 ms | 20 | ≤ 4000 ms warm | **20/20 completed all 5 steps** |
+
+Interpretation, stated narrowly:
+
+- **The realistic section 74 workflow now meets the section 76 target: 20/20, p50
+  1342.94 ms / p95 1787.70 ms, inside `<= 4000 ms` at both percentiles.** Every step
+  is still resolved, leased, revalidated and verified live against real state; the
+  input is real and the fixture's own counters confirm it. The halt set is empty.
+- **Nothing was loosened to obtain this** (section 4 rule 8). The fix is a *live*
+  re-check before a refusal: a target that is still genuinely unfocused is still
+  refused, asserted by
+  `tests/unit/test_executor.py::test_the_focus_recheck_never_overrides_a_real_focus_refusal`,
+  and the already-focused happy path skips the re-check entirely (no added latency).
+  No section 60 threshold and no section 51 rule changed.
+- **This is the first measured real-desktop happy path for the realistic pipeline.**
+  The synthetic `verifiable` workload (20/20, p50 2505.23 ms) still stands as its own
+  measurement; both workloads now meet the five-step target.
 
 ## Reproducing
 
