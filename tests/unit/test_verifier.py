@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from config.settings import VerificationSettings
 from control.verifier import Postcondition, Verifier
+from schemas.elements import UIElement
 from schemas.enums import ActionClass, ChangeClass, CoordinateSpace, UIRole, VerificationState
 from schemas.geometry import Rect
 from schemas.screen_state import ChangeRegion, ScreenDelta
@@ -193,6 +194,152 @@ def test_unreported_or_negative_selection_is_not_a_verdict() -> None:
         )
 
     assert _verifier().verify_selection(after=None, target=unselected) is None
+
+
+# -- Element-state postcondition ----------------------------------------------
+
+
+def _click_target(**overrides: object) -> UIElement:
+    """A plain push button to attribute a state transition to."""
+    return make_element("submit", text="Submit", atspi_path="/p/submit", **overrides)
+
+
+def _play_button(element_id: str, **overrides: object) -> UIElement:
+    """A control that the click enables, sharing the target's window."""
+    base: dict[str, object] = {
+        "text": "Play Button",
+        "atspi_path": "/p/play",
+        "enabled": False,
+        "owner_window_id": 42,
+    }
+    base.update(overrides)
+    return make_element(element_id, **base)
+
+
+def test_a_reported_enable_transition_verifies() -> None:
+    """Section 60: a same-application control becoming enabled is real evidence.
+
+    This is independent of the pixel delta, so it survives the section 34 temporal
+    layer reclassifying a repeated region and a delta that does not line up with
+    the observation -- both of which leave a genuine click ``UNVERIFIED``.
+    """
+    before = make_state(elements=(_click_target(), _play_button("play_before")))
+    after = make_state(elements=(_click_target(), _play_button("play_after", enabled=True)))
+    outcome = _verifier().verify_element_state_change(
+        before=before, after=after, target=_click_target()
+    )
+
+    assert outcome is not None
+    assert outcome.state is VerificationState.VERIFIED
+    assert outcome.postcondition is Postcondition.ELEMENT_STATE
+    assert outcome.evidence["state"] == "enabled"
+
+
+def test_element_state_evidence_needs_both_observations_and_a_target() -> None:
+    """Without a before/after pair and a target there is no transition to judge."""
+    after = make_state(elements=(_play_button("play_after", enabled=True),))
+    verifier = _verifier()
+    assert verifier.verify_element_state_change(
+        before=None, after=after, target=_click_target()
+    ) is None
+    assert verifier.verify_element_state_change(
+        before=after, after=None, target=_click_target()
+    ) is None
+    assert verifier.verify_element_state_change(before=after, after=after) is None
+
+
+def test_a_newly_appearing_control_is_never_evidence() -> None:
+    """Positive-only and truncation-robust: only a control seen in both counts."""
+    before = make_state(elements=(_click_target(),))
+    after = make_state(elements=(_click_target(), _play_button("play_after", enabled=True)))
+    assert (
+        _verifier().verify_element_state_change(
+            before=before, after=after, target=_click_target()
+        )
+        is None
+    )
+
+
+def test_a_transition_in_another_application_is_not_evidence() -> None:
+    """The same causality bound the screen-change overlap rule enforces."""
+    before = make_state(elements=(_click_target(), _play_button("play_before", owner_window_id=99)))
+    after = make_state(
+        elements=(
+            _click_target(),
+            _play_button("play_after", enabled=True, owner_window_id=99),
+        )
+    )
+    assert (
+        _verifier().verify_element_state_change(
+            before=before, after=after, target=_click_target()
+        )
+        is None
+    )
+
+
+def test_unchanged_or_reverse_transitions_are_not_evidence() -> None:
+    """Only false-to-true is a response; nothing else is turned into a verdict."""
+    verifier = _verifier()
+    for earlier_enabled, later_enabled in ((True, True), (True, False), (False, False)):
+        before = make_state(
+            elements=(_click_target(), _play_button("play_before", enabled=earlier_enabled))
+        )
+        after = make_state(
+            elements=(_click_target(), _play_button("play_after", enabled=later_enabled))
+        )
+        assert (
+            verifier.verify_element_state_change(
+                before=before, after=after, target=_click_target()
+            )
+            is None
+        )
+
+
+def test_the_bound_falls_back_to_the_application_name() -> None:
+    """When no window id is reported, a matching application name still bounds it."""
+    verifier = _verifier()
+    target = _click_target(owner_window_id=None, owner_app="fixture")
+    before = make_state(
+        elements=(target, _play_button("play_before", owner_window_id=None, owner_app="fixture"))
+    )
+    after = make_state(
+        elements=(
+            target,
+            _play_button("play_after", enabled=True, owner_window_id=None, owner_app="fixture"),
+        )
+    )
+    outcome = verifier.verify_element_state_change(before=before, after=after, target=target)
+    assert outcome is not None and outcome.state is VerificationState.VERIFIED
+
+    # A different application, or no bound at all, yields nothing.
+    other_app = make_state(
+        elements=(
+            target,
+            _play_button("play_after", enabled=True, owner_window_id=None, owner_app="other"),
+        )
+    )
+    assert verifier.verify_element_state_change(before=before, after=other_app, target=target) is None
+    unbounded = make_state(
+        elements=(
+            target,
+            _play_button("play_after", enabled=True, owner_window_id=None, owner_app=None),
+        )
+    )
+    assert verifier.verify_element_state_change(before=before, after=unbounded, target=target) is None
+
+
+def test_an_invisible_control_transition_is_not_evidence() -> None:
+    """A control that was not really shown cannot have become usable."""
+    before = make_state(
+        elements=(_click_target(), _play_button("play_before", visible=False))
+    )
+    after = make_state(elements=(_click_target(), _play_button("play_after", enabled=True)))
+    assert (
+        _verifier().verify_element_state_change(
+            before=before, after=after, target=_click_target()
+        )
+        is None
+    )
 
 
 # -- Window postcondition -----------------------------------------------------

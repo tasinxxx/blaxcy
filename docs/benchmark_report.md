@@ -577,6 +577,31 @@ Interpretation, stated narrowly:
   discards the rest. That is the designed behaviour; the rate is not meaningful at
   this n and is reported as-is.
 
+### Phase 15 — per-step latency attribution
+
+The soak now reports each executed step's own `elapsed_ms` (from the step's tool
+envelope) alongside the whole-workflow figure, so a drift can be named rather than
+attributed to "the workflow". The breakdown is reported in plan order, with a
+per-step second-half-vs-first-half drift and the slowest step by `p50` called out.
+A step that was `NOT_EXECUTED` after a halt contributes nothing (it has no
+duration and is not counted as a fast zero), and a step that ran in only some
+iterations reports the count it really has. The report is emitted as
+`report.steps` in the JSON and as a short table before it. It is pure analysis
+over the samples, so it is unit-tested without a desktop
+(`tests/unit/test_soak.py`). Re-measured numbers are pending a real-input run.
+
+### Phase 15 — the `s3` postcondition (mitigation)
+
+The 150-iteration run's single halt was `s3:VERIFICATION_UNVERIFIED` — the
+`Submit` click. Its input landed; the button keeps its own state and repaints
+nothing at its own box, so §60 had only the (occasionally insufficient) pixel
+evidence. A stronger, truncation-robust signal exists on the live desktop: a
+control in the same application becomes enabled. A new positive-only
+`Postcondition.ELEMENT_STATE` verifies a click from that reported transition and
+falls through to the pixel check otherwise; it never produces `CONTRADICTED`.
+Re-measurement of the workflow and soak is pending operator approval to inject
+real input.
+
 ## Reproducing
 
 ```bash

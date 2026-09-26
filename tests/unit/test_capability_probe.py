@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import pytest
+
 from config.settings import Settings
+from control.backends.base import BackendProbe
+from control.backends.portal import PortalRemoteDesktopBackend
 from core.capability_probe import (
     probe_all,
     probe_browser_accessibility,
+    probe_keyboard,
     probe_mouse,
     probe_sequence_execution,
     probe_visual_grounding,
@@ -113,9 +118,47 @@ def test_sequence_execution_reports_disabled_when_configured_off() -> None:
     assert cap.details["configured_enabled"] is False
 
 
-def test_mouse_probe_is_unavailable_without_an_x_display() -> None:
-    """Native Wayland without a portal path cannot inject pointer input."""
+def test_mouse_probe_is_unavailable_without_an_x_display_or_portal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Native Wayland with no RemoteDesktop portal cannot inject pointer input.
+
+    The portal probe is forced down so the verdict is deterministic regardless of
+    what the host's session bus happens to advertise.
+    """
+    monkeypatch.setattr(
+        PortalRemoteDesktopBackend,
+        "probe",
+        lambda _self: BackendProbe("portal-remotedesktop", False, "interface absent"),
+    )
     cap = probe_mouse(_wayland_session())
     assert cap.status is CapabilityStatus.UNAVAILABLE
     assert cap.backend is None
     assert cap.fix_hint
+
+
+def test_mouse_and_keyboard_use_the_portal_when_it_is_the_only_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """On Wayland the portal is the path; the mouse is honestly DEGRADED.
+
+    Absolute pointer motion needs a ScreenCast stream node, which this backend
+    does not have by default, so the mouse is reported DEGRADED while the keyboard
+    (which needs no stream) is AVAILABLE.
+    """
+    probe = BackendProbe(
+        "portal-remotedesktop",
+        True,
+        None,
+        {"interface_version": 2, "absolute_pointer": False, "session_started": False},
+    )
+    monkeypatch.setattr(PortalRemoteDesktopBackend, "probe", lambda _self: probe)
+
+    keyboard = probe_keyboard(_wayland_session())
+    mouse = probe_mouse(_wayland_session())
+
+    assert keyboard.status is CapabilityStatus.AVAILABLE
+    assert keyboard.backend == "portal-remotedesktop"
+    assert mouse.status is CapabilityStatus.DEGRADED
+    assert mouse.backend == "portal-remotedesktop"
+    assert "stream node" in (mouse.reason or "")

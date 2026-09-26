@@ -12,6 +12,9 @@ bounded when the same workflow is run over and over?** It repeats the section 74
 * **resource invariants** -- that no input is left held, no lease is left live, no
   stale state update is accepted, and no worker thread outlives shutdown.
 
+Each iteration also reports its **per-step** latency, so a drift is attributed to
+the step that caused it rather than to "the workflow" as a whole.
+
 It injects real input, so it is opt-in and refuses to run without
 ``--confirm-real-input``::
 
@@ -70,6 +73,10 @@ class SoakSample:
     held_keys: int
     held_buttons: int
     leases: int
+    #: Executed steps' own ``elapsed_ms``, keyed by ``step_id``. Only steps the
+    #: runner actually executed appear; a ``NOT_EXECUTED`` step carries no
+    #: duration and must not be counted as a zero, which would invent a fast step.
+    step_timings_ms: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -83,6 +90,7 @@ class SoakReport:
     halts: dict[str, int] = field(default_factory=dict)
     latency_ms: dict[str, float] = field(default_factory=dict)
     drift: dict[str, Any] = field(default_factory=dict)
+    steps: dict[str, Any] = field(default_factory=dict)
     resources: dict[str, Any] = field(default_factory=dict)
     verdicts: dict[str, bool] = field(default_factory=dict)
 
@@ -96,6 +104,7 @@ class SoakReport:
             "halts": dict(sorted(self.halts.items())),
             "latency_ms": {key: round(value, 3) for key, value in self.latency_ms.items()},
             "drift": self.drift,
+            "steps": self.steps,
             "resources": self.resources,
             "verdicts": self.verdicts,
         }
@@ -138,6 +147,70 @@ def _lease_count(env: Environment) -> int:
         return 0
 
 
+def _latency_drift(values: Sequence[float]) -> dict[str, Any]:
+    """Second-half vs first-half ``p50`` drift for one series, or an honest null.
+
+    Returns an empty dict when there are too few samples to split, so a series that
+    cannot support a drift claim reports nothing rather than a made-up number.
+    """
+    if len(values) < 4:
+        return {}
+    half = len(values) // 2
+    first_p50 = statistics.median(sorted(values[:half]))
+    second_p50 = statistics.median(sorted(values[half:]))
+    baseline = first_p50 if first_p50 > 0 else 1.0
+    fraction = (second_p50 - first_p50) / baseline
+    return {
+        "first_half_p50_ms": round(first_p50, 3),
+        "second_half_p50_ms": round(second_p50, 3),
+        "drift_fraction": round(fraction, 4),
+        "drift_within_bound": abs(fraction) <= DRIFT_REPORT_FRACTION,
+    }
+
+
+def _step_breakdown(samples: Sequence[SoakSample]) -> dict[str, Any]:
+    """Per-step latency distribution and drift, so a drift names its step.
+
+    Steps are reported in plan order (first seen), and a step contributes only on
+    iterations where it actually executed -- a step that was ``NOT_EXECUTED`` after
+    a halt has no duration and is not counted as a fast zero. The slowest step by
+    ``p50`` is called out, which is the one to look at first when the workflow as a
+    whole drifts.
+    """
+    order: list[str] = []
+    timings: dict[str, list[float]] = {}
+    for sample in samples:
+        for step_id, value in sample.step_timings_ms.items():
+            if step_id not in timings:
+                timings[step_id] = []
+                order.append(step_id)
+            timings[step_id].append(float(value))
+
+    rows: dict[str, Any] = {}
+    for step_id in order:
+        values = timings[step_id]
+        ordered = sorted(values)
+        row: dict[str, Any] = {
+            "n": len(ordered),
+            "p50_ms": round(statistics.median(ordered), 3),
+            "p95_ms": round(_percentile(ordered, 0.95), 3),
+            "min_ms": round(ordered[0], 3),
+            "max_ms": round(ordered[-1], 3),
+            "sum_p50_ms": round(sum(ordered), 3),
+        }
+        row.update(_latency_drift(values))
+        rows[step_id] = row
+
+    slowest = None
+    if rows:
+        slowest = max(rows, key=lambda step_id: rows[step_id]["p50_ms"])
+    return {
+        "order": order,
+        "steps": rows,
+        "slowest_step_by_p50": slowest,
+    }
+
+
 def analyze(
     samples: Sequence[SoakSample],
     *,
@@ -174,10 +247,8 @@ def analyze(
     drift: dict[str, Any] = {}
     if ran >= 4:
         half = ran // 2
-        first = sorted(latencies[:half])
-        second = sorted(latencies[half:])
-        first_p50 = statistics.median(first)
-        second_p50 = statistics.median(second)
+        first_p50 = statistics.median(sorted(latencies[:half]))
+        second_p50 = statistics.median(sorted(latencies[half:]))
         baseline = first_p50 if first_p50 > 0 else 1.0
         fraction = (second_p50 - first_p50) / baseline
         drift["latency_first_half_p50_ms"] = round(first_p50, 3)
@@ -186,6 +257,7 @@ def analyze(
         drift["latency_drift_within_bound"] = abs(fraction) <= DRIFT_REPORT_FRACTION
     else:
         drift["latency_drift_within_bound"] = None
+    steps = _step_breakdown(samples)
 
     rss_series = [sample.rss_mb for sample in samples if sample.rss_mb is not None]
     if rss_start_mb is not None and rss_end_mb is not None:
@@ -245,9 +317,26 @@ def analyze(
         halts=halts,
         latency_ms=latency_ms,
         drift=drift,
+        steps=steps,
         resources=resources,
         verdicts=verdicts,
     )
+
+
+def _step_timings(steps: Sequence[dict[str, Any]]) -> dict[str, float]:
+    """Executed steps' own ``elapsed_ms``, keyed by ``step_id``.
+
+    A ``NOT_EXECUTED`` step (the tail of a halted sequence) carries no duration and
+    is omitted, so it cannot be counted as a suspiciously fast step.
+    """
+    timings: dict[str, float] = {}
+    for step in steps:
+        step_id = step.get("step_id")
+        value = step.get("elapsed_ms")
+        if not step_id or value is None or step.get("error_code") == "NOT_EXECUTED":
+            continue
+        timings[str(step_id)] = float(value)
+    return timings
 
 
 def _runner_stats(env: Environment) -> dict[str, Any] | None:
@@ -300,6 +389,7 @@ def run(*, iterations: int, workload: str = "workflow-verifiable", pause_ms: int
                     held_keys=held_keys,
                     held_buttons=held_buttons,
                     leases=_lease_count(env),
+                    step_timings_ms=_step_timings(steps),
                 )
             )
             print(
@@ -332,6 +422,18 @@ def run(*, iterations: int, workload: str = "workflow-verifiable", pause_ms: int
         runner_stats=runner_stats,
     )
     print()
+    if report.steps.get("steps"):
+        print("per-step latency (ms):")
+        for step_id in report.steps["order"]:
+            row = report.steps["steps"][step_id]
+            drift = row.get("drift_fraction")
+            drift_text = "n/a" if drift is None else f"{drift:+.1%}"
+            print(
+                f"  {step_id}: n={row['n']} p50={row['p50_ms']:.1f} "
+                f"p95={row['p95_ms']:.1f} max={row['max_ms']:.1f} drift={drift_text}"
+            )
+        print(f"  slowest step by p50: {report.steps['slowest_step_by_p50']}")
+        print()
     print(json.dumps(report.to_dict(), indent=2))
     print()
     failed = [name for name, ok in report.verdicts.items() if not ok]

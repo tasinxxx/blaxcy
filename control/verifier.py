@@ -43,6 +43,7 @@ class Postcondition(StrEnum):
     TEXT_PRESENT = "TEXT_PRESENT"
     WINDOW_ACTIVE = "WINDOW_ACTIVE"
     SELECTED = "SELECTED"
+    ELEMENT_STATE = "ELEMENT_STATE"
 
 
 #: Roles whose click postcondition is "this control is now selected". The
@@ -91,6 +92,26 @@ def _find_element(state: ScreenState | None, element: UIElement) -> UIElement | 
 def _normalize_text(value: str) -> str:
     """Case-folded, whitespace-collapsed text for a containment check."""
     return " ".join(value.split()).casefold()
+
+
+def _shares_application(element: UIElement, target: UIElement) -> bool:
+    """Whether ``element`` can be attributed to the same application as ``target``.
+
+    Section 60's screen-change check requires a change to overlap the acted-on
+    control (or the active window to have changed), so an unrelated repaint
+    elsewhere cannot be counted as this action's result. The accessibility
+    signal needs the same causality bound: a reported state transition only
+    counts when the control that transitioned demonstrably belongs to the same
+    application as the clicked target. The window id is preferred because both
+    accessibility and EWMH report it exactly; the application name is the
+    fallback. When neither can be established the transition is not used at all
+    -- a missing bound is missing evidence, never a licence to guess.
+    """
+    if element.owner_window_id is not None and target.owner_window_id is not None:
+        return element.owner_window_id == target.owner_window_id
+    if element.owner_app is not None and target.owner_app is not None:
+        return element.owner_app.casefold() == target.owner_app.casefold()
+    return False
 
 
 class Verifier:
@@ -270,6 +291,69 @@ class Verifier:
             "the target reports itself selected after the click",
             {"element_id": observed.element_id},
         )
+
+    def verify_element_state_change(
+        self,
+        *,
+        before: ScreenState | None,
+        after: ScreenState | None,
+        target: UIElement | None = None,
+        reason_context: str = "action",
+    ) -> VerificationOutcome | None:
+        """Positive-only evidence that the UI reported a response (section 60).
+
+        Clicking a control whose own state does not change (a plain push button)
+        is normally judged on the pixels it repainted. That signal has two honest
+        failure modes that this check complements: the section 34 temporal layer
+        can reclassify a repeated region as ``ANIMATION``, and the delta can simply
+        be absent for the observation the executor holds (``_delta_for`` returns
+        ``None`` when the frame ids do not line up). Both leave a real response
+        ``UNVERIFIED`` even though the application did act.
+
+        A directly reported state transition is independent of the pixel delta, so
+        it survives both. This is deliberately narrow and positive-only:
+
+        * the control must be present in **both** observations, matched by
+          identity, and visible in both. A newly-appearing element is never used,
+          because the section 35 traversal can truncate -- "not in this
+          observation" is not "not there" -- so depending on an appearing element
+          would make the evidence unsound;
+        * only a reported ``enabled`` transition from false to true counts. An
+          unreported or absent transition is missing evidence, never a
+          contradiction, so ``None`` is returned and the caller falls through to
+          the ordinary screen-change check. Nothing is weakened by its absence;
+        * the transitioning control must be attributable to the same application
+          as the target, preserving the causality bound the screen-change check
+          enforces with its overlap requirement.
+
+        Returns ``None`` when there is no positive evidence; a verdict is only
+        ever ``VERIFIED``. This path can never produce ``CONTRADICTED``.
+        """
+        if before is None or after is None or target is None:
+            return None
+        previous = {element.identity: element for element in before.elements}
+        for observed in after.elements:
+            earlier = previous.get(observed.identity)
+            if earlier is None:
+                continue
+            if not (earlier.visible and observed.visible):
+                continue
+            if earlier.enabled or not observed.enabled:
+                continue
+            if not _shares_application(observed, target):
+                continue
+            return VerificationOutcome(
+                VerificationState.VERIFIED,
+                Postcondition.ELEMENT_STATE,
+                f"a control of the same application became enabled after the {reason_context}",
+                {
+                    "element_id": observed.element_id,
+                    "state": "enabled",
+                    "before": "disabled",
+                    "after": "enabled",
+                },
+            )
+        return None
 
     def verify_window(self, *, after: ScreenState | None, window_id: int) -> VerificationOutcome:
         """Judge a window-activation action against the observed active window."""

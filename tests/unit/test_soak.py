@@ -7,9 +7,11 @@ resource invariants (held input, live leases, orphan threads, memory growth).
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
-from bench.soak import SoakReport, SoakSample, analyze, main
+from bench.soak import SoakReport, SoakSample, _step_timings, analyze, main
 
 
 def _sample(
@@ -22,6 +24,7 @@ def _sample(
     held_keys: int = 0,
     held_buttons: int = 0,
     leases: int = 0,
+    steps: dict[str, float] | None = None,
 ) -> SoakSample:
     """One synthetic iteration sample."""
     return SoakSample(
@@ -36,6 +39,7 @@ def _sample(
         held_keys=held_keys,
         held_buttons=held_buttons,
         leases=leases,
+        step_timings_ms=steps or {},
     )
 
 
@@ -175,6 +179,69 @@ def test_skipped_iterations_are_not_counted_as_samples() -> None:
 
     assert report.iterations == 10
     assert report.skipped == 4
+
+
+def _breakdown_report(samples: list[SoakSample]) -> SoakReport:
+    """Analyze the samples with the fixed resource readings the other tests use."""
+    return analyze(
+        samples,
+        skipped=0,
+        rss_start_mb=100.0,
+        rss_end_mb=100.1,
+        threads_start=8,
+        threads_end=8,
+        threads_after_shutdown=8,
+    )
+
+
+def test_per_step_timings_are_reported_in_plan_order() -> None:
+    """Each step's own latency is reported, with the slowest one called out."""
+    samples = [_sample(index, steps={"s1": 10.0, "s2": 20.0, "s3": 30.0}) for index in range(10)]
+    report = _breakdown_report(samples)
+
+    assert report.steps["order"] == ["s1", "s2", "s3"]
+    assert report.steps["steps"]["s3"]["p50_ms"] == 30.0
+    assert report.steps["steps"]["s1"]["n"] == 10
+    assert report.steps["slowest_step_by_p50"] == "s3"
+
+
+def test_a_drifting_step_is_attributed_by_name() -> None:
+    """A drift in the workflow is attributed to the step that caused it."""
+    samples: list[SoakSample] = []
+    for index in range(10):
+        slow = 30.0 if index < 5 else 300.0
+        samples.append(_sample(index, steps={"s1": 10.0, "s3": slow}))
+    report = _breakdown_report(samples)
+
+    assert report.steps["steps"]["s1"]["drift_within_bound"] is True
+    assert report.steps["steps"]["s3"]["drift_within_bound"] is False
+    assert report.steps["steps"]["s3"]["drift_fraction"] == 9.0
+    assert report.steps["slowest_step_by_p50"] == "s3"
+
+
+def test_a_step_that_did_not_execute_contributes_no_timing() -> None:
+    """A ``NOT_EXECUTED`` step carries no duration and is not counted as a fast one."""
+    steps: list[dict[str, Any]] = [
+        {"step_id": "s1", "elapsed_ms": 12.0},
+        {"step_id": "s2", "elapsed_ms": 0.0, "error_code": "NOT_EXECUTED"},
+        {"step_id": "s3"},
+    ]
+    assert _step_timings(steps) == {"s1": 12.0}
+
+    # A step that ran in only some iterations reports the count it really has, so
+    # a halted run cannot make a step look uniformly fast.
+    samples = [_sample(index, steps={"s1": 10.0, "s2": 20.0}) for index in range(5)]
+    samples += [_sample(index, steps={"s1": 10.0}) for index in range(5, 10)]
+    report = _breakdown_report(samples)
+    assert report.steps["steps"]["s1"]["n"] == 10
+    assert report.steps["steps"]["s2"]["n"] == 5
+
+
+def test_a_run_without_step_timings_reports_none() -> None:
+    """Without per-step data the breakdown is empty, never fabricated."""
+    report = _breakdown_report([_sample(index) for index in range(4)])
+    assert report.steps["steps"] == {}
+    assert report.steps["slowest_step_by_p50"] is None
 
 
 def test_the_cli_refuses_without_explicit_real_input_consent(

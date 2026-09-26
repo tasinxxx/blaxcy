@@ -466,6 +466,63 @@ def test_a_selectable_click_without_selection_evidence_still_needs_a_change() ->
     assert envelope.error_code is ErrorCode.VERIFICATION_UNVERIFIED
 
 
+def test_a_click_verifies_from_a_same_window_enable_transition() -> None:
+    """Section 60: a reported state transition confirms a click the pixels cannot.
+
+    A plain push button keeps its own state, so its click is normally judged on the
+    pixels it repainted -- and the realistic section 74 ``s3`` click was left
+    ``UNVERIFIED`` when that evidence did not line up. A control in the same
+    application that becomes enabled is independent of the pixel delta and settles
+    it positively. Here the screen change is ``TRIVIAL``, so only the state
+    transition can verify it.
+    """
+    target = make_element("submit")
+    play_before = make_element(
+        "play", text="Play Button", atspi_path="/p/play", enabled=False,
+        bbox=_OTHER_BOX, center=_OTHER_BOX.center,
+    )
+    state = make_state(frame_id=5, elements=(target, play_before))
+    env = _env(state=state)
+    play_after = make_element(
+        "play", text="Play Button", atspi_path="/p/play", enabled=True,
+        bbox=_OTHER_BOX, center=_OTHER_BOX.center,
+    )
+    after = make_state(frame_id=6, elements=(target, play_after))
+    env.perceiver.script(
+        after, make_delta(before=state, after=after, change_class=ChangeClass.TRIVIAL)
+    )
+
+    envelope = env.executor.execute(PlannedAction(tool=ToolName.CLICK, target=_QUERY))
+
+    assert envelope.ok is True, envelope.message
+    assert envelope.verification is VerificationState.VERIFIED
+    assert envelope.data["verification"]["postcondition"] == "ELEMENT_STATE"
+
+
+def test_a_transition_in_another_window_does_not_verify_a_click() -> None:
+    """The state transition is bounded by the same application as the target."""
+    target = make_element("submit")
+    other_before = make_element(
+        "play", text="Play Button", atspi_path="/p/play", enabled=False,
+        owner_window_id=99, bbox=_OTHER_BOX, center=_OTHER_BOX.center,
+    )
+    state = make_state(frame_id=5, elements=(target, other_before))
+    env = _env(state=state)
+    other_after = make_element(
+        "play", text="Play Button", atspi_path="/p/play", enabled=True,
+        owner_window_id=99, bbox=_OTHER_BOX, center=_OTHER_BOX.center,
+    )
+    after = make_state(frame_id=6, elements=(target, other_after))
+    env.perceiver.script(
+        after, make_delta(before=state, after=after, change_class=ChangeClass.TRIVIAL)
+    )
+
+    envelope = env.executor.execute(PlannedAction(tool=ToolName.CLICK, target=_QUERY))
+
+    assert envelope.ok is False
+    assert envelope.error_code is ErrorCode.VERIFICATION_UNVERIFIED
+
+
 def test_drag_needs_a_destination_description() -> None:
     """A drag without a resolved drop target is refused (section 49)."""
     env = _env(state=make_state(elements=(make_element(),)))

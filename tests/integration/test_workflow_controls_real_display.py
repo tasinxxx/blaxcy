@@ -31,10 +31,11 @@ import pytest
 
 from bench.real_desktop import WORKFLOW_SEARCH_FIELD
 from config.settings import load_settings
+from control.verifier import Postcondition, Verifier
 from core.application import BlaxcyApplication
 from gui.app import self_excluded_settings
 from schemas.elements import UIElement
-from schemas.enums import CoordinateSpace, UIRole
+from schemas.enums import CoordinateSpace, UIRole, VerificationState
 from schemas.geometry import Point, Rect
 from schemas.screen_state import ScreenState
 from tests.harness import FixtureApp
@@ -191,6 +192,56 @@ def test_the_live_clickable_controls_are_large_perceivable_buttons(
         assert matches, f"{name!r} is not perceived as a BUTTON inside the fixture window"
         assert matches[0].clickable, f"{name!r} is not clickable"
         assert matches[0].bbox is not None and matches[0].bbox.width > 0.0
+
+
+def test_the_live_submit_click_reports_a_same_window_enable_transition(
+    env: tuple[BlaxcyApplication, FixtureApp],
+) -> None:
+    """Section 60: the stronger postcondition the section 74 ``s3`` click needs.
+
+    The Submit click leaves the button's own state unchanged and repaints nothing
+    at its own box, which is exactly the 1-in-150 case where the pixel check left
+    the step ``UNVERIFIED``. The live desktop does report a directly observable
+    postcondition: a control in the same application becomes enabled. This proves
+    the evidence the new verifier consumes really exists on a live Qt window. The
+    change is driven over the fixture's own control channel (no desktop input), and
+    the transition is read from real observations, so it is a functional probe of
+    the evidence rather than of the verifier in isolation.
+
+    Defined before the other tests that click Submit, because the fixture is
+    module-scoped and its Play Button stays enabled once Submit has run.
+    """
+    application, fixture = env
+    fixture.set_text("search_input", "song name")
+
+    def both_present(state: ScreenState) -> bool:
+        return any(e.accessible_name == "Submit" for e in state.elements) and any(
+            e.accessible_name == "Play Button" for e in state.elements
+        )
+
+    before = _perceive_until(application, fixture, both_present, describe="Submit and Play Button")
+    play_before = next(e for e in before.elements if e.accessible_name == "Play Button")
+    submit = next(e for e in before.elements if e.accessible_name == "Submit")
+    assert play_before.enabled is False, "the Play Button must start disabled"
+
+    fixture.click("submit_button")
+
+    def play_enabled(state: ScreenState) -> bool:
+        return any(
+            e.accessible_name == "Play Button" and e.enabled is True for e in state.elements
+        )
+
+    after = _perceive_until(application, fixture, play_enabled, describe="the enabled Play Button")
+    play_after = next(e for e in after.elements if e.accessible_name == "Play Button")
+    assert play_after.enabled is True
+
+    outcome = Verifier().verify_element_state_change(
+        before=before, after=after, target=submit, reason_context="click"
+    )
+
+    assert outcome is not None, "the live enable transition was not reported as evidence"
+    assert outcome.state is VerificationState.VERIFIED
+    assert outcome.postcondition is Postcondition.ELEMENT_STATE
 
 
 def test_the_live_results_are_named_list_items_with_geometry(

@@ -1274,11 +1274,7 @@ class Executor:
         success it cannot prove -- and section 55 wants exactly that, because a
         password step in a sequence halts it and returns to per-step handling.
         """
-        if (
-            tool in _SELECTION_TOOLS
-            and element is not None
-            and element.role in SELECTABLE_ROLES
-        ):
+        if tool in _SELECTION_TOOLS and element is not None:
             # A click on a selectable control is verified from the control's own
             # state when the tree reports it. That is stronger evidence than the
             # pixels it repainted, and it is immune to the section 34 temporal
@@ -1287,9 +1283,22 @@ class Executor:
             # already changed that region as a side effect. Positive-only: a
             # missing or false selection falls straight through to the ordinary
             # screen-change check below, so nothing is weakened.
-            selection = self._verifier.verify_selection(after=after, target=element)
-            if selection is not None:
-                return selection
+            if element.role in SELECTABLE_ROLES:
+                selection = self._verifier.verify_selection(after=after, target=element)
+                if selection is not None:
+                    return selection
+            # A click whose target keeps its own state (a plain push button) may
+            # still be confirmed from a reported state transition elsewhere in the
+            # same application -- for example a control that becomes enabled as the
+            # result of the click. This is independent of the pixel delta, so it is
+            # not defeated by the section 34 temporal layer or by a missing delta.
+            # Positive-only and bounded by the same-application rule; no positive
+            # evidence falls straight through to the screen-change check below.
+            state_change = self._verifier.verify_element_state_change(
+                before=before, after=after, target=element, reason_context=tool
+            )
+            if state_change is not None:
+                return state_change
         if tool is ToolName.TYPE_TEXT and element is not None and element.is_text_entry:
             return self._verifier.verify_text(
                 after=after, target=element, text=str(planned.params.get("text", ""))

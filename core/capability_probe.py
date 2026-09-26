@@ -207,18 +207,50 @@ def _probe_xtest() -> BackendProbe:
     return XtestBackend().probe()
 
 
-def _input_capability(name: CapabilityName, session: SessionInfo) -> Capability:
-    """Build the mouse/keyboard capability from the shared XTEST probe."""
-    if not session.has_x_display:
+def _portal_input_capability(name: CapabilityName) -> Capability:
+    """Mouse/keyboard via the XDG RemoteDesktop portal (no X display present).
+
+    The probe is functional and non-invasive: it asks the live portal whether the
+    RemoteDesktop interface exists, without creating a session or injecting input.
+    Absolute pointer motion additionally needs a ScreenCast stream node, so the
+    *mouse* capability is reported DEGRADED until one is configured; the keyboard
+    path does not need it.
+    """
+    from control.backends import PortalRemoteDesktopBackend
+
+    probe = PortalRemoteDesktopBackend().probe()
+    if not probe.available:
         return _cap(
             name,
             CapabilityStatus.UNAVAILABLE,
             reason=(
-                "no X display available for injection; Wayland input needs the "
-                "RemoteDesktop portal or a verified libei/ydotool path (section 30)"
+                "this session has no X display for XTEST, and the Wayland input "
+                f"path is unavailable: {probe.reason or 'the portal did not answer'}"
             ),
-            fix_hint="run under X11/XWayland, or implement the portal backend",
+            fix_hint=(
+                "use a Wayland session whose portal implements "
+                "org.freedesktop.portal.RemoteDesktop, or run under X11/XWayland"
+            ),
         )
+    if name is CapabilityName.MOUSE and not probe.details.get("absolute_pointer"):
+        return _cap(
+            name,
+            CapabilityStatus.DEGRADED,
+            backend=probe.name,
+            reason=(
+                "the RemoteDesktop portal is present, but absolute pointer motion "
+                "needs a ScreenCast stream node and none is configured"
+            ),
+            fix_hint="wire the ScreenCast stream node into the portal backend",
+            details=probe.details,
+        )
+    return _cap(name, CapabilityStatus.AVAILABLE, backend=probe.name, details=probe.details)
+
+
+def _input_capability(name: CapabilityName, session: SessionInfo) -> Capability:
+    """Build the mouse/keyboard capability from the shared XTEST probe."""
+    if not session.has_x_display:
+        return _portal_input_capability(name)
     probe = _probe_xtest()
     if probe.available:
         return _cap(

@@ -26,22 +26,31 @@
     instruction.
   - `0b86d56` — "Subscribe the AT-SPI state changes that gate input decisions" — the
     `s2:FOCUS_MISMATCH` root-cause fix, committed on operator instruction.
-- Last verified commit: `0b86d56` (HEAD). The index previously recorded `5e06bc0`;
-  that was stale by two commits and was reconciled **2026-09-26** (this session).
-- Working tree: **dirty — 18 files, one complete-but-uncommitted unit of work**: the
-  fix for the last two §74 workflow halt causes (`s2:VERIFICATION_CONTRADICTED` and
-  `s4:VERIFICATION_UNVERIFIED`; see "Current task"). The changed files are
-  `core/perception.py` (real `perceive(force=True)`), `core/application.py`,
-  `control/executor.py` (`perceive_fresh`, `_confirm_negative`, the selection
-  branch of `_verify`), `control/verifier.py` (`Postcondition.SELECTED`,
-  `verify_selection`), `schemas/elements.py` (`UIElement.selected`),
-  `core/accessibility.py`, `config/settings.py` + `config/default_settings.toml`,
-  `tests/harness/phase8.py`, `tests/harness/fixture_client.py`,
-  `tests/fixtures/fixture_app.py`, `tests/unit/test_{executor,perception,verifier}.py`,
+  - `372879a` — "Verify typed text and result selection from live state, and
+    re-measure" — 18 files, +754/−74.
+  - `181ef84` — "Re-check a would-be section 51 focus refusal against live state" —
+    5 files, +280/−72.
+  - `ab3d540` — "Add the Phase 15 soak run and fix the section 43.1 cache it
+    exposed" — 7 files, +777/−13; new `bench/soak.py`, `tests/unit/test_soak.py`.
+  - `8b3307e` — "Retry fixture startup races, and document the capability matrix" —
+    6 files, +433/−21; new `docs/capability_matrix.md`,
+    `tests/unit/test_fixture_client.py`.
+- Last verified commit: `8b3307e` (HEAD). **Index drift corrected 2026-09-26**: this
+  section had stopped at `0b86d56` and described the then-uncommitted 18-file unit
+  as the working tree; those four commits (`372879a`, `181ef84`, `ab3d540`,
+  `8b3307e`) now exist and the tree they described is committed. The repository wins
+  (§8 step 4).
+- Working tree: **dirty — this session's uncommitted unit**: the stronger §60
+  postcondition for clicks (`Postcondition.ELEMENT_STATE`), the XDG RemoteDesktop
+  portal input backend, and the soak's per-step latency breakdown (see "Current
+  task"). Files: `control/verifier.py`, `control/executor.py`,
+  `control/backends/portal.py` (new), `control/backends/__init__.py`,
+  `core/capability_probe.py`, `bench/soak.py`,
+  `tests/unit/test_{verifier,executor,soak,portal_backend,capability_probe,input_backends}.py`,
   `tests/integration/test_workflow_controls_real_display.py`, `docs/limitations.md`,
-  `docs/benchmark_report.md`, and this file. Re-verified green this session
-  (**1167 passed, 6 skipped**; ruff + mypy clean, **179 files**) but not yet
-  committed (committing needs explicit user confirmation, §11).
+  `docs/capability_matrix.md`, `docs/benchmark_report.md`, and this file.
+  Re-verified green (**1215 passed, 6 skipped**; ruff + mypy clean, **184 files**)
+  but not yet committed (committing needs explicit user confirmation, §11).
 - **Index drift corrected 2026-09-25 (this session).** This file was last written by
   the session that became commit `5e06bc0` (the warm/cold perceive-cycle work),
   while a following session built the `workflow-verifiable` workload, the two AT-SPI
@@ -1048,6 +1057,51 @@ The `[logging]` config section is no longer a dead stub.
     against throwaway prefixes; no system-wide install was performed.
 
 ## Current task
+- **2026-09-26 (this session): the `s3` soak halt is addressed, the Wayland portal
+  path is implemented, and the soak attributes drift per step.** Three units, all
+  uncommitted:
+  - **(1) Stronger §60 postcondition for clicks** (`control/verifier.py`,
+    `control/executor.py`). The 150-iteration soak's single halt was
+    `s3:VERIFICATION_UNVERIFIED` — the `Submit` click. Root cause: a plain push
+    button keeps its own state and repaints nothing at its own box, so §60 had only
+    the pixel evidence, which can be reclassified `ANIMATION` by §34 or missing a
+    delta entirely. The live desktop *does* report a directly observable
+    postcondition: a control in the same application becomes enabled (measured on
+    the fixture: `Play Button` `enabled=False→True`). New positive-only
+    `Postcondition.ELEMENT_STATE` + `Verifier.verify_element_state_change` verifies a
+    click from that reported transition — an element present in **both** observations
+    (truncation-robust), visible in both, `enabled` false→true, attributable to the
+    target's own window/app (the same causality bound the pixel check enforces with
+    overlap). It returns `None` (never a verdict) when there is no positive evidence,
+    so the click falls through to the ordinary screen-change check; it can never
+    produce `CONTRADICTED`. Wired into `Executor._verify`'s click branch after the
+    selection check. New tests: 7 in `tests/unit/test_verifier.py`, 2 in
+    `tests/unit/test_executor.py`, 1 live in
+    `tests/integration/test_workflow_controls_real_display.py`.
+  - **(2) XDG RemoteDesktop portal input backend** (`control/backends/portal.py`,
+    `control/backends/__init__.py`, `core/capability_probe.py`). A real
+    `InputBackend` over `org.freedesktop.portal.RemoteDesktop` (dbus-python, lazy):
+    `CreateSession`→`SelectDevices`→`Start` with bounded `Response` waits, then
+    `NotifyPointerMotion(Absolute)`/`NotifyPointerButton`/`NotifyPointerAxisDiscrete`/
+    `NotifyKeyboardKeysym`. Its **probe is functional and non-invasive** — it
+    introspects the live portal for the interface (and version) without creating a
+    session or injecting input. `select_backend()` now falls back XTEST → portal.
+    Honest limits: no readback, and absolute pointer motion needs a ScreenCast stream
+    node, so `mouse` is reported **DEGRADED** on Wayland while `keyboard` is
+    `AVAILABLE`. **Measured on this host:** the probe reports `UNAVAILABLE` with the
+    exact reason (the X11 gtk portal does not expose the interface); session
+    establishment and injection are therefore **unverified** and no Wayland control
+    support is claimed. 13 unit tests over a fake transport
+    (`tests/unit/test_portal_backend.py`).
+  - **(3) Per-step soak timing** (`bench/soak.py`). Each sample now carries the
+    executed steps' own `elapsed_ms`; `analyze()` reports a per-step breakdown (plan
+    order, `p50`/`p95`/`max`, per-step second-half drift, slowest step by `p50`), and
+    the CLI prints a table. A `NOT_EXECUTED` step contributes nothing (no duration,
+    not counted as a fast zero). 4 new tests in `tests/unit/test_soak.py` (14 total).
+  - **Gate: 1215 passed, 6 skipped**; ruff + mypy clean (**184 files**). Recorded in
+    `docs/benchmark_report.md` "Phase 15", `docs/capability_matrix.md`,
+    `docs/limitations.md`. **Not yet re-measured with real input** — the workflow/
+    soak re-run needs operator approval to inject real input.
 - **2026-09-26: Phase 15 continued — harness retry, capability matrix, longer soak.**
   (a) `FixtureApp.start()` now retries a launch up to `start_attempts` (default 3)
   and requires the child to stay alive for `ready_grace_s` after `ready`, so the
@@ -3176,3 +3230,20 @@ The `[logging]` config section is no longer a dead stub.
   clean (179 files); the live workflow suite is **5 passed**. Nothing was loosened to
   obtain a number: §60's thresholds are untouched and the benchmark has deliberately
   **not** been re-quoted.
+- 2026-09-26 — a later session, three queued units. (1) Investigated the 150-iteration
+  soak's single halt (`s3:VERIFICATION_UNVERIFIED`, the `Submit` click) and decided
+  its postcondition **can** be verified from a stronger signal: measured read-only on
+  the fixture, the click enable-transitions `Play Button` (`enabled=False→True`), a
+  directly reported accessibility state. Added a positive-only
+  `Postcondition.ELEMENT_STATE`/`Verifier.verify_element_state_change` (element present
+  in both observations, visible in both, enabled false→true, same window/app as the
+  target) wired into the click branch with fall-through to the pixel check; it never
+  yields `CONTRADICTED`. (2) Implemented the XDG RemoteDesktop portal backend
+  (`control/backends/portal.py`) with a functional, non-invasive probe and wired it as
+  the XTEST fallback; **measured on this host the probe reports UNAVAILABLE** because
+  the X11 gtk portal does not expose the interface, so session/injection are unverified
+  and no Wayland control support is claimed (absolute pointer also needs a ScreenCast
+  stream node → `mouse` DEGRADED, `keyboard` AVAILABLE on Wayland). (3) Gave the soak a
+  per-step latency breakdown so drift names its step. Gate: **1215 passed, 6 skipped**;
+  ruff + mypy clean (184 files). The real-input re-measurement is pending operator
+  approval.

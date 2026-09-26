@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from control.backends import (
+    PortalRemoteDesktopBackend,
     XtestBackend,
     canonical_key_name,
     is_modifier_name,
@@ -139,22 +140,23 @@ def test_release_all_and_close_are_safe_without_a_connection() -> None:
     assert backend._display is None
 
 
-def test_select_backend_returns_none_when_the_probe_fails(
+def test_select_backend_returns_none_when_both_probes_fail(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Selection is driven by the probe result, not by module availability."""
+    """Selection is driven by the probes, not by module availability."""
 
-    def _down(_self: XtestBackend) -> BackendProbe:
-        return BackendProbe("xtest", False, "unavailable")
+    def _down(_self: object) -> BackendProbe:
+        return BackendProbe("x", False, "unavailable")
 
     monkeypatch.setattr(XtestBackend, "probe", _down)
+    monkeypatch.setattr(PortalRemoteDesktopBackend, "probe", _down)
     assert select_backend() is None
 
 
 def test_select_backend_returns_xtest_when_the_probe_passes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A passing probe selects the XTEST backend."""
+    """A passing XTEST probe is preferred, so the portal is not even consulted."""
 
     def _up(_self: XtestBackend) -> BackendProbe:
         return BackendProbe("xtest", True, None, {"xtest_version": "2.2"})
@@ -163,3 +165,19 @@ def test_select_backend_returns_xtest_when_the_probe_passes(
     backend = select_backend()
     assert isinstance(backend, XtestBackend)
     assert backend.name == "xtest"
+
+
+def test_select_backend_falls_back_to_the_portal(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When XTEST has no display, a probed RemoteDesktop portal is selected."""
+
+    def _down(_self: object) -> BackendProbe:
+        return BackendProbe("xtest", False, "no display")
+
+    def _up(_self: object) -> BackendProbe:
+        return BackendProbe("portal-remotedesktop", True, None, {"interface_version": 2})
+
+    monkeypatch.setattr(XtestBackend, "probe", _down)
+    monkeypatch.setattr(PortalRemoteDesktopBackend, "probe", _up)
+    backend = select_backend()
+    assert isinstance(backend, PortalRemoteDesktopBackend)
+    assert backend.name == "portal-remotedesktop"
