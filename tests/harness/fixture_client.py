@@ -17,6 +17,7 @@ import queue
 import subprocess
 import sys
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -68,6 +69,9 @@ class FixtureApp:
         command_timeout: float = 10.0,
         bench_controls: bool = False,
         workflow_controls: bool = False,
+        start_attempts: int = 3,
+        retry_backoff_s: float = 0.25,
+        ready_grace_s: float = 0.2,
     ) -> None:
         self._platform = platform
         self._title = title
@@ -75,6 +79,12 @@ class FixtureApp:
         self._command_timeout = command_timeout
         self._bench_controls = bench_controls
         self._workflow_controls = workflow_controls
+        #: A launch is retried this many times: on a busy desktop a child can fail
+        #: to become (or stay) ready, which is a startup race, not a test failure.
+        self._start_attempts = max(1, start_attempts)
+        self._retry_backoff_s = max(0.0, retry_backoff_s)
+        #: How long a child must stay alive after ``ready`` to count as started.
+        self._ready_grace_s = max(0.0, ready_grace_s)
         self._process: subprocess.Popen[str] | None = None
         self._lines: queue.Queue[Any] = queue.Queue()
         self._reader: threading.Thread | None = None
@@ -84,12 +94,42 @@ class FixtureApp:
     # -- lifecycle ------------------------------------------------------------
 
     def start(self) -> FixtureApp:
-        """Start the child process and block until its ``ready`` line arrives."""
+        """Start the child and block until its ``ready`` line arrives.
+
+        A launch is retried up to ``start_attempts`` times. On a loaded desktop a
+        child can exit before or just after reporting ``ready`` -- the fixture exits
+        on stdin EOF -- and that is a startup **race**, not a defect in the code
+        under test. A child that does not stay alive for ``ready_grace_s`` after
+        ``ready`` is treated as a failed attempt and retried; only after every
+        attempt is exhausted does ``start`` raise, with the last cause attached.
+        """
         if self._process is not None:
             raise FixtureError("fixture already started")
         if not FIXTURE_APP.exists():
             raise FixtureError(f"fixture app not found at {FIXTURE_APP}")
 
+        last_error: FixtureError | None = None
+        for attempt in range(1, self._start_attempts + 1):
+            try:
+                self._launch()
+                ready = self._next_line(self._start_timeout)
+                if ready.get("event") != "ready":
+                    raise FixtureError(f"fixture did not report ready; first line was: {ready!r}")
+                self._await_ready_grace()
+                self.ready_payload = ready
+                return self
+            except FixtureError as exc:
+                last_error = exc
+                self.stop()
+                self._join_reader()
+                if attempt < self._start_attempts:
+                    time.sleep(self._retry_backoff_s * attempt)
+        raise FixtureError(
+            f"fixture failed to start after {self._start_attempts} attempts: {last_error}"
+        ) from last_error
+
+    def _launch(self) -> None:
+        """Spawn the child and its reader threads, resetting per-attempt state."""
         env = dict(os.environ)
         if self._platform is not None:
             env["QT_QPA_PLATFORM"] = self._platform
@@ -99,6 +139,11 @@ class FixtureApp:
             argv.append("--bench-controls")
         if self._workflow_controls:
             argv.append("--workflow-controls")
+        # A retry starts from a clean queue: a previous attempt's trailing EOF must
+        # not be mistaken for this attempt's output.
+        with self._lines.mutex:
+            self._lines.queue.clear()
+        self._stderr_chunks.clear()
         self._process = subprocess.Popen(
             argv,
             cwd=str(PROJECT_ROOT),
@@ -113,12 +158,27 @@ class FixtureApp:
         self._reader.start()
         threading.Thread(target=self._read_stderr, daemon=True).start()
 
-        ready = self._next_line(self._start_timeout)
-        if ready.get("event") != "ready":
-            self.stop()
-            raise FixtureError(f"fixture did not report ready; first line was: {ready!r}")
-        self.ready_payload = ready
-        return self
+    def _await_ready_grace(self) -> None:
+        """Fail when the child dies within the ready grace window (a startup race)."""
+        process = self._process
+        if process is None or self._ready_grace_s <= 0.0:
+            return
+        try:
+            code = process.wait(timeout=self._ready_grace_s)
+        except subprocess.TimeoutExpired:
+            return  # still alive after the grace window: a usable fixture
+        raise FixtureError(f"fixture exited immediately after ready (code {code})")
+
+    def _join_reader(self) -> None:
+        """Wait briefly for the stdout reader to finish before the next attempt.
+
+        The reader touches the shared line queue; letting it finish means a retry's
+        drain cannot race a late EOF from the attempt that just failed.
+        """
+        reader = self._reader
+        if reader is not None:
+            reader.join(timeout=2.0)
+            self._reader = None
 
     def stop(self) -> None:
         """Ask the fixture to quit, then ensure the process is gone."""

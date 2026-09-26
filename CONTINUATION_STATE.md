@@ -61,12 +61,11 @@
 ## Current phase
 - Phase: **Phase 15 — Full matrix / soak / documentation** (started 2026-09-26).
   Phases 0-14 are complete (Phase 12-14 are recorded under "Previous phases").
-  Phase 15 now has a **soak runner** (`bench/soak.py`) and a first run: 30
-  iterations of the section 74 workflow, **30/30 stable**, flat latency (−0.56 %
-  drift) and flat steady-state memory (0.004 MB/iteration), no stuck input, no
-  retained lease, no orphan thread — recorded in `docs/benchmark_report.md`.
-  **Still open for Phase 15:** the full environment/capability matrix, and a soak
-  longer than the ~40 iterations run so far.
+  Phase 15 now has a **soak runner** (`bench/soak.py`; 30-iteration and
+  150-iteration runs, the latter **149/150**, with flat latency and flat
+  steady-state memory) and the **environment/capability matrix**
+  (`docs/capability_matrix.md`). **Still open for Phase 15:** verification on a
+  Wayland/XWayland session, which this host cannot provide (no Wayland compositor).
 - **The soak surfaced and closed a real resolver-cache defect (2026-09-26).** The
   §43.1 cache could never hit on a live desktop: every perceived element carries
   `owner_window_id = None` (measured 146/146), so hints were keyed under `None`
@@ -1049,6 +1048,18 @@ The `[logging]` config section is no longer a dead stub.
     against throwaway prefixes; no system-wide install was performed.
 
 ## Current task
+- **2026-09-26: Phase 15 continued — harness retry, capability matrix, longer soak.**
+  (a) `FixtureApp.start()` now retries a launch up to `start_attempts` (default 3)
+  and requires the child to stay alive for `ready_grace_s` after `ready`, so the
+  observed startup race is retried instead of failing a test
+  (`tests/unit/test_fixture_client.py`, 5 tests). (b) `docs/capability_matrix.md`
+  documents capability × session × backend and states everything unsupported (no
+  Wayland ScreenCast/RemoteDesktop portal, no `libei`/`ydotool`, no `xdotool`
+  fallback, no XShm capture path). (c) A **150-iteration soak**: **149/150 stable**
+  (one honest `s3:VERIFICATION_UNVERIFIED`), latency drift −5.15 %, steady-state
+  memory 0.002 MB/iteration, resolver-cache hit rate **0.9906**, no stuck input, no
+  retained lease, no orphan thread. Recorded in `docs/benchmark_report.md` "Phase
+  15". Gate: **1186 passed, 6 skipped**; ruff + mypy clean (182 files).
 - **2026-09-26: Phase 15 started — a soak runner is added and run, and it found a real
   defect.** `bench/soak.py` repeats the section 74 workflow end to end on the live
   desktop and reports **stability**, **drift** and **resource invariants** (held
@@ -1174,6 +1185,11 @@ The `[logging]` config section is no longer a dead stub.
 
 ## Files being actively modified
 - (none mid-change; this session's fixes are complete, tested and green)
+- Touched this session (Phase 15 continued, 2026-09-26): `tests/harness/fixture_client.py`
+  (the bounded startup retry: `_launch`, `_await_ready_grace`, `_join_reader`),
+  `tests/unit/test_fixture_client.py` (new, 5 tests), `docs/capability_matrix.md`
+  (new), `docs/benchmark_report.md` (the 150-iteration soak table),
+  `docs/limitations.md` (Phase 15 row + the 1-in-150 verification note), this file.
 - Touched this session (the Phase 15 soak, 2026-09-26): `bench/soak.py` (new),
   `tests/unit/test_soak.py` (new, 10 tests), `core/target_resolver.py`
   (`_record` passes the observation's active window as the cache key fallback),
@@ -1270,6 +1286,17 @@ The `[logging]` config section is no longer a dead stub.
   `docs/environment_report.md` (regenerated)
 
 ## Last test results (verbatim, not paraphrased as "passed")
+- Command (`2026-09-26`, after Phase 15 continued — harness retry + matrix):
+  `. .venv/bin/activate && ruff check . && mypy . && timeout 900 python -m pytest -o addopts="" -p no:pytest-qt -q`
+- Result: `1186 passed, 6 skipped, 4 warnings in 36.74s`; `ruff check .` ->
+  `All checks passed!`; `mypy .` -> `Success: no issues found in 182 source files`.
+- Command (`2026-09-26`, the longer soak, real input, operator-approved):
+  `. .venv/bin/activate && timeout 560 python -m bench.soak --confirm-real-input --iterations 150`
+- Result: **149/150 completed** (stability 0.9933, `stable: false` — one honest
+  `s3:VERIFICATION_UNVERIFIED`); latency p50 2325.18 / p95 2673.68 ms; drift
+  −5.15 %; RSS warm-up 154.5→270.4 MB with **steady-state 0.002 MB/iteration**;
+  threads 1→6→1; held input 0; leases 0; resolver-cache hit rate **0.9906**
+  (741/7); speculation requested/completed 598, taken 1, max_outstanding 3.
 - Command (`2026-09-26`, after the Phase 15 soak + the §43.1 cache fix):
   `. .venv/bin/activate && ruff check . && mypy . && timeout 900 python -m pytest -o addopts="" -p no:pytest-qt -q`
 - Result: `1181 passed, 6 skipped, 4 warnings in 33.08s`; `ruff check .` ->
@@ -1690,7 +1717,7 @@ The `[logging]` config section is no longer a dead stub.
     `test_a_hit_is_possible_for_elements_the_traversal_did_not_attribute`.
   - next investigation: none — closed. Worth remembering that a hint must be keyed
     by the same window source a lookup filters on.
-- **Fixture-startup flake under load — open, observed once**
+- **Fixture-startup flake under load — MITIGATED 2026-09-26 (bounded retry)**
   - failure: `tests/integration/test_workflow_controls_real_display.py` fails during
     fixture startup, the child exiting cleanly (`code 0`) before the first command
   - environment: this host, immediately after a long real-input soak
@@ -1702,11 +1729,14 @@ The `[logging]` config section is no longer a dead stub.
   - expected result: the fixture stays up for the test
   - likely cause: real-desktop timing under load, not a code defect (the fixture
     binary started and reported its inventory on every manual launch)
-  - current status: **open, not reproduced on demand**; not caused by the Phase 15
-    changes (resolver-only)
-  - next investigation: give the harness a bounded retry on an early child exit
-    before the first command, so a startup race is retried rather than reported as a
-    test failure*
+  - current status: **mitigated.** `FixtureApp.start()` retries a launch up to
+    `start_attempts` (default 3) and requires the child to remain alive for
+    `ready_grace_s` after `ready`; a startup race is now retried rather than
+    reported as a test failure. Locked by `tests/unit/test_fixture_client.py`
+    (5 tests: healthy no-retry, die-after-ready retried, never-ready retried,
+    bounded attempts, single-attempt opt-out). Not reproduced since.
+  - next investigation: none — closed unless it recurs at a rate the retry cannot
+    absorb; the retry is bounded on purpose so a real defect still surfaces.*
 - **The realistic §74 workflow happy path — RESOLVED and met 2026-09-26**
   (`workflow-verifiable` reaches **20/20, p50 1342.94 ms / p95 1787.70 ms**, within
   the ≤ 4000 ms target). Kept for the record: it took four causes, each root-caused
@@ -2618,7 +2648,12 @@ The `[logging]` config section is no longer a dead stub.
   soak surfaced a **real §43.1 defect** — the cache could never hit on a live
   desktop (`owner_window_id = None` for all 146 elements, so the key's window
   component never matched) — fixed in `TargetResolver._record` and re-measured at
-  hit rate **0.875**. Gate **1181 passed, 6 skipped**; ruff + mypy clean (181 files).
+  hit rate **0.875** (and 0.9906 over 150 sequences). Gate **1181 passed, 6
+  skipped**; ruff + mypy clean (181 files). Then Phase 15 continued: a bounded
+  startup retry in `tests/harness/fixture_client.py` (+5 tests), the capability
+  matrix `docs/capability_matrix.md`, and a **150-iteration soak, 149/150 stable**
+  with flat latency and steady-state memory. Gate **1186 passed, 6 skipped**;
+  ruff + mypy clean (182 files).
 - 2026-09-23 — implemented §50's clipboard paste path on request (the item Phase 7
   left open): `control/clipboard.py` `X11ClipboardPaster` (owns the CLIPBOARD
   selection, serves it on its own thread, captures and re-serves the previous

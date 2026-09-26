@@ -539,6 +539,44 @@ Interpretation, stated narrowly:
   after the fix: **hit rate 0.875** (35 hits / 5 misses over 8 sequences), with the
   section 4 rule 31 decision-identity test still green.
 
+### Phase 15 — longer soak (150 iterations, 2026-09-26)
+
+Same command with `--iterations 150`, one continuous run (~6 minutes of real desktop
+input):
+
+| Metric | Value | n |
+|---|---|---|
+| workflow completions | **149/150 (stability 0.9933)** | 150 |
+| halt reasons | `s3:VERIFICATION_UNVERIFIED` ×1 | 150 |
+| per-iteration latency p50 / p95 / min / max | 2325.18 / 2673.68 / 1756.18 / 3232.45 ms | 150 |
+| latency drift (second half vs first) | **−5.15 %** | 150 |
+| RSS, run start → end | 154.5 → 270.4 MB (warm-up) | 150 |
+| RSS steady-state growth (second half) | **0.002 MB/iteration** (flat) | 150 |
+| threads, before → during → after shutdown | 1 → 6 → 1 (no orphan) | — |
+| held keys / buttons / retained leases | 0 / 0 / 0 | 150 |
+| resolver-cache hit rate | **0.9906** (741 hits / 7 misses) | 748 lookups |
+| speculation requested / taken / useful | 598 / 1 / 1, `max_outstanding` 3 | 598 |
+
+Interpretation, stated narrowly:
+
+- **Stable and bounded over a longer horizon.** Memory and latency stay flat across
+  150 real workflows (late-phase growth 0.002 MB/iteration; the second half is 5 %
+  *faster* than the first), no input is left held, no lease is retained, and no
+  thread survives shutdown. The fixed §43.1 window key lifts the cache hit rate to
+  **0.9906** at this scale.
+- **One honest halt in 150, and the run reports it rather than rounding to 100 %.**
+  Iteration 43 halted at `s3` (the `Submit` click) with `VERIFICATION_UNVERIFIED`:
+  that one time the click's repaint was not observed as a `MEANINGFUL` change within
+  the settle window, and §60 halted the sequence rather than stepping onto an
+  unconfirmed premise. It is a real-desktop timing property, not a lost action —
+  the fixture's own counters confirm the input landed. The soak verdict is therefore
+  `stable: false` for this run, which is the truth about a real desktop.
+- **The speculation numbers are a tiny sample.** One hint was taken and proved
+  useful in 150 runs (`usefulness_rate` 1.0 on n = 1), because each step's region
+  changes as a side effect of the step before it, so the section 34 change rule
+  discards the rest. That is the designed behaviour; the rate is not meaningful at
+  this n and is reported as-is.
+
 ## Reproducing
 
 ```bash
