@@ -1,5 +1,8 @@
 [build-system]
-requires = ["setuptools>=68"]
+# setuptools >= 77 is required for the PEP 639 SPDX license expression below; the
+# older TOML-table form is deprecated and this keeps the build warning-free on
+# current and future setuptools.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +11,10 @@ version = "0.1.0"
 description = "BLAXCY - a Linux-native AI computer-control BODY (perception, control, policy, verification, recovery)."
 readme = "README.md"
 requires-python = ">=3.12"
-license = { text = "Proprietary" }
+# A PEP 639 SPDX expression. "Proprietary" is not a valid SPDX identifier, so
+# the license is expressed as a forbidden-use statement the SPDX grammar accepts;
+# the full terms are distributed with the source.
+license = "LicenseRef-Proprietary"
 authors = [{ name = "BLAXCY" }]
 
 # Runtime dependencies. Versions are intentionally lower-bounded, not pinned:
