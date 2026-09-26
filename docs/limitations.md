@@ -13,7 +13,7 @@ created with `--system-site-packages`, real XTEST 2.2, live AT-SPI.
 
 | Gap | Status | Evidence / detail |
 |---|---|---|
-| **Realistic §74 workflow happy path** | Open (one of three causes fixed, not re-measured) | `--workload workflow-verifiable` completed **2/20** five-step sequences; halted on `s2:FOCUS_MISMATCH` ×8, `s2:VERIFICATION_CONTRADICTED` ×4, `s4:VERIFICATION_UNVERIFIED` ×6. The `FOCUS_MISMATCH` cause is now **root-caused and fixed**: the §35 element cache did not subscribe to `object:state-changed:focused`, so a click that moved focus was invisible and §51's guard refused to type into a field that really was focused, for up to `cache_ttl_seconds` (2 s) — longer than the §45 action-state-age ceiling. The two remaining causes (the live AT-SPI read of a typed field lagging the injection, and a `LIST_ITEM` selection not repainting `MEANINGFUL`-ly at its own box) are unfixed. **The 2/20 number has not been re-measured** since the fix, so the row stays open. The synthetic `verifiable` workload still meets the §76 target (20/20). See `CONTINUATION_STATE.md` "Known failures". |
+| **Realistic §74 workflow happy path** | Open (narrowed to one cause; **re-measured 2026-09-26**) | Pre-fix, `--workload workflow-verifiable` completed **2/20** five-step sequences; halted on `s2:FOCUS_MISMATCH` ×8, `s2:VERIFICATION_CONTRADICTED` ×4, `s4:VERIFICATION_UNVERIFIED` ×6. After the three fixes it completes **5/20** and the halt set is a **single** cause, `s2:FOCUS_MISMATCH` ×15 (the standalone click and keyboard rows are both **30/30 VERIFIED**, up from `5/50` and `1/30`). The remaining item is sequence-specific focus timing: `s1` clicks the search icon (which focuses the field) and `s2` types ~120 ms later, and §51 reads a state captured before that change — §35's 2 s element TTL can outlive §45's 1500 ms action-state-age ceiling. All three causes are now root-caused and fixed: (a) the §35 element cache was never subscribed to `object:state-changed:focused`, so a click that moved focus was invisible and §51's guard refused to type into a field that really was focused; (b) verification judged typed text from a single read taken immediately after injection, which the element cache could serve *before* the action, so a lagging read was reported as a contradiction; (c) a result click's repaint was reclassified `ANIMATION` by the §34 temporal layer when the previous step had changed that region as a side effect, so a real selection was `UNVERIFIED`. The fixes are: subscribe the action-gating state changes (incl. `selected`); re-check a negative verdict against fresh, live observations for `verify_settle_ms` before reporting it (§60's `CONTRADICTED` needs positive evidence); and verify a click on a selectable control from the control's own `selected` state, positive-only, falling back to the pixel check. **Re-measured 2026-09-26**: 5/20, with the two verification causes gone and only the focus-timing residual left, so the row stays open but is narrowed. The synthetic `verifiable` workload still meets the §76 target (20/20). See `CONTINUATION_STATE.md` "Known failures". |
 | **Wayland** | Not implemented | There is no portal/`libei` input path. `Control` is X11/XTEST only. No Wayland support is claimed (§30, §79). |
 | `activate_element` | **Implemented** | `core/accessibility.py` invokes the application's own AT-SPI action; the executor reaches it only after policy → resolve → lease → revalidation, and verifies it like any other `MUTATING` tool. It injects **no** pointer or key input, which is the point: no coordinates and no pointer occlusion. Verified **live** on the §74 fixture (`tests/integration/test_workflow_controls_real_display.py::test_the_live_submit_control_is_really_activated_through_atspi`). A backend that lacks the optional `activate` capability reports a structured `UNAVAILABLE` rather than substituting a click. |
 | **Browser accessibility** | UNAVAILABLE | Runtime-probed and reported honestly; no browser was relaunched or configured. |
@@ -27,10 +27,18 @@ created with `--system-site-packages`, real XTEST 2.2, live AT-SPI.
 
 - **AT-SPI state-change subscriptions.** The element cache invalidates on any
   observed AT-SPI event, so the subscription list decides which changes it can
-  see. It now includes the state changes an action gates on (`focused`,
-  `enabled`, `sensitive`, `editable`); `checked`/`selected` are still not
-  subscribed because no pre-input gate reads them. A focus/enabled change that
-  arrives as some other event type would still be missed.
+  see. It now includes the state changes an action or a verdict depends on
+  (`focused`, `enabled`, `sensitive`, `editable`, `selected`); `checked` is still
+  not subscribed because no gate or postcondition reads it. A change that arrives
+  as some *other* event type would still be missed -- the cache is a hint, which is
+  why a negative verdict is re-checked against a live read (see `verify_settle_ms`
+  below).
+- **Negative verdicts are given a settle window.** `[verification] verify_settle_ms`
+  (default 1000) re-checks an `UNVERIFIED`/`CONTRADICTED` verdict against fresh,
+  live observations before reporting it, because one read taken immediately after
+  injection is not positive evidence. The cost is paid only on a would-be failure;
+  a `VERIFIED` verdict never waits. Set it to `0` to disable the re-check and get
+  the old single-read behaviour.
 - **The documented bare `pytest` command does not run on this host.** PySide6
   6.10.3 (apt) ships QtCore/QtGui/QtWidgets but not `QtTest`, so the installed
   `pytest-qt` plugin aborts in `pytest_configure` before collecting anything.
@@ -64,7 +72,7 @@ unresolved item below prevents a claim of full completion.
 | **Privacy** — protected content redacted, password fields never uploaded, secrets never logged, no continuous streaming | **Met**, and the logging half is newly implemented: `core/logging_setup.py` + `security/redaction.py`, enforced by tests that assert a registered secret and a password-named field never reach the log file. |
 | **Engineering** — test coverage, strict typing, lint passes, no production TODO/FIXME/stubs, benchmarks documented, limitations documented | **Met** for lint/type/tests/benchmarks/limitations. Coverage is meaningful but is *not* reported as a percentage; no coverage gate exists. |
 | **Installation** — menu entry, startup, controlled second launch, uninstall, update/rollback | **Met**, verified against throwaway prefixes with a per-file sha256 manifest. |
-| **Phase 14 (§76 benchmarks)** | **PARTIAL.** Every read-only and real-input number is measured and recorded; the realistic workflow happy path is 2/20 (above). |
+| **Phase 14 (§76 benchmarks)** | **PARTIAL.** Every read-only and real-input number is measured and recorded; the realistic workflow happy path is 5/20 (above), halted only on the sequence focus-timing residual. |
 | **Phase 15 (full matrix / soak / documentation)** | **NOT STARTED** beyond this documentation set. No soak run has been performed. |
 | **Batching-layer safety-neutrality proof** | **Met** by `tests/safety/test_sequence_halts.py` plus the resolver-cache and speculative-perceiver suites, which assert that no cached or speculative result reaches input without a fresh live resolution, lease and revalidation. |
 | **Git state / secrets in history** | The tree is **uncommitted** on `5e06bc0`; no secret material is present in source, config or tests (the API key lives only in the OS keyring). |

@@ -238,6 +238,15 @@ class VerificationSettings(_Section):
 
     max_action_state_age_ms: int = Field(default=1500, ge=1)
     require_verification_for_mutating: bool = True
+    #: How long a *negative* verdict may be re-checked against fresh, live
+    #: observations before it is reported (section 60). Section 60's
+    #: ``CONTRADICTED`` requires positive evidence, and a single read taken
+    #: immediately after injection is not positive evidence when the application
+    #: may not have applied the input yet -- or when the element cache (section 35)
+    #: served a pre-action read. A verdict of ``VERIFIED`` is never delayed by this
+    #: window; it only gives a would-be failure a chance to be disproved.
+    verify_settle_ms: int = Field(default=1000, ge=0, le=30_000)
+    verify_poll_ms: int = Field(default=150, ge=1, le=5_000)
 
 
 class RecoverySettings(_Section):

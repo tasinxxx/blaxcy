@@ -416,6 +416,46 @@ def test_orchestrator_is_usable_directly_as_the_perceive_hook(env_factory: EnvFa
     assert env.cache.current is state
 
 
+def test_a_forced_cycle_bypasses_the_element_cache(env_factory: EnvFactory) -> None:
+    """Section 60's confirmation asks for the tree as it is *now*, not as cached.
+
+    The section 35 element cache serves its last traversal for the whole TTL, so an
+    observation taken right after an action can carry element data from before that
+    action. ``force=True`` is what lets the executor re-check a negative
+    verification verdict against a live tree instead of a cached one.
+    """
+    env = env_factory(elements=[_send_button()])
+    env.orchestrator.perceive()
+    traversals = env.a11y_backend.enumerate_calls
+
+    env.orchestrator.perceive()  # inside the TTL: served from the cache
+    assert env.a11y_backend.enumerate_calls == traversals
+
+    env.orchestrator.perceive(force=True)  # a live traversal
+    assert env.a11y_backend.enumerate_calls == traversals + 1
+
+
+def test_a_forced_cycle_sees_a_change_the_cache_is_still_serving(
+    env_factory: EnvFactory,
+) -> None:
+    """The forced read really observes the live tree, not a hint (sections 35, 45)."""
+    env = env_factory(elements=[_send_button()])
+    first = env.orchestrator.perceive()
+    assert first is not None
+    assert [element.element_id for element in first.elements] == ["b1"]
+
+    # The desktop changed, but nothing invalidated the cache.
+    env.a11y_backend.elements = [button("b2", "Send")]
+
+    cached = env.orchestrator.perceive()
+    assert cached is not None
+    assert [element.element_id for element in cached.elements] == ["b1"]
+
+    live = env.orchestrator.perceive(force=True)
+    assert live is not None
+    assert [element.element_id for element in live.elements] == ["b2"]
+
+
 def test_settings_are_not_mutated_by_a_perception_cycle(env_factory: EnvFactory) -> None:
     """Perception observes; it never rewrites configuration."""
     settings = Settings()

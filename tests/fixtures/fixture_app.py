@@ -389,6 +389,17 @@ class FixtureWindow(QMainWindow):
             self._make_self_verifying(button)
         self.search_input.setFixedSize(WORKFLOW_CONTROL_WIDTH, WORKFLOW_CONTROL_HEIGHT)
         self.result_list.setFixedSize(WORKFLOW_CONTROL_WIDTH, WORKFLOW_CONTROL_HEIGHT * 2)
+        # Selecting a row is a real, user-visible change in any application, but
+        # Qt's default highlight is theme-dependent and can land below the section
+        # 34 ``MEANINGFUL`` thresholds on this host -- which makes a section 60
+        # verdict on the result click honestly ``UNVERIFIED`` rather than wrong.
+        # Both states are pinned so the row repaints unambiguously at *its own*
+        # box, which is what makes this workload test the pipeline (resolve -> lease
+        # -> revalidate -> click -> verify) instead of testing the desktop theme.
+        self.result_list.setStyleSheet(
+            "QListWidget::item { background-color: #e8e8e8; color: #101010; }"
+            "QListWidget::item:selected { background-color: #103a6b; color: #ffffff; }"
+        )
 
     def _make_self_verifying(self, button: QPushButton) -> None:
         """Size a control so its own repaint is ``MEANINGFUL``, and make it toggle.
@@ -578,6 +589,28 @@ class FixtureWindow(QMainWindow):
         widget.setFocus(Qt.FocusReason.OtherFocusReason)
         return {"target": target, "focused": self._focused_object_name()}
 
+    def op_set_selection(self, target: str, index: int) -> dict[str, Any]:
+        """Select a row of a list widget (no desktop input involved).
+
+        Used to measure what a *result selection* repaints, so the section 76
+        workflow's result step can be judged against a real screen change rather
+        than against Qt's theme-dependent default highlight. If the row is already
+        current it is cleared first, so the caller always observes a transition.
+        """
+        widget = self.find_control(target)
+        if not isinstance(widget, QListWidget):
+            raise FixtureCommandError(f"{target!r} is not a list")
+        if widget.currentRow() == index:
+            widget.setCurrentRow(-1)
+            widget.clearSelection()
+        widget.setCurrentRow(index)
+        current = widget.currentItem()
+        return {
+            "target": target,
+            "index": index,
+            "selected": None if current is None else current.text(),
+        }
+
     def op_open_dialog(self) -> dict[str, Any]:
         if self._dialog is None:
             dialog = QDialog(self)
@@ -688,6 +721,8 @@ class CommandPump:
             return window.op_set_occluder(bool(request.get("visible", True)))
         if cmd == "set_focus":
             return window.op_set_focus(str(request["target"]))
+        if cmd == "set_selection":
+            return window.op_set_selection(str(request["target"]), int(request.get("index", 0)))
         if cmd == "open_dialog":
             return window.op_open_dialog()
         if cmd == "quit":

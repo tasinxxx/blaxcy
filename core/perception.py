@@ -233,8 +233,14 @@ class PerceptionOrchestrator:
 
         Returns the cache's accepted state (which may be the previous one when a
         capture failed) or ``None`` when nothing has ever been observed.
+
+        ``force`` asks for a *live* accessibility traversal instead of the
+        section 35 element cache. The cache is a hint, and its entries can be up
+        to ``cache_ttl_seconds`` old; a caller that is about to judge what it
+        observed (section 60's verification) or to act on it must be able to ask
+        for the tree as it is now rather than as it was. The frame is always
+        fresh either way -- only the element source is affected.
         """
-        del force  # the cache already decides which observations are new
         try:
             frame = self._engine.grab()
         except BlaxcyError:
@@ -244,7 +250,7 @@ class PerceptionOrchestrator:
             return self._cache.current
 
         delta = self._delta_for(frame)
-        elements = self._accessibility_elements()
+        elements = self._accessibility_elements(force=force)
         ocr_elements = self._ocr_pass(frame, delta)
         combined = elements + ocr_elements
         state = self._build_state(frame, combined)
@@ -377,12 +383,12 @@ class PerceptionOrchestrator:
 
     # -- Stages ----------------------------------------------------------------
 
-    def _accessibility_elements(self) -> tuple[UIElement, ...]:
+    def _accessibility_elements(self, *, force: bool = False) -> tuple[UIElement, ...]:
         """The AT-SPI observation, annotated with any discovered browser URL."""
         if self._a11y is None:
             return ()
         try:
-            elements = self._a11y.elements()
+            elements = self._a11y.elements(force=force)
         except BlaxcyError as exc:
             self._counters.poison.append(f"accessibility query failed: {exc.code.value}")
             return ()

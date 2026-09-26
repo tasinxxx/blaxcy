@@ -300,6 +300,7 @@ class BlaxcyApplication:
             event_bus=self.bus,
             window_manager=self.windows,
             perceive=self.perceiver.perceive,
+            perceive_fresh=self._perceive_fresh,
             abort_check=self.abort_check,
             confirmation=self._confirm_action if confirmation is not None else None,
             capabilities=self.capabilities,
@@ -678,6 +679,16 @@ class BlaxcyApplication:
         around it (sections 38, 41, 43).
         """
         return self.perceiver.enrich(query, mode=self.modes.mode).enriched
+
+    def _perceive_fresh(self) -> ScreenState | None:
+        """A live observation with the section 35 element cache bypassed.
+
+        Wired into the executor as its "observe again, for real" hook. Section 60's
+        negative verdicts are re-checked against this before they are reported, so
+        a cached pre-action read can never be mistaken for positive evidence that
+        the action failed (sections 35, 45, 60).
+        """
+        return self.perceiver.perceive(force=True)
 
     # -- Internals -------------------------------------------------------------
 

@@ -161,10 +161,42 @@ def test_missing_typed_target_is_unverified() -> None:
 def test_no_observation_for_text_is_unverified() -> None:
     """Without an observation typing cannot be confirmed."""
     outcome = _verifier().verify_text(after=None, target=make_text_input(), text="hello")
-    assert outcome.state is VerificationState.UNVERIFIED
+    assert outcome.state is VerificationState.UNVERIFIED# -- Selection postcondition --------------------------------------------------
+
+
+def test_a_selected_target_is_positive_selection_evidence() -> None:
+    """Section 60: a selectable control's own state settles a click.
+
+    This is stronger evidence than the pixels the control repainted, and it is
+    immune to the section 34 temporal layer reclassifying a repeated region as
+    ``ANIMATION`` -- which is what made clicking a result row unverifiable when the
+    previous step had already changed that region as a side effect.
+    """
+    item = make_element("row", role=UIRole.LIST_ITEM, text="Result 1", selected=True)
+    outcome = _verifier().verify_selection(after=make_state(elements=(item,)), target=item)
+
+    assert outcome is not None
+    assert outcome.state is VerificationState.VERIFIED
+    assert outcome.postcondition is Postcondition.SELECTED
+
+
+def test_unreported_or_negative_selection_is_not_a_verdict() -> None:
+    """Positive-only: the selection path never manufactures or contradicts a result."""
+    unselected = make_element("row", role=UIRole.LIST_ITEM, text="Result 1", selected=False)
+    unknown = make_element("row", role=UIRole.LIST_ITEM, text="Result 1")
+    assert unknown.selected is None
+
+    for element in (unselected, unknown):
+        assert (
+            _verifier().verify_selection(after=make_state(elements=(element,)), target=element)
+            is None
+        )
+
+    assert _verifier().verify_selection(after=None, target=unselected) is None
 
 
 # -- Window postcondition -----------------------------------------------------
+
 
 def test_active_window_matching_verifies() -> None:
     """The requested window being active establishes the postcondition."""

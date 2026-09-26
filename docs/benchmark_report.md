@@ -383,6 +383,74 @@ Interpretation, stated narrowly:
   that repaints at its own box on selection and a longer settle for the field read,
   or accepting the honest partial result; that is an operator decision, not a
   code fix to make unilaterally (section 4 rule 8).
+- **The three causes have since been fixed, and every number above is the
+  *pre-fix* measurement.** Kept as the baseline it was taken from, not as a
+  description of the current tree:
+  1. the §35 element cache was never subscribed to `object:state-changed:focused`,
+     so a click that moved focus was invisible and §51's guard refused a
+     legitimate type (`s2:FOCUS_MISMATCH`);
+  2. verification judged typed text from a single read taken immediately after
+     injection, which the element cache can serve from *before* the action, so a
+     read that lagged the input was reported as a contradiction
+     (`s2:VERIFICATION_CONTRADICTED`); and
+  3. a result click's repaint was reclassified `ANIMATION` by the §34 temporal
+     layer when the previous step had changed that region as a side effect, so a
+     real selection was `UNVERIFIED` (`s4:VERIFICATION_UNVERIFIED`).
+  The fixes are a corrected event subscription, a bounded re-check of negative
+  verdicts against fresh live observations (`[verification] verify_settle_ms`), and
+  a positive-only selection postcondition for clicks on selectable controls. **A
+  post-fix number requires a re-run of the command above; none is quoted here, and
+  the section 60 thresholds were not changed to obtain one** (section 4 rule 8,
+  section 76).
+
+### Phase 14 — the same workflow re-measured after the three fixes (2026-09-26)
+
+Machine / session / backend (all rows): identical to the block above (Kali
+GNU/Linux, XFCE on X11 `DISPLAY=:0.0`, Python 3.14.6, real XTEST 2.2, live AT-SPI,
+the section 74 fixture). Same command, same sample counts: the re-measurement the
+pre-fix baseline above asked for.
+
+| Measurement | p50 | p95 | n | Target | Verdict |
+|---|---|---|---|---|---|
+| accessibility query (live AT-SPI refresh) | 566.53 ms | 629.67 ms | 20 | — | 172 elements |
+| perception cycle, warm | 9.53 ms | 12.26 ms | 20 | ≤ 1500 ms | met (cache-served) |
+| perception cycle, cold | 579.29 ms | 604.21 ms | 20 | ≤ 1500 ms | met (live traversal) |
+| target resolution | 1.21 ms | 1.79 ms | 20 | — | over 172 live elements |
+| lease revalidation | 0.42 ms | 1.05 ms | 20 | ≤ 25 ms | **met** |
+| GUI refresh | 0.61 ms | 1.28 ms | 20 | ≤ 50 ms | met |
+| end-to-end click | 177.12 ms | 730.22 ms | 30 | — | **30/30 VERIFIED** |
+| end-to-end keyboard | 679.40 ms | 712.47 ms | 30 | — | **30/30 VERIFIED** |
+| end-to-end 5-step `run_sequence` | 184.69 ms | 1457.09 ms | 20 | ≤ 4000 ms warm | **5/20 completed all 5 steps** |
+
+Interpretation, stated narrowly:
+
+- **Two of the three halt causes are demonstrably gone, and the third is isolated.**
+  The standalone end-to-end click and keyboard rows moved from `5/50` and `1/30`
+  VERIFIED to **30/30** each — the typed-field read lag and the result-selection
+  postcondition now verify on the real Qt application. The sequence's halt set
+  collapsed from `{s2:FOCUS_MISMATCH ×8, s2:VERIFICATION_CONTRADICTED ×4,
+  s4:VERIFICATION_UNVERIFIED ×6}` to a single cause: `s2:FOCUS_MISMATCH` ×15.
+  `VERIFICATION_CONTRADICTED` and `VERIFICATION_UNVERIFIED` no longer appear.
+- **The remaining `s2:FOCUS_MISMATCH` is sequence-specific, not a general typing
+  failure.** The standalone keyboard row types into the *same* Qt field and is
+  `30/30`, because the benchmark focuses that field and confirms it through
+  perception *before* the timed action. In the sequence, step `s1` clicks the
+  search-icon button (whose handler calls `setFocus()` on the field) and step `s2`
+  must type ~120 ms later. The section 51 guard still refuses in 15/20 runs, which
+  points at focus-propagation timing between a synthetic click and the accessibility
+  state the guard reads — not at the guard's logic, which correctly fails closed.
+- **The sequence's p50 is fast because it halts early.** A run that stops at `s2`
+  (after click + refused type) contributes ~180 ms; only the 5 completed runs
+  approach the ~2 s end-to-end cost. The `n = 20` distribution is therefore a mix
+  of halts and completions, not a happy-path latency.
+- **No section 60 threshold was changed to obtain any of this** (section 4 rule 8).
+  `verify_settle_ms` only re-checks a would-be *failure*, and the selection path is
+  positive-only evidence that falls back to the pixel check. A residual fix for the
+  focus-timing item should likewise be a fresh live re-check before refusing, never
+  a relaxed guard.
+- **The section 76 five-step happy-path target remains met by the synthetic
+  `verifiable` workload (20/20, p50 2505.23 ms)**, and is still not met by this
+  realistic workload. The target stays a target.
 
 ## Reproducing
 

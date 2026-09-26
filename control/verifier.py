@@ -25,7 +25,13 @@ from typing import Any
 
 from config.settings import VerificationSettings
 from schemas.elements import UIElement
-from schemas.enums import CHANGE_CLASS_SEVERITY, ActionClass, ChangeClass, VerificationState
+from schemas.enums import (
+    CHANGE_CLASS_SEVERITY,
+    ActionClass,
+    ChangeClass,
+    UIRole,
+    VerificationState,
+)
 from schemas.screen_state import ScreenDelta, ScreenState
 
 
@@ -36,6 +42,15 @@ class Postcondition(StrEnum):
     SCREEN_CHANGED = "SCREEN_CHANGED"
     TEXT_PRESENT = "TEXT_PRESENT"
     WINDOW_ACTIVE = "WINDOW_ACTIVE"
+    SELECTED = "SELECTED"
+
+
+#: Roles whose click postcondition is "this control is now selected". The
+#: accessibility tree reports that directly, which is stronger evidence than the
+#: pixels the control repainted (section 60).
+SELECTABLE_ROLES: frozenset[UIRole] = frozenset(
+    {UIRole.LIST_ITEM, UIRole.TREE_ITEM, UIRole.TAB, UIRole.MENU_ITEM}
+)
 
 
 @dataclass(frozen=True)
@@ -221,6 +236,39 @@ class Verifier:
             Postcondition.TEXT_PRESENT,
             "the target is readable and does not contain the typed text",
             {"element_id": observed.element_id, "characters": len(text)},
+        )
+
+    def verify_selection(
+        self,
+        *,
+        after: ScreenState | None,
+        target: UIElement,
+    ) -> VerificationOutcome | None:
+        """Positive-only evidence that a click selected ``target`` (section 60).
+
+        Clicking a selectable control's postcondition is "this control is now
+        selected", and the accessibility tree reports that directly. That is
+        *stronger* evidence than the pixels the control repainted, and it is what
+        makes a result-list click verifiable when its repaint is reclassified
+        ``ANIMATION`` by the section 34 temporal layer -- which happens whenever the
+        same region also changed as a side effect of the previous step.
+
+        Deliberately positive-only: ``None`` means "this observation says nothing
+        about selection", and the caller falls back to the ordinary screen-change
+        check. A selection that is unreported, or reported ``False``, is never taken
+        as a contradiction, because a click may legitimately do something else (and
+        an unreadable state is missing evidence, not contradicting evidence).
+        """
+        if after is None:
+            return None
+        observed = _find_element(after, target)
+        if observed is None or observed.selected is not True:
+            return None
+        return VerificationOutcome(
+            VerificationState.VERIFIED,
+            Postcondition.SELECTED,
+            "the target reports itself selected after the click",
+            {"element_id": observed.element_id},
         )
 
     def verify_window(self, *, after: ScreenState | None, window_id: int) -> VerificationOutcome:

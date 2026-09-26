@@ -47,7 +47,7 @@ from control.backends.base import PointerButton
 from control.keyboard import KeyboardController
 from control.mouse import MouseController
 from control.recovery import RecoveryController
-from control.verifier import VerificationOutcome, Verifier
+from control.verifier import SELECTABLE_ROLES, VerificationOutcome, Verifier
 from control.window_manager import WindowController
 from core.calibration import Calibration
 from core.event_bus import EventBus
@@ -323,6 +323,9 @@ _TARGET_TOOLS: frozenset[str] = frozenset(
 #: Tools that depend on keyboard focus, so their window must really be active.
 _FOCUS_TOOLS: frozenset[str] = frozenset({ToolName.TYPE_TEXT, ToolName.PRESS_KEY, ToolName.HOTKEY})
 
+#: Tools whose postcondition on a selectable control is "it is now selected".
+_SELECTION_TOOLS: frozenset[str] = frozenset({ToolName.CLICK, ToolName.DOUBLE_CLICK})
+
 #: Tools that inject a key sequence and have **no** element target. There is
 #: nothing to resolve, lease or revalidate for them -- revalidation is a check on
 #: a specific element's liveness (section 45), and with no element the only
@@ -386,6 +389,7 @@ class Executor:
         event_bus: EventBus | None = None,
         window_manager: WindowController | None = None,
         perceive: Callable[[], ScreenState | None] | None = None,
+        perceive_fresh: Callable[[], ScreenState | None] | None = None,
         abort_check: Callable[[], ErrorCode | None] | None = None,
         confirmation: Callable[[str, dict[str, Any]], bool] | None = None,
         capabilities: CapabilityReport | None = None,
@@ -406,6 +410,7 @@ class Executor:
         self._bus = event_bus
         self._windows = window_manager
         self._perceive = perceive
+        self._perceive_fresh = perceive_fresh
         self._abort_check = abort_check
         self._confirmation = confirmation
         self._capabilities = capabilities
@@ -867,6 +872,10 @@ class Executor:
 
         # -- VERIFY -----------------------------------------------------------
         outcome = self._verify(tool, planned, live_element, before, after, delta)
+        if outcome.state is not VerificationState.VERIFIED:
+            outcome, after = self._confirm_negative(
+                outcome, tool, planned, live_element, before, after
+            )
         self._cache.set_verification(outcome.state)
         self._emit(
             EventType.VERIFICATION_RESULT,
@@ -1218,6 +1227,22 @@ class Executor:
         success it cannot prove -- and section 55 wants exactly that, because a
         password step in a sequence halts it and returns to per-step handling.
         """
+        if (
+            tool in _SELECTION_TOOLS
+            and element is not None
+            and element.role in SELECTABLE_ROLES
+        ):
+            # A click on a selectable control is verified from the control's own
+            # state when the tree reports it. That is stronger evidence than the
+            # pixels it repainted, and it is immune to the section 34 temporal
+            # layer reclassifying a repeated region as ANIMATION -- which is what
+            # made a result-list click unverifiable when the previous step had
+            # already changed that region as a side effect. Positive-only: a
+            # missing or false selection falls straight through to the ordinary
+            # screen-change check below, so nothing is weakened.
+            selection = self._verifier.verify_selection(after=after, target=element)
+            if selection is not None:
+                return selection
         if tool is ToolName.TYPE_TEXT and element is not None and element.is_text_entry:
             return self._verifier.verify_text(
                 after=after, target=element, text=str(planned.params.get("text", ""))
@@ -1225,6 +1250,61 @@ class Executor:
         return self._verifier.verify_screen_change(
             before=before, after=after, delta=delta, target=element, reason_context=tool
         )
+
+    def _confirm_negative(
+        self,
+        outcome: VerificationOutcome,
+        tool: str,
+        planned: PlannedAction,
+        element: UIElement | None,
+        before: ScreenState | None,
+        after: ScreenState | None,
+    ) -> tuple[VerificationOutcome, ScreenState | None]:
+        """Give a negative verdict a bounded chance to be disproved (section 60).
+
+        A failure is only reported once it has been re-checked against fresh,
+        *live* observations. Two facts make that necessary, and neither is
+        optional:
+
+        * the section 35 element cache can serve a read taken before the action,
+          so "the field is readable and does not contain my text" can be said about
+          a field whose content simply had not been re-read yet; and
+        * injected input is applied by the application asynchronously, so one
+          observation taken immediately after injection can legitimately precede
+          the effect it is judging.
+
+        Section 60 requires *positive* evidence for ``CONTRADICTED``, and a stale or
+        too-early read is neither. Only a ``VERIFIED`` verdict short-circuits (it
+        never reaches here at all), so this window can only turn a wrong failure
+        into the truth: it never delays a success, never softens a check and never
+        invents evidence. Every re-check runs the ordinary verifier, so
+        ``CONTRADICTED`` still requires a readable read that really disagrees.
+        """
+        if self._perceive_fresh is None or element is None:
+            return outcome, after
+        settle_s = float(self._settings.verification.verify_settle_ms) / 1000.0
+        if settle_s <= 0.0:
+            return outcome, after
+        poll_s = float(self._settings.verification.verify_poll_ms) / 1000.0
+        deadline = time.monotonic() + settle_s
+        latest = outcome
+        seen = after
+        while time.monotonic() < deadline:
+            if self._abort_code() is not None:
+                # A stop outranks a nicer verdict, exactly as it does everywhere.
+                break
+            fresh = self._perceive_fresh()
+            if fresh is None:
+                break
+            seen = fresh
+            latest = self._verify(tool, planned, element, before, fresh, self._delta_for(fresh))
+            if latest.state is VerificationState.VERIFIED:
+                return latest, seen
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.0:
+                break
+            time.sleep(min(poll_s, remaining))
+        return latest, seen
 
     # -- Policy plumbing ------------------------------------------------------
 

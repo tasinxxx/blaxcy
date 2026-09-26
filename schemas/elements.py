@@ -56,6 +56,13 @@ class UIElement(BaseModel):
     enabled: bool = True
     focusable: bool = False
     focused: bool = False
+    #: Whether the control is *selected* (section 60). ``None`` means the source
+    #: does not report selection at all, which is not the same as "not selected":
+    #: a verification may only use ``True`` as positive evidence, and an unknown
+    #: value must never be read as a contradiction. This is what makes clicking a
+    #: list item verifiable from the item's own state rather than only from the
+    #: pixels it repainted.
+    selected: bool | None = None
     visible: bool = True
     occluded: bool = False
     password: bool = False

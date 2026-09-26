@@ -195,6 +195,7 @@ class ExecutorEnv:
         clipboard: object | None = None,
         resolver_cache: object | None = None,
         activate: object | None = None,
+        with_perceive_fresh: bool = False,
     ) -> None:
         """Build the environment and seed the cache with ``state``.
 
@@ -237,6 +238,13 @@ class ExecutorEnv:
         #: budgets over the same controller the executor retries through (§61).
         self.recovery = recovery
         self.perceiver = FakePerceiver(self.cache)
+        #: A second scripted observer, wired as the executor's section 60
+        #: verification-confirmation hook (``perceive_fresh``). ``None`` by default
+        #: so the ordinary pipeline behaviour -- and every existing test -- is
+        #: unchanged; a test that wants to exercise the re-check asks for it.
+        self.fresh_perceiver: FakePerceiver | None = (
+            FakePerceiver(self.cache) if with_perceive_fresh else None
+        )
         if state is not None:
             self.cache.update_screen_state(state)
         self.executor = Executor(
@@ -252,6 +260,7 @@ class ExecutorEnv:
             event_bus=self.bus,
             window_manager=window_manager,  # type: ignore[arg-type]
             perceive=self.perceiver,
+            perceive_fresh=self.fresh_perceiver,
             abort_check=abort_check,  # type: ignore[arg-type]
             confirmation=confirmation,  # type: ignore[arg-type]
             capabilities=capabilities,  # type: ignore[arg-type]

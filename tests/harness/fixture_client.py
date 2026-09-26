@@ -263,5 +263,9 @@ class FixtureApp:
     def set_focus(self, target: str) -> FixtureResponse:
         return self.command_ok("set_focus", target=target)
 
+    def set_selection(self, target: str, index: int) -> FixtureResponse:
+        """Select a row of a list control, over the fixture's own channel."""
+        return self.command_ok("set_selection", target=target, index=index)
+
     def open_dialog(self) -> FixtureResponse:
         return self.command_ok("open_dialog")

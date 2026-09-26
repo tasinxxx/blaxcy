@@ -21,18 +21,27 @@
     path".
   - `5e06bc0` — "Report the §76 perception cycle as warm and cold, not as one cached
     number".
-- Last verified commit: `5e06bc0`.
-- Working tree: **dirty, and this session's reconciliation found the dirty set is a
-  complete-but-unindexed unit of work** (see the drift note below). The changed
-  files are the AT-SPI Qt text-field/role fixes (`core/accessibility.py`), the
-  resolver weak-signal stage split (`core/target_resolver.py`), the fixture's new
-  `--workflow-controls` layout (`tests/fixtures/fixture_app.py`,
-  `tests/harness/fixture_client.py`), the third benchmark workload
-  (`bench/real_desktop.py`), a new live test
-  (`tests/integration/test_workflow_controls_real_display.py`, untracked), and the
-  matching unit/integration tests. Verified green this session (**1121 passed, 6
-  skipped**; ruff + mypy clean, **174 files**) but not yet committed (committing
-  needs explicit user confirmation, §11).
+  - `686a022` — "Complete §66 tool coverage and add the §70 logging path" — the
+    `activate_element` tool and the structured-logging unit, committed on operator
+    instruction.
+  - `0b86d56` — "Subscribe the AT-SPI state changes that gate input decisions" — the
+    `s2:FOCUS_MISMATCH` root-cause fix, committed on operator instruction.
+- Last verified commit: `0b86d56` (HEAD). The index previously recorded `5e06bc0`;
+  that was stale by two commits and was reconciled **2026-09-26** (this session).
+- Working tree: **dirty — 18 files, one complete-but-uncommitted unit of work**: the
+  fix for the last two §74 workflow halt causes (`s2:VERIFICATION_CONTRADICTED` and
+  `s4:VERIFICATION_UNVERIFIED`; see "Current task"). The changed files are
+  `core/perception.py` (real `perceive(force=True)`), `core/application.py`,
+  `control/executor.py` (`perceive_fresh`, `_confirm_negative`, the selection
+  branch of `_verify`), `control/verifier.py` (`Postcondition.SELECTED`,
+  `verify_selection`), `schemas/elements.py` (`UIElement.selected`),
+  `core/accessibility.py`, `config/settings.py` + `config/default_settings.toml`,
+  `tests/harness/phase8.py`, `tests/harness/fixture_client.py`,
+  `tests/fixtures/fixture_app.py`, `tests/unit/test_{executor,perception,verifier}.py`,
+  `tests/integration/test_workflow_controls_real_display.py`, `docs/limitations.md`,
+  `docs/benchmark_report.md`, and this file. Re-verified green this session
+  (**1167 passed, 6 skipped**; ruff + mypy clean, **179 files**) but not yet
+  committed (committing needs explicit user confirmation, §11).
 - **Index drift corrected 2026-09-25 (this session).** This file was last written by
   the session that became commit `5e06bc0` (the warm/cold perceive-cycle work),
   while a following session built the `workflow-verifiable` workload, the two AT-SPI
@@ -41,6 +50,13 @@
   when this session bootstrapped it. Everything below now records the reconciled
   state; the drift is called out where it matters rather than silently absorbed.
   The earlier drift corrections are kept in the session log (append-only).
+- **Index drift corrected again 2026-09-26 (bootstrap session).** This file still
+  recorded `5e06bc0` as HEAD and listed only five commits, but two of the units it
+  described as uncommitted had in fact been committed as `686a022` and `0b86d56`.
+  The repository wins (§8 step 4): the commit list and HEAD above are corrected, and
+  the working tree is now accurately described as the 18-file three-halt-causes fix
+  unit. The gate was re-run this session, not trusted (**1167 passed, 6 skipped**;
+  ruff + mypy clean, 179 files), matching the "Current task" claim exactly.
 
 ## Current phase
 - Phase: **Phase 14 — Benchmarks (§76)**. Phases 0-13 are complete (Phase 12 and
@@ -57,13 +73,15 @@ are written** (`docs/architecture.md`, `docs/security.md`, `docs/limitations.md`
 The `[logging]` config section is no longer a dead stub.
 - Phase status: **IN PROGRESS — one §76 row is measured but not met.** The
   `workflow-verifiable` workload (the realistic §74 pipeline — search icon → type →
-  submit → result → play — laid out at self-verifying scale; built by the
-  un-indexed session, run for the first time this session) completes all five steps
-  in **2/20** runs, halting on `s2:FOCUS_MISMATCH` ×8, `s2:VERIFICATION_CONTRADICTED`
-  ×4 and `s4:VERIFICATION_UNVERIFIED` ×6. The 5-step happy-path **target is met**
-  by the synthetic `verifiable` workload (**20/20**, p50 2505.23 ms / p95 3671.94 ms,
-  ≤ 4000 ms), but the *realistic* pipeline is not yet, and closing that gap is an
-  operator decision (see "Known failures").
+  submit → result → play — laid out at self-verifying scale) was **re-measured
+  2026-09-26 after all three halt causes were fixed**: it now completes **5/20** runs
+  (was 2/20), and its halt set collapsed to a **single** cause, `s2:FOCUS_MISMATCH`
+  ×15 — `VERIFICATION_CONTRADICTED` and `s4:VERIFICATION_UNVERIFIED` no longer occur
+  (the standalone click and keyboard rows moved from `5/50`/`1/30` to **30/30
+  VERIFIED** each). The 5-step happy-path **target is met** by the synthetic
+  `verifiable` workload (**20/20**, p50 2505.23 ms / p95 3671.94 ms, ≤ 4000 ms), but
+  the *realistic* pipeline is not yet, and the residual is a focus-timing item, not
+  a batching or §60 defect (see "Known failures").
 - **One environment item is still open, and it is a human action, not code**: this
   host's PySide6 6.10.3 (apt) ships QtCore/QtGui/QtWidgets but **not QtTest**, so
   the installed `pytest-qt` plugin aborts *every* pytest run at configure time. The
@@ -1021,6 +1039,24 @@ The `[logging]` config section is no longer a dead stub.
     against throwaway prefixes; no system-wide install was performed.
 
 ## Current task
+- **2026-09-26 (bootstrap session): the post-fix re-measurement was run, on operator
+  approval.** The three halt causes were fixed but unmeasured; the index's next
+  concrete action was the opt-in real-input re-run, so it was executed rather than
+  asserted. Result (`--workload workflow-verifiable`, n=20 sequences / 30 input
+  samples each, real XTEST 2.2): the sequence now completes **5/20** (was 2/20) and
+  its halt set is a **single** cause — `s2:FOCUS_MISMATCH` ×15; the standalone click
+  and keyboard rows are both **30/30 VERIFIED** (were `5/50` and `1/30`), so the
+  typed-field read lag and the result-selection postcondition are demonstrably
+  fixed. The residual is **sequence-specific focus timing**: the standalone keyboard
+  types into the *same* Qt field and is 30/30 because it focuses the field and
+  confirms it through perception before the timed action, whereas the sequence's
+  `s1` click focuses the field and `s2` types ~120 ms later. Recorded in
+  `docs/benchmark_report.md` "Phase 14 — the same workflow re-measured after the
+  three fixes". No code changed, no §60 threshold moved (§4 rule 8).
+- **2026-09-25 (bootstrap session, continued): the two remaining workflow halt causes are both root-caused and fixed.** On the operator's instruction ("fix the two remaining workflow halt causes"), each was *measured* read-only before anything was changed, and both diagnoses differed from the index's summary.
+  - **`s2:VERIFICATION_CONTRADICTED` — the typed-field read lag.** Measured live, no input injected: with the fixture's field text changed over its own control channel, a plain `perceive()` took **921 ms** to see the new text (the §35 element cache serves its last traversal for the TTL), while a forced live read returned it correctly in 731 ms. `verify_text` therefore judged a *stale* read, and §60 calls a readable-and-wrong read `CONTRADICTED`. Fix: (i) `PerceptionOrchestrator.perceive(force=True)` now really does a live AT-SPI traversal (the parameter existed and was silently ignored — `del force`), (ii) the executor gained a `perceive_fresh` hook, and (iii) `Executor._confirm_negative` re-checks an `UNVERIFIED`/`CONTRADICTED` verdict against fresh live observations for `[verification] verify_settle_ms` (default 1000) before reporting it. A `VERIFIED` verdict never reaches the re-check, so a success is never delayed; the window can only turn a wrong failure into the truth. This is the §60 rule the module docstring already stated — `CONTRADICTED` requires *positive* evidence, and a read that may predate the action is not it.
+  - **`s4:VERIFICATION_UNVERIFIED` — the result click.** The index said the selection "does not repaint `MEANINGFUL`-ly at its own box". Measured: **that is not what was wrong.** With both row colours pinned high-contrast the repaint *is* spatially `MEANINGFUL` (a 240x80 row) — but the §34 temporal layer reclassified it `ANIMATION`, because the previous step (Submit) had already changed the same list region as a side effect, and `_apply_animation` treats a region that changed again within `animation_recheck_seconds` (3 s) as moving content. The honest fix is *not* to loosen §34 (that classifier is a verification guard): a click on a selectable control's postcondition is "this control is now selected", which the accessibility tree reports directly and which is stronger evidence than the pixels it repainted. Delivered: `UIElement.selected`, populated from the AT-SPI `SELECTED` state (and `object:state-changed:selected` subscribed), a positive-only `Verifier.verify_selection`, and an executor branch that uses it for clicks on `LIST_ITEM`/`TREE_ITEM`/`TAB`/`MENU_ITEM` and otherwise falls straight through to the ordinary screen-change check — so nothing is weakened. The fixture's workflow layout also pins both row colours, so the repaint is unambiguous at the item's own box rather than theme-dependent.
+  - Gate after both fixes: **1167 passed, 6 skipped** (was 1157); ruff + mypy clean (179 files). The live `tests/integration/test_workflow_controls_real_display.py` is **5 passed** and now proves the evidence itself on the real tree: `Result 1` reports `selected=True` and its sibling `Result 2` reports `selected=False`. **The benchmark number is deliberately NOT re-quoted**: all three causes are fixed but `--workload workflow-verifiable` has not been re-run, and a fixed number must be re-measured, never asserted (§76).
 - **2026-09-25 (bootstrap session, continued): the `s2:FOCUS_MISMATCH` halts are ROOT-CAUSED and fixed at the source.** On the operator's choice ("investigate FOCUS_MISMATCH first") the recorded blocker was diagnosed read-only rather than accepted or papered over. The chain, all in the tree: `AccessibilityService.elements()` serves the §35 element cache for up to `cache_ttl_seconds` (2 s) unless `force=True`; `PerceptionOrchestrator.perceive()` calls it without `force`; the executor hands that same observation to §51's focus guard (`control/executor.py::_perform`, `state=state`); and `control/keyboard.py::check_focus` reads the `focused` flag off it. The cache invalidates on any *observed* AT-SPI event — but `AtspiBackend._subscribe` registered name/showing/visible/children/defunct and `window:activate/deactivate` **and not `object:state-changed:focused`**. A `setFocus()` on an already-active window emits a focus state-change and nothing else, so a click that moved focus was invisible for the whole TTL — and the TTL (2 s) is longer than the §45 action-state-age ceiling (1500 ms) that is supposed to bound action-relevant state. Result: §51 refused to type into a field that really *was* focused (`FOCUS_MISMATCH`), which is exactly what step `s2` does ~120 ms after step `s1` clicks the search icon. **Fix:** subscribe `object:state-changed:focused`/`:enabled`/`:sensitive`/`:editable` — every state this module reads into a field an action gates on (§51 focus, §45/§51 enabled+editability, §37's Qt `text`+`EDITABLE` refinement). The cache is documented as event-driven ("any observed AT-SPI event conservatively invalidates it"); it simply was not subscribed to the events that matter. Locked by `tests/unit/test_accessibility.py::test_state_events_that_gate_input_are_subscribed` (the pre-existing `test_an_observed_event_invalidates_the_cache` covers the mechanism; nothing covered the registration list). Gate: **1157 passed, 6 skipped**; ruff + mypy clean (179 files). **Not yet re-measured** — the two remaining workflow causes (the live read of a typed field lagging the injection, and a `LIST_ITEM` selection not repainting `MEANINGFUL`-ly) are unfixed, so a real-input re-run is what would show the effect. No safety property was weakened: a live-confirmed focus can only *permit* an action §51's cached check wrongly refused; it never permits one the guard would refuse.
 - **2026-09-25 (this session, continued): `activate_element` — the last unimplemented §66 tool — is now implemented and verified live.** §66 lists it as a required tool; the executor deliberately refused it with `BACKEND_UNAVAILABLE` because `core/accessibility.py` only ever *read* `Atspi.Action`, never invoked it. Delivered: `AccessibilityService.activate(path, action=None)` (marshalled to the single `T-A11Y` owner thread, descending the element path **live** rather than reusing a cached node, which would be exactly the stale target §45 exists to reject), the pure helpers behind it (`_descend_path`, `_select_action_index`, `_invoke_action`), `ActivationOutcome` as a shared typed result, the executor branch (an injected `activate=` hook, the same pattern as `perceive`/`resolve_fallback`), and the composition-root wiring. It is `MUTATING`, so it passes policy → resolve → lease → revalidation → verification exactly like a click, and it injects **no** pointer or key input. Because it is XTEST-free, it also works where a synthetic click is unreliable (no coordinates, no pointer occlusion). Activation is an *optional* backend capability: a backend without it reports a structured `UNAVAILABLE` rather than substituting a click.
 - **Two live/ordering defects were found by the new tests, not by reasoning.** (1) The first `activate` call raised `unknown accessibility request 'activate'` — `_dispatch` marshals through an explicit kind table and nothing had registered the new kind; the live integration test caught it immediately, which is precisely what a fake-only suite would have missed. (2) An existing safety test asserted that `activate_element` *always* reports `UNAVAILABLE`; once the tool is real that is no longer true (a late full-suite run reports `TARGET_STALE` because the harness's seeded state is past its 1500 ms maximum age), so the test was rewritten to pin the property that actually matters — a structured refusal, never a fabricated success, and nothing injected.
@@ -1096,8 +1132,22 @@ The `[logging]` config section is no longer a dead stub.
   a package install (see "Next concrete action") and therefore a human decision.
 
 ## Files being actively modified
-- (none mid-change; this session's focus-staleness fix is complete, tested and
-  green — `core/accessibility.py` + the unit test below)
+- (none mid-change; this session's three fixes are complete, tested and green)
+- Touched this session (the typed-field read lag and the result click):
+  `core/perception.py` (the `force` parameter is now real),
+  `core/application.py` (`_perceive_fresh` wiring), `control/executor.py`
+  (`perceive_fresh` hook, `_confirm_negative`, the selection branch in `_verify`),
+  `control/verifier.py` (`Postcondition.SELECTED`, `SELECTABLE_ROLES`,
+  `verify_selection`), `schemas/elements.py` (`UIElement.selected`),
+  `core/accessibility.py` (populate `selected`, subscribe
+  `object:state-changed:selected`), `config/settings.py` +
+  `config/default_settings.toml` (`[verification] verify_settle_ms`/`verify_poll_ms`),
+  `tests/harness/phase8.py` (`with_perceive_fresh`),
+  `tests/harness/fixture_client.py` + `tests/fixtures/fixture_app.py`
+  (`set_selection`, and the pinned result-row colours),
+  `tests/unit/{test_executor,test_verifier,test_perception}.py`,
+  `tests/integration/test_workflow_controls_real_display.py`,
+  `docs/limitations.md`, `docs/benchmark_report.md`, this file
 - Touched this session (the `s2:FOCUS_MISMATCH` root cause and fix):
   `core/accessibility.py` (`AtspiBackend._subscribe` now registers the
   action-gating state-change events), `tests/unit/test_accessibility.py` (the new
@@ -1167,6 +1217,18 @@ The `[logging]` config section is no longer a dead stub.
   `docs/environment_report.md` (regenerated)
 
 ## Last test results (verbatim, not paraphrased as "passed")
+- Command (`2026-09-26`, this bootstrap session — re-verifying the uncommitted
+  unit before trusting it): `. .venv/bin/activate && ruff check . && mypy . && timeout 900 python -m pytest -o addopts="" -p no:pytest-qt -q`
+- Result: `1167 passed, 6 skipped, 4 warnings in 36.70s`; `ruff check .` ->
+  `All checks passed!`; `mypy .` -> `Success: no issues found in 179 source files`.
+  This matches the index's claim exactly (the claim was re-run, not trusted).
+- Command (`2026-09-26`, opt-in real input, operator-approved):
+  `. .venv/bin/activate && timeout 560 python -m bench.real_desktop --confirm-real-input --workload workflow-verifiable --samples 20 --input-samples 30 --sequence-samples 20`
+- Result: click **30/30 VERIFIED** (p50 177.12 ms); keyboard **30/30 VERIFIED**
+  (p50 679.40 ms); 5-step `run_sequence` **5/20 completed** (p50 184.69 ms, p95
+  1457.09 ms), halted `s2:FOCUS_MISMATCH` ×15; revalidation p50 0.42 ms (≤ 25 ms
+  met); warm perceive 9.53 ms / cold 579.29 ms (≤ 1500 ms met). Recorded in
+  `docs/benchmark_report.md`.
 - Command: `. .venv/bin/activate && ruff check . && mypy . && timeout 900 python -m pytest -o addopts="" -p no:pytest-qt -q`
 - Result (`2026-09-25`, this session, after implementing `activate_element`):
   `1156 passed, 6 skipped, 4 warnings in 32.86s`; `ruff check .` ->
@@ -1539,8 +1601,9 @@ The `[logging]` config section is no longer a dead stub.
 ## Known failures
 *(structure per §12.1)*
 - **The realistic §74 workflow happy path is built but NOT achieved on the real
-  desktop — `workflow-verifiable` completes 2/20** (found and measured 2026-09-25
-  this session; **open — needs a decision, not a code fix**)
+  desktop — `workflow-verifiable` completes 5/20 after the fixes** (found and
+  measured 2026-09-25; **re-measured 2026-09-26**; the two verification causes are
+  closed, **one focus-timing cause remains open**)
   - failure: with the fixture's `--workflow-controls` layout and
     `--workload workflow-verifiable`, only 2 of 20 five-step `run_sequence` runs
     completed all five steps; the rest halted at step `s2` (typing) or `s4`
@@ -1577,17 +1640,41 @@ The `[logging]` config section is no longer a dead stub.
     recorded halt reasons, not all of them: `s2:VERIFICATION_CONTRADICTED` ×4 and
     `s4:VERIFICATION_UNVERIFIED` ×6 are the separate §51/§60 read-lag and
     `LIST_ITEM`-repaint limits and remain open.
-  - current status: **open**; the synthetic `verifiable` workload still meets the
-    §76 5-step target (**20/20**, p50 2505.23 ms), so the target is met by one
-    workload and not by the realistic one. Numbers and interpretation are in
-    `docs/benchmark_report.md` "Phase 14". No safety guarantee is weakened.
-  - next investigation: decide between (a) accept the honest 2/20 as the realistic
-    workload's result and keep the synthetic 20/20 as the §76 happy-path number, or
-    (b) make the workload genuinely verifiable — give the result list a selection
-    highlight that repaints `MEANINGFUL`-ly at the selected item's own box, and give
-    the typed step a longer settle/re-perceive window before verification — then
-    re-measure. Either way a fixed number must be re-measured, not asserted
-    (§76). Do **not** loosen §60 to make the number nicer (§4 rule 8).
+  - **root cause of the other two causes (found and fixed 2026-09-25, this session;
+    see "Current task" for the measurements):** the typed-field `CONTRADICTED` was
+    `verify_text` judging a read the §35 cache could serve from before the action
+    (measured: 921 ms for a plain `perceive()` vs 731 ms forced), fixed by making
+    `perceive(force=True)` real and re-checking a negative verdict against live
+    observations; and the result click's `UNVERIFIED` was **not** a repaint-size
+    problem — the repaint is spatially `MEANINGFUL` — but the §34 temporal layer
+    reclassifying it `ANIMATION` because the previous step had changed that region.
+    Fixed from the control's own `selected` state, positive-only.
+  - **RE-MEASURED 2026-09-26** (post-fix, same command): **5/20 completed**
+    (was 2/20), and the halt set is now a *single* cause — `s2:FOCUS_MISMATCH` ×15.
+    `s2:VERIFICATION_CONTRADICTED` ×4 and `s4:VERIFICATION_UNVERIFIED` ×6 are gone.
+    The standalone rows prove the two fixes: click **30/30 VERIFIED** (p50 177.12 ms)
+    and keyboard **30/30 VERIFIED** (p50 679.40 ms), where the pre-fix run was
+    `5/50` and `1/30`. Recorded in `docs/benchmark_report.md` "Phase 14 — the same
+    workflow re-measured after the three fixes".
+  - current status: **open, narrowed to one cause.** The residual
+    `s2:FOCUS_MISMATCH` is **sequence-specific**: the standalone keyboard benchmark
+    types into the *same* Qt field and is 30/30, because it focuses the field and
+    confirms it through perception *before* the timed action. In the sequence, `s1`
+    clicks the search icon (whose handler calls `setFocus()` on the field) and `s2`
+    types ~120 ms later; §51's guard still refuses in 15/20 runs. This points at
+    focus-propagation timing between a synthetic click and the accessibility state
+    the guard reads — not at the guard's logic, which correctly fails closed. The
+    synthetic `verifiable` workload still meets the §76 5-step target (**20/20**,
+    p50 2505.23 ms). No safety guarantee was weakened: no §60 threshold changed, and
+    the selection path is positive-only evidence.
+  - next investigation: the focus-timing residual. The consistent direction is a
+    **fresh live re-check before refusing** (§45/§51): if the guard fails against a
+    cache-served state, re-perceive live and re-check, exactly as `_confirm_negative`
+    now does for a negative verification verdict — a re-check can only turn a wrong
+    refusal into a correct permission, never permit a refusal the guard would make.
+    (§35's element TTL of 2 s exceeds §45's 1500 ms action-state-age ceiling, which
+    is the underlying inconsistency.) Do **not** loosen §60 or the §51 guard to make
+    the number nicer (§4 rule 8); any fix must be re-measured, not asserted (§76).
 - **pytest cannot run at all while `pytest-qt` is installed — PySide6 has no `QtTest`**
   - failure: every `python -m pytest ...` invocation ends in `INTERNALERROR` during
     `pytest_configure`, collecting zero tests; `main.py`, `ruff` and `mypy` are
@@ -1731,26 +1818,22 @@ The `[logging]` config section is no longer a dead stub.
     concrete action").
 
 ## Next concrete action
-- **Re-measure the realistic §74 workflow (opt-in real input), now that the
-  `s2:FOCUS_MISMATCH` cause is fixed.** The one-command measurement, which needs the
-  operator's explicit go-ahead because it injects real input:
-  ```bash
-  . .venv/bin/activate && python -m bench.real_desktop --confirm-real-input \
-    --workload workflow-verifiable --samples 20 --input-samples 30 --sequence-samples 20
-  ```
-  What to expect, stated before the run rather than after: the `s2:FOCUS_MISMATCH`
-  family should disappear (the guard now sees the focus change), while
-  `s2:VERIFICATION_CONTRADICTED` (the live AT-SPI read of the typed field lagging the
-  injection) and `s4:VERIFICATION_UNVERIFIED` (a `LIST_ITEM` selection not repainting
-  `MEANINGFUL`-ly at its own box) are independent and remain. A fixed number must be
-  re-measured, never asserted (§76), and §60 must not be loosened to make it nicer
-  (§4 rule 8). The synthetic `verifiable` workload (**20/20**) still carries the §76
-  happy-path target either way.
-- **Then the same decision as before, but narrower**: accept the honest residual
-  result, or make the workload genuinely verifiable (a result-list selection
-  highlight that repaints `MEANINGFUL`-ly at the selected item's own box, plus a
-  longer settle/re-perceive window before the typed step's verification). Path (b) is
-  benchmark-harness work; it must not touch §60.
+- **DONE 2026-09-26 — the realistic §74 workflow was re-measured** (operator
+  approved the real-input run). Result: **5/20 completed**, single residual cause
+  `s2:FOCUS_MISMATCH` ×15; click and keyboard standalone both **30/30 VERIFIED**.
+  Recorded in `docs/benchmark_report.md`. The pre-run prediction was partly right
+  (`VERIFICATION_CONTRADICTED` and `s4` are gone) and partly wrong (`FOCUS_MISMATCH`
+  is not gone in the *sequence*, only in the standalone case) — which is exactly why
+  the number was measured rather than asserted (§76).
+- **Next: the focus-timing residual.** §51's guard correctly refuses when the state
+  it reads was captured before the click's focus change; §35's cache TTL (2 s) can
+  outlive §45's action-state-age ceiling (1500 ms). The direction is a fresh live
+  re-check before refusing (mirroring `_confirm_negative`), never a relaxed guard or
+  a §60 threshold change. **A fix must be re-measured, not asserted** (§76).
+  Adjacent cost to remember: `[verification] verify_settle_ms` adds up to 1 s to each
+  step that would otherwise fail, so a 5-step sequence with several sub-threshold
+  steps is slower than the ~2.5 s `verifiable` figure — the cost of not reporting a
+  stale read as a failure, tunable (`0` restores the old single-read behaviour).
 - **Phase 14 is otherwise delivered.** Every other §76 number is measured and in the
   §76 form (`target, actual, machine, desktop/session, backend, sample count`) in
   `docs/benchmark_report.md`, including this session's third-workload run. A target
@@ -1762,9 +1845,10 @@ The `[logging]` config section is no longer a dead stub.
   ```
   then `python -m pytest -o addopts="" -q` should be green with no `-p no:pytest-qt`,
   and the "Known failures" entry above can be deleted.
-- **The reconciled tree is uncommitted.** It is green (**1121 passed, 6 skipped**;
-  ruff + mypy clean, 174 files) and is the natural next recovery checkpoint after
-  `5e06bc0`; committing needs explicit user confirmation (§11).
+- **The reconciled tree is still uncommitted.** Re-verified green this session
+  (**1167 passed, 6 skipped**; ruff + mypy clean, 179 files). It is the natural next
+  recovery checkpoint after `0b86d56`; committing needs explicit user confirmation
+  (§11). (This line previously cited the stale 1121/174 figures.)
 - (Superseded) **§76 verifiable workload: RUN and recorded (2026-09-25).** With the operator's
   go-ahead:
   ```bash
@@ -2189,6 +2273,16 @@ The `[logging]` config section is no longer a dead stub.
   returns a bool from `poll_events`, so it cannot distinguish which event types are
   subscribed — no fake could have caught this, which is why it survived to the live
   workflow benchmark.
+- Typed-field read lag and result-click verification (sections 60, 76): PASS —
+  `test_perception.py` +2 (`perceive(force=True)` bypasses the element cache, and
+  sees a change the cache is still serving), `test_executor.py` +3 (a negative
+  verdict is re-checked against a live observation and becomes VERIFIED; a VERIFIED
+  verdict is never re-checked; live reads that keep disagreeing are still
+  CONTRADICTED, so nothing is softened), `test_verifier.py` +2 (the selection
+  postcondition, and that unreported/negative selection is not a verdict either
+  way), and the live
+  `test_workflow_controls_real_display.py::test_a_result_selection_is_observable_as_positive_evidence`
+  (real Qt list: `Result 1` reports `selected=True`, `Result 2` `selected=False`).
 - Unit tests: PASS (incl. accessibility 21 + browser accessibility 12; event bus 12 +
   state cache 21; OCR 20 incl. one real-backend functional test; target resolver 26;
   mouse 16 + keyboard 23 + input backends 8; policy modes 9 + terminal guard 39 +
@@ -2392,6 +2486,17 @@ The `[logging]` config section is no longer a dead stub.
   (`xfce4-panel`, pid 2039). No window activation was performed.
 
 ## Session log (append-only, informational only — never load-bearing)
+- 2026-09-26 — bootstrap session. Root confirmed `/home/tsn/blaxcy`. Read this index,
+  then reconciled it against `git log`/`git status`: HEAD is `0b86d56`, not the
+  `5e06bc0` this file recorded, and two units it described as uncommitted (`686a022`
+  activate_element + §70 logging; `0b86d56` the AT-SPI focus-event fix) were already
+  committed. Re-ran the gate before trusting any "done" claim: `ruff check .` clean,
+  `mypy .` clean (179 files), `pytest -p no:pytest-qt -q` -> **1167 passed, 6
+  skipped**. Then, on operator approval, ran the opt-in real-input re-measurement of
+  `--workload workflow-verifiable`: sequence **5/20 completed** (was 2/20), halt set
+  now a single cause `s2:FOCUS_MISMATCH` ×15; click **30/30** and keyboard **30/30**
+  VERIFIED (were 5/50 and 1/30). Recorded in `docs/benchmark_report.md`; no code was
+  changed. Next: the sequence-specific focus-timing residual.
 - 2026-09-23 — implemented §50's clipboard paste path on request (the item Phase 7
   left open): `control/clipboard.py` `X11ClipboardPaster` (owns the CLIPBOARD
   selection, serves it on its own thread, captures and re-serves the previous
@@ -2888,5 +2993,29 @@ The `[logging]` config section is no longer a dead stub.
   clean (179 files). Deliberately **not** re-measured: the effect needs an opt-in
   real-input run, and the other two halt causes (`s2:VERIFICATION_CONTRADICTED`,
   `s4:VERIFICATION_UNVERIFIED`) are independent and remain open.
-- 2026-09-25 — same session, continued: the fixes above are committed-ready; the
-  next step is the opt-in re-measure recorded under "Next concrete action".
+- 2026-09-25 — same session, continued: on the operator's instruction, fixed the
+  two remaining `workflow-verifiable` halt causes. Both were **measured read-only
+  before anything changed**, and both diagnoses turned out to be different from the
+  index's summary. (1) The typed-field `s2:VERIFICATION_CONTRADICTED` is the §35
+  element cache: a plain `perceive()` took **921 ms** to see a field-text change,
+  while a forced live read returned it in **731 ms**, so `verify_text` was judging a
+  pre-action read and §60 was calling it a contradiction. Fixed by making
+  `PerceptionOrchestrator.perceive(force=True)` real (the parameter existed and was
+  ignored — `del force`), adding a `perceive_fresh` executor hook, and having the
+  executor re-check a negative verdict against fresh live observations for
+  `[verification] verify_settle_ms` (default 1000) before reporting it; a VERIFIED
+  verdict never reaches that window. (2) The result-click `s4:VERIFICATION_UNVERIFIED`
+  is **not** a repaint-size problem as the index said: with the row colours pinned
+  high-contrast the repaint is spatially `MEANINGFUL` (240x80) but the §34 temporal
+  layer reclassifies it `ANIMATION` because the previous step had changed the same
+  region. Rather than loosen a verification classifier, a click on a selectable
+  control is now verified from the control's own `selected` state (positive-only,
+  falling back to the pixel check). **A first version of the new live test asserted
+  the delta class and failed on `ANIMATION` — that failure is what produced the real
+  diagnosis**, and the test was rewritten to assert the semantic evidence, which is
+  both stronger and not dependent on the rest of the desktop. New: `UIElement.selected`,
+  `[verification] verify_settle_ms`/`verify_poll_ms`, `set_selection` on the fixture
+  harness, and 10 new tests. Gate: **1167 passed, 6 skipped** (was 1157); ruff + mypy
+  clean (179 files); the live workflow suite is **5 passed**. Nothing was loosened to
+  obtain a number: §60's thresholds are untouched and the benchmark has deliberately
+  **not** been re-quoted.

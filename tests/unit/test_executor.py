@@ -7,11 +7,19 @@ the envelope shape are pinned).
 
 from __future__ import annotations
 
+from config.settings import Settings, VerificationSettings
 from control.executor import revalidate_target
 from control.window_manager import WindowController, WindowInfo, WindowManagerProbe
 from schemas.actions import PlannedAction, ToolName
 from schemas.elements import ElementQuery, UIElement
-from schemas.enums import CoordinateSpace, ErrorCode, PolicyMode, UIRole, VerificationState
+from schemas.enums import (
+    ChangeClass,
+    CoordinateSpace,
+    ErrorCode,
+    PolicyMode,
+    UIRole,
+    VerificationState,
+)
 from schemas.events import EventType
 from schemas.geometry import Point, Rect
 from schemas.leases import ElementLease, issue_lease
@@ -281,6 +289,122 @@ def test_type_text_is_verified_from_the_readable_field() -> None:
     assert envelope.ok is True
     assert envelope.verification is VerificationState.VERIFIED
     assert env.backend.payloads("key_press")
+
+
+def _type_hello() -> PlannedAction:
+    """The typing action the verification tests below all perform."""
+    return PlannedAction(
+        tool=ToolName.TYPE_TEXT,
+        target=ElementQuery(role_hint=UIRole.TEXT_INPUT),
+        params={"text": "hello"},
+    )
+
+
+def test_a_negative_verdict_is_rechecked_against_a_live_observation() -> None:
+    """Section 60: a stale read is not evidence that the action failed.
+
+    The section 35 element cache can serve a read taken before the action, and an
+    injected keystroke is applied by the application asynchronously, so the first
+    post-action observation can legitimately show a field that does not contain the
+    typed text yet. That is not *positive* evidence of failure, which is what
+    ``CONTRADICTED`` requires, so the executor re-checks against a live observation
+    before reporting one. This is exactly the realistic section 74 workflow's
+    ``s2:VERIFICATION_CONTRADICTED``.
+    """
+    field = make_text_input()
+    state = make_state(frame_id=5, elements=(field,))
+    env = _env(state=state, with_perceive_fresh=True)
+    stale = make_state(frame_id=6, elements=(make_text_input(text=""),))
+    env.perceiver.script(stale, make_delta(before=state, after=stale))
+    assert env.fresh_perceiver is not None
+    landed = make_state(frame_id=7, elements=(make_text_input(text="hello"),))
+    env.fresh_perceiver.script(landed, None)
+
+    envelope = env.executor.execute(_type_hello())
+
+    assert envelope.ok is True, envelope.message
+    assert envelope.verification is VerificationState.VERIFIED
+    assert env.fresh_perceiver.calls == 1
+
+
+def test_a_verified_verdict_is_never_rechecked() -> None:
+    """The confirmation window only ever applies to a would-be failure."""
+    field = make_text_input()
+    state = make_state(frame_id=5, elements=(field,))
+    env = _env(state=state, with_perceive_fresh=True)
+    after = make_state(frame_id=6, elements=(make_text_input(text="hello"),))
+    env.perceiver.script(after, make_delta(before=state, after=after))
+    assert env.fresh_perceiver is not None
+
+    envelope = env.executor.execute(_type_hello())
+
+    assert envelope.verification is VerificationState.VERIFIED
+    assert env.fresh_perceiver.calls == 0
+
+
+def test_the_recheck_never_softens_a_real_contradiction() -> None:
+    """Live reads that keep disagreeing are still a contradiction (section 60)."""
+    settings = Settings(
+        verification=VerificationSettings(verify_settle_ms=150, verify_poll_ms=50)
+    )
+    field = make_text_input()
+    state = make_state(frame_id=5, elements=(field,))
+    env = _env(state=state, settings=settings, with_perceive_fresh=True)
+    wrong = make_state(frame_id=6, elements=(make_text_input(text="something else"),))
+    env.perceiver.script(wrong, make_delta(before=state, after=wrong))
+    # Nothing is scripted for the fresh observer, so every live re-read returns the
+    # cache's current state -- which still really does not contain the typed text.
+
+    envelope = env.executor.execute(_type_hello())
+
+    assert envelope.ok is False
+    assert envelope.error_code is ErrorCode.VERIFICATION_CONTRADICTED
+
+
+def test_clicking_a_selectable_control_verifies_from_its_selected_state() -> None:
+    """Section 60: a selection is stronger evidence than the pixels it repainted.
+
+    A result-list click's repaint is reclassified ``ANIMATION`` by the section 34
+    temporal layer whenever the same region also changed as a side effect of the
+    previous step -- which makes the pixel check refuse even though the click
+    plainly worked. The item's own selected state settles it positively, so a
+    ``TRIVIAL`` screen change is enough here.
+    """
+    item = make_element("row", role=UIRole.LIST_ITEM, text="Result 1")
+    state = make_state(frame_id=5, elements=(item,))
+    env = _env(state=state)
+    after = make_state(
+        frame_id=6,
+        elements=(make_element("row", role=UIRole.LIST_ITEM, text="Result 1", selected=True),),
+    )
+    env.perceiver.script(
+        after, make_delta(before=state, after=after, change_class=ChangeClass.TRIVIAL)
+    )
+
+    envelope = env.executor.execute(
+        PlannedAction(tool=ToolName.CLICK, target=ElementQuery(text="Result 1"))
+    )
+
+    assert envelope.ok is True, envelope.message
+    assert envelope.verification is VerificationState.VERIFIED
+
+
+def test_a_selectable_click_without_selection_evidence_still_needs_a_change() -> None:
+    """The selection path adds evidence; it never replaces the pixel check."""
+    item = make_element("row", role=UIRole.LIST_ITEM, text="Result 1")
+    state = make_state(frame_id=5, elements=(item,))
+    env = _env(state=state)
+    after = make_state(frame_id=6, elements=(item,))
+    env.perceiver.script(
+        after, make_delta(before=state, after=after, change_class=ChangeClass.ANIMATION)
+    )
+
+    envelope = env.executor.execute(
+        PlannedAction(tool=ToolName.CLICK, target=ElementQuery(text="Result 1"))
+    )
+
+    assert envelope.ok is False
+    assert envelope.error_code is ErrorCode.VERIFICATION_UNVERIFIED
 
 
 def test_drag_needs_a_destination_description() -> None:

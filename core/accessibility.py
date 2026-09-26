@@ -844,7 +844,9 @@ class AtspiBackend:
         # that moves focus is invisible, and the guard refuses to type into a field
         # that really is focused until the TTL expires), ``enabled``/``sensitive``
         # (section 45 revalidation and section 51's editability check) and
-        # ``editable`` (the Qt ``text``+``EDITABLE`` role refinement, section 37).
+        # ``editable`` (the Qt ``text``+``EDITABLE`` role refinement, section 37)
+        # and ``selected`` (section 60's selection postcondition, which is what
+        # makes clicking a list item verifiable from the item's own state).
         # Omitting them was a real defect, not a tuning choice: focus changes are
         # delivered as state-changed events and as nothing else, so the stale flag
         # was frozen for ``cache_ttl_seconds`` -- longer than the section 45
@@ -857,6 +859,7 @@ class AtspiBackend:
             "object:state-changed:enabled",
             "object:state-changed:sensitive",
             "object:state-changed:editable",
+            "object:state-changed:selected",
             "object:children-changed",
             "object:defunct",
             "window:activate",
@@ -1196,6 +1199,7 @@ class AtspiBackend:
             enabled="ENABLED" in states or "SENSITIVE" in states or not states,
             focusable="FOCUSABLE" in states,
             focused="FOCUSED" in states,
+            selected=("SELECTED" in states) if states else None,
             visible=visible,
             occluded=False,
             password=password,

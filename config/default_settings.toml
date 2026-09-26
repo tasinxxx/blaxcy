@@ -139,6 +139,13 @@ ttl_ms = 3000
 [verification]
 max_action_state_age_ms = 1500
 require_verification_for_mutating = true
+# A negative verdict (UNVERIFIED/CONTRADICTED) is re-checked against fresh, live
+# observations for this long before it is reported. section 60's CONTRADICTED
+# needs positive evidence, and one read taken right after injection is not that
+# when the application has not applied the input yet. A VERIFIED verdict is never
+# delayed by this window.
+verify_settle_ms = 1000
+verify_poll_ms = 150
 
 [recovery]
 automatic_attempts_per_tool = 2

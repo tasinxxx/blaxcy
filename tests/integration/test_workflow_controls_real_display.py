@@ -269,3 +269,62 @@ def test_the_live_submit_control_is_really_activated_through_atspi(
     assert int(fixture.stats()["counters"].get("submit_button", 0)) > before, (
         "the accessibility action reported success but the application never acted"
     )
+
+
+def test_a_result_selection_is_observable_as_positive_evidence(
+    env: tuple[BlaxcyApplication, FixtureApp],
+) -> None:
+    """Section 60: a result click's postcondition is readable from the item itself.
+
+    Clicking a selectable control's postcondition is "this control is now
+    selected", and the accessibility tree reports that directly -- stronger
+    evidence than the pixels the control repainted, and immune to the section 34
+    temporal layer reclassifying a repeated region as ``ANIMATION`` (which is what
+    made the benchmark's result step ``UNVERIFIED``: the previous step had already
+    changed that region as a side effect). This test proves the evidence the
+    verifier consumes actually exists on a live Qt list. The row is selected over
+    the fixture's own control channel, so no desktop input is injected.
+    """
+    application, fixture = env
+    fixture.set_text("search_input", "song name")
+    fixture.click("submit_button")
+
+    def results(state: ScreenState) -> bool:
+        return (
+            sum(
+                1
+                for element in state.elements
+                if element.role is UIRole.LIST_ITEM
+                and (element.text or "").startswith("Result ")
+            )
+            >= 3
+        )
+
+    _perceive_until(application, fixture, results, describe="the result items")
+    fixture.set_selection("result_list", 0)
+
+    def selected(state: ScreenState) -> bool:
+        return any(
+            element.role is UIRole.LIST_ITEM
+            and element.text == "Result 1"
+            and element.selected is True
+            for element in state.elements
+        )
+
+    state = _perceive_until(
+        application, fixture, selected, describe="the selected result being reported"
+    )
+    item = next(
+        element
+        for element in state.elements
+        if element.role is UIRole.LIST_ITEM and element.text == "Result 1"
+    )
+    assert item.selected is True
+    # The unselected siblings must not be reported as selected, or the evidence
+    # would be worthless.
+    sibling = next(
+        element
+        for element in state.elements
+        if element.role is UIRole.LIST_ITEM and element.text == "Result 2"
+    )
+    assert sibling.selected is False
