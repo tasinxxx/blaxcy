@@ -109,7 +109,9 @@ document is preserved and re-verified byte-identically.
 
 ## GitHub Actions flow (requirements 4/5/15)
 
-`relay/workflow/process-task.yml`:
+`relay/workflow/process-task.yml` → `.github/workflows/process-task.yml` (GitHub
+Actions only discovers workflow definitions under `.github/workflows/`; the
+content is unchanged):
 
 1. `runs-on: [self-hosted, linux]` — **never** hosted runners (they have no
    access to this desktop and must never gain it).

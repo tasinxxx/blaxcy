@@ -4,7 +4,7 @@ The relay repository is a *directory tree* in this implementation: the same
 layout a GitHub repository presents when cloned, so the self-hosted runner and
 the tests use identical code paths. Nothing here talks to the GitHub API — the
 syncing of these directories is `git`'s job (pull before, commit+push after),
-and the workflow in ``relay/workflow/`` orchestrates exactly that.
+and the workflow in ``.github/workflows/process-task.yml`` orchestrates exactly that.
 
 Layout (documented in ``docs/relay.md``):
 
