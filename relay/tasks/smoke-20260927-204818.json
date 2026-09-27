@@ -1,0 +1,10 @@
+{
+  "plan": [
+    {
+      "step_id": "s1",
+      "tool": "get_capabilities"
+    }
+  ],
+  "schema_version": 1,
+  "task_id": "smoke-20260927-204818"
+}
