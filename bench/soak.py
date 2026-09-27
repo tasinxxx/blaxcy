@@ -128,7 +128,11 @@ def _rss_mb() -> float | None:
     except ImportError:  # pragma: no cover - psutil is a declared dependency
         return None
     try:
-        return psutil.Process().memory_info().rss / (1024 * 1024)
+        # psutil ships no type stubs, so the raw value arrives as ``Any``;
+        # binding it to a typed name keeps this function's declared return
+        # type honest without changing the arithmetic.
+        rss_bytes: float = psutil.Process().memory_info().rss
+        return rss_bytes / (1024 * 1024)
     except Exception:  # pragma: no cover - defensive: psutil on an exotic host
         return None
 
