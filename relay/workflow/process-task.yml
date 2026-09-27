@@ -1,0 +1,109 @@
+# BLAXCY relay — task processing workflow (Phase 2B, requirements 4/5/15).
+#
+# This workflow is ORCHESTRATION ONLY: it syncs the private relay repository on
+# a self-hosted runner and invokes the relay CLI, which executes tasks strictly
+# through the Phase 2A LocalBridge. Desktop control happens inside BLAXCY's own
+# pipeline (policy -> resolve -> lease -> revalidate -> execute -> verify);
+# this workflow never injects input, never starts a Body by itself, and never
+# interprets task contents.
+#
+# Scope guards (per the Phase 2B constraints):
+#   - runs ONLY on a self-hosted Linux runner ("runs-on: [self-hosted, linux]");
+#   - no MCP, no ChatGPT/Gemini/external AI service, no public network server;
+#   - no arbitrary repository content is executed: the only thing this workflow
+#     runs is the checked-out BLAXCY relay CLI (pinned to this repository);
+#   - the shared bridge token arrives ONLY via the BLAXCY_BRIDGE_TOKEN secret
+#     (requirement 8) and is never echoed, never written to disk.
+
+name: BLAXCY relay task
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: "One task id to process (default: every PENDING task)"
+        required: false
+        default: ""
+  # A producer may also trigger via repository_dispatch with the task id in
+  # client_payload; the relay's own dedup makes double-delivery harmless.
+  repository_dispatch:
+    types: [blaxcy-task]
+
+permissions:
+  contents: read # read the relay repository; results are committed by the runner's local git, not by this token
+
+concurrency:
+  # One desktop, one relay run at a time. Overlapping runs would race the
+  # claim files; the relay's O_EXCL claim is the second net, this is the first.
+  group: blaxcy-relay-desktop
+  cancel-in-progress: false
+
+jobs:
+  process:
+    name: Process pending BLAXCY tasks
+    # Requirement 5: self-hosted Linux only. Never hosted runners: they have no
+    # access to this desktop and must never gain it.
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 15
+    steps:
+      - name: Check out the relay repository
+        uses: actions/checkout@v4
+        with:
+          # The BLAXCY checkout below needs the relay history too; a full clone
+          # keeps the task records' history honest (provenance, requirement 3).
+          fetch-depth: 0
+
+      - name: Check out BLAXCY (pinned to the relay's declared commit)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.BLAXCY_REPO || github.repository }}
+          ref: ${{ vars.BLAXCY_REF || 'master' }}
+          path: blaxcy
+
+      - name: Use the operator's Python
+        run: |
+          set -eu
+          # The self-hosted runner is expected to provide the BLAXCY venv
+          # (docs/relay.md "Self-hosted runner requirements"). Nothing here
+          # installs or upgrades BLAXCY: a workflow that mutates the Body's
+          # environment as a side effect of a task would be an execution path.
+          . blaxcy/.venv/bin/activate
+          python -c "import bridge, relay; print('relay cli ready')"
+
+      - name: Sync the relay repository (pull before processing)
+        run: |
+          set -eu
+          git -C . pull --ff-only
+          git -C blaxcy pull --ff-only || echo "blaxcy checkout is read-only; continuing"
+
+      - name: Process tasks through the LocalBridge
+        env:
+          BLAXCY_BRIDGE_TOKEN: ${{ secrets.BLAXCY_BRIDGE_TOKEN }}
+          BLAXCY_LOG_DIR: ${{ runner.temp }}/blaxcy-logs
+        run: |
+          set -eu
+          . blaxcy/.venv/bin/activate
+          # The relay CLI (relay/entry.py): claims pending tasks exclusively,
+          # validates and verifies each envelope, and executes through the
+          # Phase 2A LocalBridge. It never injects input itself; a Body that is
+          # not running (or OBSERVE) makes tasks halt or fail closed, never
+          # act unattended.
+          TASK_ARGS=""
+          if [ -n "${{ github.event.inputs.task_id || github.event.client_payload.task_id || '' }}" ]; then
+            TASK_ARGS="--task-id ${{ github.event.inputs.task_id || github.event.client_payload.task_id }}"
+          fi
+          python -m relay.entry --repo . process $TASK_ARGS
+
+      - name: Commit results back to the relay repository
+        run: |
+          set -eu
+          if git diff --quiet -- relay/ && git diff --cached --quiet -- relay/; then
+            echo "no relay records changed"
+            exit 0
+          fi
+          git config user.name "blaxcy-relay"
+          git config user.email "blaxcy-relay@users.noreply.github.com"
+          git add relay/
+          git commit -m "relay: record task results from $GITHUB_RUN_ID"
+          git pull --rebase --autostash
+          git push
