@@ -67,6 +67,7 @@ blaxcy = "main:main"
 [tool.setuptools]
 py-modules = ["main"]
 packages = [
+    "bridge",
     "config",
     "security",
     "schemas",

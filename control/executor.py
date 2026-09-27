@@ -538,7 +538,7 @@ class Executor:
                 )
             )
 
-        if tool is ToolName.ENSURE_WINDOW:
+        if tool == ToolName.ENSURE_WINDOW:
             # A focus change is not input injection, so it is not treated as
             # "performed" for recovery purposes.
             return AttemptOutcome(self._execute_ensure_window(planned, started))
@@ -772,13 +772,13 @@ class Executor:
         """Cheap, pre-perception parameter validation."""
         if planned.tool in _TARGET_TOOLS and planned.target is None:
             return (ErrorCode.TARGET_NOT_FOUND, f"{planned.tool} requires a target description")
-        if planned.tool is ToolName.TYPE_TEXT and not str(planned.params.get("text", "")):
+        if planned.tool == ToolName.TYPE_TEXT and not str(planned.params.get("text", "")):
             return (ErrorCode.PERMISSION_DENIED, "type_text requires non-empty text")
-        if planned.tool is ToolName.PRESS_KEY and not planned.params.get("key"):
+        if planned.tool == ToolName.PRESS_KEY and not planned.params.get("key"):
             return (ErrorCode.PERMISSION_DENIED, "press_key requires a key")
-        if planned.tool is ToolName.HOTKEY and not planned.params.get("combo"):
+        if planned.tool == ToolName.HOTKEY and not planned.params.get("combo"):
             return (ErrorCode.PERMISSION_DENIED, "hotkey requires a combo")
-        if planned.tool is ToolName.DRAG and not planned.params.get("destination"):
+        if planned.tool == ToolName.DRAG and not planned.params.get("destination"):
             return (ErrorCode.PERMISSION_DENIED, "drag requires a destination description")
         return None
 
@@ -997,11 +997,11 @@ class Executor:
             # Key actions have no element and are injected first: they need no
             # geometry, and requiring one would make a keyboard action fail for
             # a reason that does not apply to it.
-            if tool is ToolName.PRESS_KEY:
+            if tool == ToolName.PRESS_KEY:
                 modifiers = tuple(str(m) for m in (planned.params.get("modifiers") or ()))
                 self._keyboard.press_key(str(planned.params.get("key", "")), modifiers=modifiers)
                 return None
-            if tool is ToolName.HOTKEY:
+            if tool == ToolName.HOTKEY:
                 self._keyboard.hotkey(str(planned.params.get("combo", "")))
                 return None
             # Section 66's ``activate_element``: the application performs its own
@@ -1010,7 +1010,7 @@ class Executor:
             # AT-SPI action needs no coordinates -- but it still arrives here only
             # after policy, a fresh lease and the full section 45 revalidation,
             # and it is verified exactly like any other MUTATING action.
-            if tool is ToolName.ACTIVATE_ELEMENT:
+            if tool == ToolName.ACTIVATE_ELEMENT:
                 if self._activate is None:
                     return self._deny(
                         started,
@@ -1033,28 +1033,28 @@ class Executor:
             point = element.point_for_input() if element is not None else None
             if point is None or element is None:
                 return self._deny(started, ErrorCode.TARGET_STALE, "target has no geometry", planned)
-            if tool is ToolName.CLICK:
+            if tool == ToolName.CLICK:
                 result = self._mouse.click(point)
                 if not result.ok:
                     return self._deny(
                         started, ErrorCode.BACKEND_UNAVAILABLE, result.reason or "click failed", planned
                     )
                 return None
-            if tool is ToolName.DOUBLE_CLICK:
+            if tool == ToolName.DOUBLE_CLICK:
                 result = self._mouse.double_click(point)
                 if not result.ok:
                     return self._deny(
                         started, ErrorCode.BACKEND_UNAVAILABLE, result.reason or "double click failed", planned
                     )
                 return None
-            if tool is ToolName.RIGHT_CLICK:
+            if tool == ToolName.RIGHT_CLICK:
                 result = self._mouse.right_click(point)
                 if not result.ok:
                     return self._deny(
                         started, ErrorCode.BACKEND_UNAVAILABLE, result.reason or "right click failed", planned
                     )
                 return None
-            if tool is ToolName.SCROLL:
+            if tool == ToolName.SCROLL:
                 scroll = self._mouse.scroll(
                     point,
                     vertical=int(planned.params.get("vertical", 3)),
@@ -1065,7 +1065,7 @@ class Executor:
                         started, ErrorCode.BACKEND_UNAVAILABLE, scroll.reason or "scroll failed", planned
                     )
                 return None
-            if tool is ToolName.TYPE_TEXT:
+            if tool == ToolName.TYPE_TEXT:
                 # A credential field's content must not be placed on the clipboard:
                 # the clipboard is shared, and a clipboard manager persists it in
                 # history, which would leak the password out of the field it was
@@ -1086,7 +1086,7 @@ class Executor:
                     sensitive=sensitive,
                 )
                 return None
-            if tool is ToolName.DRAG:
+            if tool == ToolName.DRAG:
                 return self._perform_drag(planned, point, state, started)
         except BlaxcyError as exc:
             return self._deny(started, exc.code, exc.message, planned, data=exc.details)
@@ -1323,7 +1323,7 @@ class Executor:
             )
             if state_change is not None:
                 return state_change
-        if tool is ToolName.TYPE_TEXT and element is not None and element.is_text_entry:
+        if tool == ToolName.TYPE_TEXT and element is not None and element.is_text_entry:
             return self._verifier.verify_text(
                 after=after, target=element, text=str(planned.params.get("text", ""))
             )
