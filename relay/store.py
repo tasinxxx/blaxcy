@@ -167,6 +167,7 @@ class TaskStore:
         # the claim file name is derived from the id, and a malformed id must
         # surface as ``INVALID_TASK_ID``, never as a stray file or raw OSError.
         self.task_dir(task_id)
+        self.claims_dir.mkdir(parents=True, exist_ok=True)
         claim = self.claims_dir / f"{task_id}.claim"
         try:
             handle = os.open(str(claim), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
