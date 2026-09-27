@@ -77,6 +77,11 @@ from security.keyring_manager import (
 #: Backend identifier reported in capability/benchmark output.
 VISUAL_BACKEND_NAME: Final[str] = "google-genai"
 
+#: The model used when the caller does not name one. Kept in step with
+#: ``config.settings.GeminiSettings.model`` (re-verified 2026-09-26: the 2.5
+#: family returns 404 for new API users).
+DEFAULT_VISUAL_MODEL: Final[str] = "gemini-3.8-flash"
+
 #: Section 41 default bound on the uploaded image's longest side.
 DEFAULT_MAX_IMAGE_SIDE: Final[int] = 1024
 
@@ -781,7 +786,7 @@ class VisualGrounder:
         if self._backend is not None:
             return self._backend
         backend = GeminiVisualBackend(
-            model=self._model or "gemini-2.5-flash", key_manager=self._key_manager
+            model=self._model or DEFAULT_VISUAL_MODEL, key_manager=self._key_manager
         )
         self._backend = backend
         return backend

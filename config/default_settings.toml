@@ -181,7 +181,9 @@ rotation_backups = 5
 redact_on_root_logger = true
 
 [gemini]
-model = "gemini-2.5-flash"
+# Re-verified 2026-09-26: the 2.5 family returns 404 for new API users; this is
+# the replacement the API names. Override freely if your key has access to more.
+model = "gemini-3.8-flash"
 max_model_turns = 40
 max_task_wall_clock_seconds = 300
 context_token_budget = 1200

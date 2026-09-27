@@ -72,6 +72,12 @@ class ModelToolCall:
     name: str
     args: dict[str, Any] = field(default_factory=dict)
     call_id: str | None = None
+    #: The provider's opaque ``thought_signature`` that rode in with the call
+    #: (Gemini 3 models). It must be echoed back on the replayed function call,
+    #: so it travels with the call rather than living inside one adapter. The
+    #: SDK exposes it as raw ``bytes`` (base64 on the wire); BLAXCY keeps that
+    #: same representation so replaying the call needs no re-encoding.
+    thought_signature: bytes | None = None
 
 
 @dataclass(frozen=True)

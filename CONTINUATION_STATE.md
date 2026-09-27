@@ -35,22 +35,28 @@
   - `8b3307e` — "Retry fixture startup races, and document the capability matrix" —
     6 files, +433/−21; new `docs/capability_matrix.md`,
     `tests/unit/test_fixture_client.py`.
-- Last verified commit: `8b3307e` (HEAD). **Index drift corrected 2026-09-26**: this
+- Last verified commit: **`9787b79`** (HEAD, corrected 2026-09-27 — the index had
+  stopped at `8b3307e`; `d96333c`, `8b3307e`'s successors `181ef84`/`ab3d540`/
+  `8b3307e` were already recorded, then `9787b79` "Require setuptools 77 and use
+  an SPDX license expression" landed). The repository wins (§8 step 4).
+  **Index drift corrected 2026-09-26**: this
   section had stopped at `0b86d56` and described the then-uncommitted 18-file unit
   as the working tree; those four commits (`372879a`, `181ef84`, `ab3d540`,
   `8b3307e`) now exist and the tree they described is committed. The repository wins
   (§8 step 4).
-- Working tree: **dirty — this session's uncommitted unit**: the stronger §60
-  postcondition for clicks (`Postcondition.ELEMENT_STATE`), the XDG RemoteDesktop
-  portal input backend, and the soak's per-step latency breakdown (see "Current
-  task"). Files: `control/verifier.py`, `control/executor.py`,
-  `control/backends/portal.py` (new), `control/backends/__init__.py`,
-  `core/capability_probe.py`, `bench/soak.py`,
-  `tests/unit/test_{verifier,executor,soak,portal_backend,capability_probe,input_backends}.py`,
-  `tests/integration/test_workflow_controls_real_display.py`, `docs/limitations.md`,
-  `docs/capability_matrix.md`, `docs/benchmark_report.md`, and this file.
-  Re-verified green (**1215 passed, 6 skipped**; ruff + mypy clean, **184 files**)
-  but not yet committed (committing needs explicit user confirmation, §11).
+- Working tree: **dirty — two uncommitted units on top of `9787b79`**:
+  (1) the *live-Brain verification fix unit* (2026-09-26/27, described under
+  "Live Brain verification" below): `ai/brain_adapter.py`, `ai/gemini_adapter.py`,
+  `config/default_settings.toml`, `config/settings.py`, `core/visual_grounder.py`,
+  `main.py`, `tests/unit/test_gemini_adapter.py`, `docs/limitations.md`;
+  (2) the *core-completion audit unit* (2026-09-27, see "Core completion audit
+  2026-09-27" below): stale doc-in-code fixes in `ai/tool_protocol.py` and
+  `control/executor.py`, the MCP-readiness pinning tests
+  (`tests/unit/test_mcp_readiness.py`, new), and the corrected Wayland rows in
+  `docs/limitations.md`, `docs/capability_matrix.md`, `docs/security.md`.
+  Re-verified green this session: **ruff clean, mypy clean (188 files),
+  1267 passed / 7 skipped**, safety suite 79 passed. Not yet committed
+  (committing needs explicit user confirmation, §11).
 - **Index drift corrected 2026-09-25 (this session).** This file was last written by
   the session that became commit `5e06bc0` (the warm/cold perceive-cycle work),
   while a following session built the `workflow-verifiable` workload, the two AT-SPI
@@ -89,8 +95,10 @@ trip green).
    and the loop-level equivalents in `tests/unit/test_brain_adapter.py`. The
    adapter already fails closed (no key ⇒ `BACKEND_UNAVAILABLE`, automatic
    function calling disabled, key redacted from every error). **Live Gemini run
-   remains externally blocked: no API key on this host** — the exact remaining
-   step is `python main.py keys set-gemini`, then `python main.py run "..."`.
+   now succeeds (2026-09-26/27)** — the operator stored the key in the OS keyring
+   (`python main.py keys` → `key_present: true`), and the real
+   Brain→dispatcher→Body loop completed end-to-end against the live API. Three
+   real defects surfaced and were fixed; see "Live Brain verification" below.
 2. **Wayland input + capture (items 2/7)** — new `core/portal_capture.py`:
    `PortalCaptureBackend` (a real `FrameEngine` capture backend),
    `DbusScreencastTransport` (CreateSession→SelectSources→Start, consent left to
@@ -154,6 +162,103 @@ trip green).
     are unchanged. Re-measured: **5/5 completed** (`--sequence-samples 5`) and
     the full workload run completed all steps, sequence p50 2005.96 ms ≤ 4000 ms,
     click 30/30 and keyboard 30/30 VERIFIED.
+
+### Core completion audit 2026-09-27 (final agent phase)
+
+A whole-system audit against the tool protocol, executor, verifier, recovery,
+policy, safety, sequence, input and application modules (all read in full this
+session). **Findings:** the pipeline, policy engine, verifier, recovery
+classifier, emergency stop, sequence runner and dispatcher are complete and
+safety-intact; the audit found **no functional defect** — only three stale
+doc-in-code claims and one documentation contradiction, all fixed:
+
+1. `ai/tool_protocol.py` — the `activate_element` model-facing description said
+   "not implemented" while the capability is implemented and live-verified; a
+   consuming model would have refused a working tool. Fixed; no test pinned the
+   string (checked first).
+2. `control/executor.py` — module docstring and the unhandled-tool refusal
+   message carried the same stale claim. Fixed.
+3. `docs/limitations.md`, `docs/capability_matrix.md`, `docs/security.md` —
+   the Wayland-capture row said "not implemented" in two files while a third
+   (and the code) say implemented-but-unverified. Contradiction resolved in
+   favour of the code: implemented, not verified on this host.
+4. **MCP-readiness pinned by test** (`tests/unit/test_mcp_readiness.py`, new,
+   15 tests): declarations are deterministic and JSON-serializable strict
+   schemas (19 tools, no drift), every class of pre-resolved/overspecified
+   argument (coordinate, element_id, lease, frame_id, unknown key, missing
+   required, bad role, unknown tool) is a structured rejection, and single,
+   failed and sequence envelopes (incl. the `NOT_EXECUTED` tail and `halt_code`)
+   round-trip JSON unchanged. A future adapter needs no core rework.
+
+**Runtime verification on the real desktop (2026-09-27, this session):**
+- live integration suite: `test_workflow_controls_real_display.py` +
+  `test_emergency_stop_real_display.py` → **10 passed** (real AT-SPI, real
+  XTEST into the §74 fixture);
+- `python main.py status` on the live desktop: full Body assembled, XTEST +
+  AT-SPI + clipboard + window manager up, capabilities **11 AVAILABLE /
+  1 DEGRADED / 0 UNAVAILABLE**;
+- dispatcher smoke on the real desktop: `get_screen_state` ok (30 elements),
+  `find_element` ok (RESOLVED), and a `click` in OBSERVE **refused**
+  (`PERMISSION_DENIED`) — the safe default verified live; an ad-hoc ASSIST click
+  outside the sanctioned harness choreography reported `UNVERIFIED` (§60
+  declining to claim a postcondition without the fixture's raise/settle setup —
+  honest, not a regression);
+- full gate after the changes: **1267 passed / 7 skipped; ruff clean; mypy clean
+  (188 files)**; safety suite **79 passed**.
+
+### Live Brain verification 2026-09-26/27 (real Gemini key, real desktop)
+
+The operator stored the Gemini API key in the OS keyring (service `blaxcy`, key
+`gemini_api_key`); `python main.py keys` reports `key_present: true`. The key is
+never printed, logged or committed (§69): it was only used through
+`GeminiAdapter.from_keyring`. Driving the real loop exposed three genuine defects,
+all fixed and test-pinned:
+
+1. **Default model 404.** `gemini-2.5-flash` is no longer served to new users
+   (`404 … use models/gemini-3.8-flash`). Default moved to `gemini-3.8-flash` in
+   `config/settings.py`, `config/default_settings.toml` and
+   `core/visual_grounder.py` (`DEFAULT_VISUAL_MODEL`).
+2. **No perception before the first model turn.** `python main.py run` never
+   called `app.perceive()`, so the model's first `get_screen_state` returned
+   `CAPTURE_FAILED` ("no screen state has been observed yet"). `_cmd_run` now
+   seeds the perception cache after `app.start()`.
+3. **`thought_signature` was dropped when history was replayed.** Gemini 3
+   models sign each `functionCall` part; BLAXCY rebuilds parts by hand in
+   `GeminiAdapter._to_contents`, and the SDK's aggregate `response.function_calls`
+   drops the wrapping `Part` (and thus the signature). A replayed call without it
+   is `400 INVALID_ARGUMENT`. Fixed by capturing the signature off the part
+   (`_function_call_parts`, kept as raw `bytes`) and echoing it on the replayed
+   part's `thought_signature`; when the provider returned no signature the
+   documented `skip_thought_signature_validator` sentinel is used instead.
+4. **Function responses dropped the call `id`.** A multi-step turn (several
+   function calls and responses in one turn) is matched by id; a response sent
+   without its id is answered with `400 INVALID_ARGUMENT` ("function response turn
+   comes immediately after a function call turn"). `_to_contents` now builds each
+   `FunctionResponse` with the matching `call_id` (`Part.from_function_response`
+   cannot carry it).
+
+Evidence of the live loop (no secret material):
+
+- Adapter-level, against the live API: turn 1 returned a `get_active_window` call
+  carrying a **283-byte** `thought_signature`; replaying that call together with a
+  stub function response produced a **`200`** on turn 2 (previously a `400`).
+- App-level, real perception + real dispatch: two runs completed
+  `turns=2, halted=false` with real `final_text` — e.g.
+  `final_text='The active application is QTerminal.'` and
+  `final_text='The currently active application is QTerminal (window title "…")'`.
+- Post-fix gate is green: **ruff clean, mypy clean in 187 files, 1252 passed /
+  7 skipped**.
+
+**Open blocker (external, not code):** after the fix runs the Gemini API began
+answering `429 RESOURCE_EXHAUSTED` ("You exceeded your current quota") on
+`gemini-3.8-flash`, `gemini-3.6-flash` and `gemini-flash-latest` alike — the free
+tier's daily quota is spent. A fresh live multi-step run to confirm fix 4 could
+not be made today; the fix is unit-pinned
+(`test_a_function_response_without_a_call_id_carries_no_id` and the id assertion
+in `test_turns_translate_to_user_model_and_function_response_contents`) and the
+loop halts honestly (`RATE_LIMITED`, `final_text: null`, no injected input) rather
+than fabricating success. Re-run
+`python main.py run "Look at the current screen …"` once the quota resets.
 
 **Known-flaky watch:** `test_the_previous_content_is_served_during_the_restore_grace`
 (xfce4-clipman race) remains ~1-in-5; not touched this pass.

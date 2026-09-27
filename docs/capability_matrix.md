@@ -34,7 +34,7 @@ claimed for it (§4 rule 24, §79).
 |---|---|---|---|---|
 | **X11** | `x11` (primary path) | `mss` — **AVAILABLE**, measured live | in-process XTEST — **AVAILABLE**, measured live | yes |
 | **XWayland** | `xwayland` (XWayland on a Wayland compositor) | would use the same `mss` path; **not verified here** | would use XTEST against the XWayland server; **not verified here** | **no** — untested, so unclaimed |
-| **Wayland (native)** | `wayland` | **not implemented**: requires the XDG ScreenCast portal + PipeWire. The capture probe reports `UNAVAILABLE` with that fix hint on this session type. | **portal backend implemented** (`control/backends/portal.py`): `select_backend()` falls back to a functionally-probed `org.freedesktop.portal.RemoteDesktop`. Keyboard is `AVAILABLE` when the interface is present; the pointer is honestly `DEGRADED` until a ScreenCast stream node is wired (absolute motion). Session establishment needs interactive consent and is **not verified on this host** (see below). | **no** — the portal path is implemented and probe-tested, but its session/injection path is unverified here |
+| **Wayland (native)** | `wayland` | **implemented, not verified here**: `core/portal_capture.py` (ScreenCast portal + PipeWire → BGRA appsink) is a real `FrameEngine` backend; its probe is functional and non-invasive, but this host's portal does not advertise ScreenCast and there is no compositor to consent, so a real capture has never run. | **portal backend implemented** (`control/backends/portal.py`): `select_backend()` falls back to a functionally-probed `org.freedesktop.portal.RemoteDesktop`. Keyboard is `AVAILABLE` when the interface is present; the pointer is honestly `DEGRADED` until a ScreenCast stream node is wired (absolute motion). Session establishment needs interactive consent and is **not verified on this host** (see below). | **no** — the portal paths are implemented and probe-tested, but their session/injection/capture paths are unverified here |
 | **unknown** | `unknown` | `DEGRADED` / `UNAVAILABLE` from the probe, with the reason | `UNAVAILABLE` (`UnavailableBackend`) | **no** |
 
 BLAXCY starts on any of these — on a session where no input backend passes, the
@@ -47,7 +47,7 @@ Probe result on this host: **AVAILABLE 9 · DEGRADED 0 · UNAVAILABLE 3**.
 
 | Capability | Implemented backend | X11 (measured) | Latency | Other sessions |
 |---|---|---|---|---|
-| `capture` | `mss` (`core/frame_engine.py::MssBackend`) | **AVAILABLE** | 34.1 ms | Wayland: not implemented (portal + PipeWire); the probe says `UNAVAILABLE` with that hint |
+| `capture` | `mss` (`core/frame_engine.py::MssBackend`) | **AVAILABLE** | 34.1 ms | Wayland: portal capture implemented, **unverified** (`core/portal_capture.py`) |
 | `accessibility` | AT-SPI via `gi.repository.Atspi` (`core/accessibility.py`) | **AVAILABLE** | 251.5 ms | same code path on XWayland; **not verified** there |
 | `mouse` | in-process XTEST, else RemoteDesktop portal | **AVAILABLE** | — | Wayland: portal backend, **DEGRADED** until a ScreenCast stream node is wired (absolute pointer); probe checks the live interface |
 | `keyboard` | in-process XTEST, else RemoteDesktop portal | **AVAILABLE** | — | Wayland: portal backend, **AVAILABLE** when the interface is present (keysym injection needs no stream) |

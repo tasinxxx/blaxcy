@@ -386,9 +386,10 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "description is a separate, later capability and is reported as unavailable."
     ),
     ToolName.ACTIVATE_ELEMENT: (
-        "Invoke a control's accessibility action. Currently reports "
-        "BACKEND_UNAVAILABLE: AT-SPI action invocation is not implemented, and "
-        "BLAXCY does not fake it."
+        "Invoke a control's own accessibility action (e.g. a button's default "
+        "action) instead of injecting a pointer event. Mutating. A target with "
+        "no accessibility path reports BACKEND_UNAVAILABLE rather than "
+        "substituting a click, and BLAXCY never fakes it."
     ),
     ToolName.ENSURE_WINDOW: (
         "Activate a window and verify it really became active (bounded wait). "

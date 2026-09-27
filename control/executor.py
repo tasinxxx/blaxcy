@@ -27,10 +27,11 @@ Three invariants this module exists to enforce:
 
 Read-only tools never come here. They do not touch the desktop and are
 dispatched on the read path (section 32.1); routing them through the
-single-writer executor would serialise work that needs no serialisation. A tool
-this phase cannot really perform (``activate_element``, whose AT-SPI action
-invocation is not implemented) returns a structured ``BACKEND_UNAVAILABLE``
-rather than a fabricated success.
+single-writer executor would serialise work that needs no serialisation.
+``activate_element`` travels this pipeline like every other ``MUTATING`` tool:
+the AT-SPI action invocation lives behind the ``activate=`` hook (wired to the
+accessibility service by the composition root), and a Body without that hook
+reports a structured ``BACKEND_UNAVAILABLE`` rather than a fabricated click.
 """
 
 from __future__ import annotations
@@ -531,9 +532,8 @@ class Executor:
                 self._deny(
                     started,
                     ErrorCode.BACKEND_UNAVAILABLE,
-                    f"{tool!r} is not implemented by the executor "
-                    "(read-only tools are dispatched on the read path; AT-SPI action "
-                    "invocation is not implemented)",
+                    f"{tool!r} is not performed by the executor "
+                    "(read-only tools are dispatched on the read path)",
                     planned,
                 )
             )

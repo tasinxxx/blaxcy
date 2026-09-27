@@ -275,6 +275,10 @@ def _cmd_run(args: argparse.Namespace) -> int:
         app = BlaxcyApplication(settings)
         app.start()
         try:
+            # Seed the perception cache before the Brain speaks: the first
+            # ``get_screen_state`` must observe a real frame, not fail
+            # CAPTURE_FAILED because nothing has been observed yet.
+            app.perceive()
             result = app.run_task(args.task)
             print(json.dumps(result.to_dict(), indent=2))
             return 2 if result.halted else 0

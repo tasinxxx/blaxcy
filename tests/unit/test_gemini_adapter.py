@@ -105,19 +105,28 @@ def _response(
     calls: tuple[Any, ...] = (),
     text_raises: bool = False,
 ) -> Any:
-    """A stand-in for a GenerateContentResponse."""
+    """A stand-in for a GenerateContentResponse.
+
+    Calls are embedded in ``candidates[0].content.parts`` the way the real SDK
+    delivers them, each part carrying the call and its ``thought_signature``.
+    """
+    parts: list[Any] = [
+        SimpleNamespace(function_call=call, thought_signature=None) for call in calls
+    ]
+    candidate = SimpleNamespace(content=SimpleNamespace(parts=parts), finish_reason=None)
     if text_raises:
+
         class _Raising:
             @property
             def text(self) -> str:
                 raise ValueError("no text part in this response")
 
-            candidates: tuple[Any, ...] = ()
+            candidates: tuple[Any, ...] = (candidate,)
 
         obj = _Raising()
         obj.function_calls = calls  # type: ignore[attr-defined]
         return obj
-    return SimpleNamespace(text=text, function_calls=calls, candidates=())
+    return SimpleNamespace(text=text, function_calls=calls, candidates=(candidate,))
 
 
 # -- SDK availability ---------------------------------------------------------
@@ -238,6 +247,30 @@ def test_turns_translate_to_user_model_and_function_response_contents() -> None:
     response_part = contents[2].parts[0]
     assert response_part.function_response.name == ToolName.CLICK
     assert response_part.function_response.response["ok"] is True
+    # The call's id rides back on its response: a multi-step turn is matched by
+    # id, and a response missing it is rejected with 400 INVALID_ARGUMENT.
+    assert response_part.function_response.id == "c1"
+
+
+@requires_sdk
+def test_a_function_response_without_a_call_id_carries_no_id() -> None:
+    """A call that arrived without an id must not gain a fabricated one."""
+    adapter, models, _client = _adapter(_response(text="hi"))
+    adapter.generate(
+        system_instruction="x",
+        turns=(
+            ConversationTurn(
+                role="tool",
+                tool_results=(
+                    ToolResultPayload(name=ToolName.CLICK, envelope={"ok": True}),
+                ),
+            ),
+        ),
+        tools=tool_declarations(),
+    )
+    response_part = models.calls[0]["contents"][0].parts[0]
+    assert response_part.function_response.name == ToolName.CLICK
+    assert response_part.function_response.id is None
 
 
 # -- Response parsing ---------------------------------------------------------
@@ -254,6 +287,102 @@ def test_function_calls_are_parsed_for_the_loop() -> None:
     assert turn.tool_calls[0].name == ToolName.CLICK
     assert turn.tool_calls[0].args == {"target": "Send"}
     assert turn.tool_calls[0].call_id == "c1"
+
+
+@requires_sdk
+def test_the_thought_signature_is_captured_from_the_call_part() -> None:
+    """Gemini 3 signs each function-call part; the capture keeps it with the call."""
+    candidate = SimpleNamespace(
+        content=SimpleNamespace(
+            parts=[
+                SimpleNamespace(
+                    function_call=SimpleNamespace(
+                        name=ToolName.CLICK, args={"target": "Send"}, id=None
+                    ),
+                    thought_signature=b"sig-abc",
+                ),
+            ]
+        ),
+        finish_reason=None,
+    )
+    adapter, _models, _client = _adapter(
+        SimpleNamespace(text=None, function_calls=(), candidates=(candidate,))
+    )
+    turn = adapter.generate(
+        system_instruction="x", turns=(ConversationTurn(role="user", text="hi"),), tools=()
+    )
+    assert turn.has_tool_calls is True
+    assert turn.tool_calls[0].name == ToolName.CLICK
+    assert turn.tool_calls[0].thought_signature == b"sig-abc"
+
+
+@requires_sdk
+def test_a_call_without_a_signature_captures_none() -> None:
+    """A part that only signs emptyly yields no signature, not an empty string."""
+    candidate = SimpleNamespace(
+        content=SimpleNamespace(
+            parts=[
+                SimpleNamespace(
+                    function_call=SimpleNamespace(name=ToolName.CLICK, args={}, id=None),
+                    thought_signature=b"",
+                ),
+            ]
+        ),
+        finish_reason=None,
+    )
+    adapter, _models, _client = _adapter(
+        SimpleNamespace(text=None, function_calls=(), candidates=(candidate,))
+    )
+    turn = adapter.generate(
+        system_instruction="x", turns=(ConversationTurn(role="user", text="hi"),), tools=()
+    )
+    assert turn.tool_calls[0].thought_signature is None
+
+
+@requires_sdk
+def test_a_replayed_call_echoes_the_thought_signature_on_its_part() -> None:
+    """The signature must ride back on the same part, or Gemini 3 rejects the request."""
+    adapter, models, _client = _adapter(_response(text="hi"))
+    adapter.generate(
+        system_instruction="x",
+        turns=(
+            ConversationTurn(role="user", text="click send"),
+            ConversationTurn(
+                role="model",
+                tool_calls=(
+                    ModelToolCall(
+                        name=ToolName.CLICK,
+                        args={"target": "Send"},
+                        call_id="c1",
+                        thought_signature=b"sig-abc",
+                    ),
+                ),
+            ),
+        ),
+        tools=tool_declarations(),
+    )
+    call_part = models.calls[0]["contents"][1].parts[-1]
+    assert call_part.function_call.name == ToolName.CLICK
+    assert call_part.function_call.args == {"target": "Send"}
+    assert call_part.thought_signature == b"sig-abc"
+
+
+@requires_sdk
+def test_a_call_that_arrived_without_a_signature_replays_with_the_sentinel() -> None:
+    """With no signature to echo, the documented sentinel keeps Gemini 3 from 400ing."""
+    adapter, models, _client = _adapter(_response(text="hi"))
+    adapter.generate(
+        system_instruction="x",
+        turns=(
+            ConversationTurn(
+                role="model",
+                tool_calls=(ModelToolCall(name=ToolName.CLICK, args={"target": "Send"}),),
+            ),
+        ),
+        tools=tool_declarations(),
+    )
+    call_part = models.calls[0]["contents"][0].parts[-1]
+    assert call_part.thought_signature == b"skip_thought_signature_validator"
 
 
 @requires_sdk

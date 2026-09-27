@@ -70,8 +70,11 @@ misleading:
   disk; an attacker with write access to the log directory can alter it.
 - **`--system-deps` reports, it does not install.** No privileged package
   installation has been performed or is attempted unattended.
-- **Wayland has no verified input path** on this host; the §30 portal path is
-  not implemented. Input is X11/XTEST only.
+- **Wayland has no *verified* input path** on this host. The §30 XDG
+  RemoteDesktop portal path **is implemented** (`control/backends/portal.py`,
+  functionally probed, unit-tested over fakes), but its session/injection path
+  has never run — this host's X11 portal does not expose the interface and there
+  is no Wayland compositor here. Verified input is X11/XTEST only.
 
 ## Reporting
 

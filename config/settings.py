@@ -305,7 +305,11 @@ class LoggingSettings(_Section):
 class GeminiSettings(_Section):
     """Brain connection limits (sections 67, 68). Key lives in the keyring."""
 
-    model: str = "gemini-2.5-flash"
+    # Re-verified 2026-09-26 against the live API: gemini-2.5-flash returns 404
+    # "no longer available to new users" and points at the 3.x family. The
+    # default is the replacement the API itself names; any model the key can see
+    # remains configurable here.
+    model: str = "gemini-3.8-flash"
     max_model_turns: int = Field(default=40, ge=1)
     max_task_wall_clock_seconds: int = Field(default=300, ge=1)
     context_token_budget: int = Field(default=1200, ge=128)

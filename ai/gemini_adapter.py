@@ -21,16 +21,23 @@ stating, because each one is a place this could have gone wrong:
 
 The API shape used here was verified against the installed ``google-genai``
 version (2.20.0): ``FunctionDeclaration.parameters_json_schema`` accepts the
-JSON schema BLAXCY already declares, ``GenerateContentResponse.function_calls``
-exposes the model's calls, and function responses are sent back as
-``Content(role="user", parts=[Part.from_function_response(...)])``.
+JSON schema BLAXCY already declares, function responses are sent back as
+``Content(role="user", parts=[Part.from_function_response(...)])``, and a
+model's ``thought_signature`` lives on the ``Part`` that wraps each
+``FunctionCall`` -- so it is captured per part here and echoed back on the
+replayed call, as Gemini 3 models require.
+
+One consequence of that verification: the aggregated
+``GenerateContentResponse.function_calls`` property flattens each part down to
+its bare ``FunctionCall`` and silently drops the ``thought_signature``, so
+:meth:`GeminiAdapter._to_model_turn` walks the candidate's parts itself instead.
 """
 
 from __future__ import annotations
 
 import json
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Final
 
 from ai.brain_adapter import (
     ROLE_MODEL,
@@ -45,6 +52,16 @@ from ai.tool_protocol import ToolDeclaration
 from config.settings import GeminiSettings
 from schemas.enums import ErrorCode
 from security.keyring_manager import ApiKeyManager, KeyringError, redact_secret
+
+#: Google's documented escape hatch for a replayed ``functionCall`` part that
+#: arrived without a ``thought_signature``. Gemini 3 models enforce the signature
+#: and answer a signed call replayed without one with ``400 INVALID_ARGUMENT``
+#: whose text talks about function-call/response ordering rather than the
+#: signature, so the cause is opaque from the error alone. Google advises the
+#: sentinel only as a last resort because it costs some model performance, so it
+#: is used only when the provider genuinely returned no signature to echo.
+#: https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/thinking/thought-signatures
+_SKIP_SIGNATURE_SENTINEL: Final[bytes] = b"skip_thought_signature_validator"
 
 #: Detected once at import, reported honestly, never assumed. Held as ``Any``
 #: so an absent SDK really is ``None`` rather than a module object.
@@ -234,20 +251,43 @@ class GeminiAdapter(BrainAdapter):
                         call_kwargs["args"] = dict(call.args)
                     if call.call_id:
                         call_kwargs["id"] = call.call_id
-                    parts.append(
-                        _types.Part(function_call=_types.FunctionCall(**call_kwargs))
+                    part_kwargs: dict[str, Any] = {
+                        "function_call": _types.FunctionCall(**call_kwargs)
+                    }
+                    # Gemini 3 models validate that the thought_signature which
+                    # rode in with a function call is echoed back on the same
+                    # part; a replayed call without one is a 400 INVALID_ARGUMENT.
+                    # When the provider returned no signature to echo, the
+                    # documented sentinel keeps the replay valid instead of
+                    # halting the task.
+                    part_kwargs["thought_signature"] = (
+                        call.thought_signature or _SKIP_SIGNATURE_SENTINEL
                     )
+                    parts.append(_types.Part(**part_kwargs))
                 contents.append(_types.Content(role="model", parts=parts or [_types.Part(text="")]))
                 continue
             if turn.role == ROLE_TOOL:
                 # A function response goes back with role "user" (verified against
-                # google-genai 2.20.0's own automatic-function-calling path).
-                responses = [
-                    _types.Part.from_function_response(
-                        name=result.name, response=dict(result.envelope)
+                # google-genai 2.20.0's own automatic-function-calling path). The
+                # call's ``id`` travels with the response too: a multi-step turn
+                # (several function calls and responses) is matched by id, and a
+                # response missing its id is answered with 400 INVALID_ARGUMENT
+                # ("function response turn comes immediately after a function
+                # call turn"). ``Part.from_function_response`` cannot carry it, so
+                # the part is built directly.
+                responses: list[Any] = []
+                for result in turn.tool_results:
+                    response_kwargs: dict[str, Any] = {
+                        "name": result.name,
+                        "response": dict(result.envelope),
+                    }
+                    if result.call_id:
+                        response_kwargs["id"] = result.call_id
+                    responses.append(
+                        _types.Part(
+                            function_response=_types.FunctionResponse(**response_kwargs)
+                        )
                     )
-                    for result in turn.tool_results
-                ]
                 if responses:
                     contents.append(_types.Content(role="user", parts=responses))
                 continue
@@ -259,7 +299,7 @@ class GeminiAdapter(BrainAdapter):
         """Parse the SDK response into a :class:`ModelTurn`."""
         text = self._response_text(response)
         calls: list[ModelToolCall] = []
-        for call in getattr(response, "function_calls", None) or ():
+        for call, signature in self._function_call_parts(response):
             name = getattr(call, "name", None)
             if not name:
                 continue
@@ -274,6 +314,7 @@ class GeminiAdapter(BrainAdapter):
                     name=str(name),
                     args=dict(raw_args) if isinstance(raw_args, dict) else {},
                     call_id=getattr(call, "id", None),
+                    thought_signature=signature,
                 )
             )
         return ModelTurn(
@@ -281,6 +322,28 @@ class GeminiAdapter(BrainAdapter):
             tool_calls=tuple(calls),
             finish_reason=self._finish_reason(response),
         )
+
+    def _function_call_parts(self, response: Any) -> list[tuple[Any, bytes | None]]:
+        """The response's function calls, each paired with its signature.
+
+        This walks the first candidate's parts exactly the way the SDK's
+        aggregated ``response.function_calls`` property does, but keeps the
+        wrapping ``Part`` around each call -- which is where the
+        ``thought_signature`` lives (google-genai 2.20.0). The aggregate drops
+        it, and a replayed call without its signature is rejected by Gemini 3
+        models with 400 INVALID_ARGUMENT.
+        """
+        candidates = getattr(response, "candidates", None) or ()
+        for candidate in candidates[:1]:
+            content = getattr(candidate, "content", None)
+            parts = getattr(content, "parts", None) or ()
+            found: list[tuple[Any, bytes | None]] = []
+            for part in parts:
+                call = getattr(part, "function_call", None)
+                if call is not None:
+                    found.append((call, getattr(part, "thought_signature", None) or None))
+            return found
+        return []
 
     def _response_text(self, response: Any) -> str | None:
         """Best-effort plain text, or ``None`` when the turn carried no text.
