@@ -67,7 +67,7 @@ jobs:
           # (docs/relay.md "Self-hosted runner requirements"). Nothing here
           # installs or upgrades BLAXCY: a workflow that mutates the Body's
           # environment as a side effect of a task would be an execution path.
-          . blaxcy/.venv/bin/activate
+          . "$HOME/blaxcy/.venv/bin/activate"
           python -c "import bridge, relay; print('relay cli ready')"
 
       - name: Sync the relay repository (pull before processing)
@@ -82,7 +82,7 @@ jobs:
           BLAXCY_LOG_DIR: ${{ runner.temp }}/blaxcy-logs
         run: |
           set -eu
-          . blaxcy/.venv/bin/activate
+          . "$HOME/blaxcy/.venv/bin/activate"
           # The relay CLI (relay/entry.py): claims pending tasks exclusively,
           # validates and verifies each envelope, and executes through the
           # Phase 2A LocalBridge. It never injects input itself; a Body that is
