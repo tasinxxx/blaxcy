@@ -40,6 +40,7 @@ jobs:
             at-spi2-core \
             dbus-x11 \
             xvfb \
+            libegl1 \
             x11-utils \
             xdotool \
             tesseract-ocr
