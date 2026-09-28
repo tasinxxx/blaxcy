@@ -69,6 +69,12 @@ def test_step_rejects_run_sequence_nesting() -> None:
         _step(tool=ToolName.RUN_SEQUENCE)
 
 
+def test_step_to_dict_preserves_explicit_verification_override() -> None:
+    """Relay serialization must not discard a per-step verification override."""
+    step = _step(require_verification=False)
+    assert step.to_dict()["require_verification"] is False
+
+
 def test_step_default_verification_by_class() -> None:
     """Verification defaults to the action class, but can be overridden."""
     click = _step(tool=ToolName.CLICK)
