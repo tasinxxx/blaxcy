@@ -158,6 +158,10 @@ class Task(BaseModel):
     task_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
     plan: tuple[SequenceStep, ...] = Field(min_length=1, max_length=MAX_TASK_STEPS)
     created_at_ms: int | None = Field(default=None, ge=0)
+    operator_approved: bool = Field(
+        default=False,
+        description="Explicit approval supplied by the trusted Agent producer for this task.",
+    )
 
     @field_validator("schema_version")
     @classmethod
