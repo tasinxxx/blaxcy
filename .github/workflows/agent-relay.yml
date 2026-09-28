@@ -37,7 +37,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install producer validation dependencies
-        run: python -m pip install --disable-pip-version-check "pydantic>=2,<3" xxhash
+        run: python -m pip install --disable-pip-version-check "pydantic>=2,<3" xxhash tomlkit
 
       - name: Sign pending Agent requests
         env:
