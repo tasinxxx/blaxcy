@@ -446,8 +446,7 @@ def occluders_above(
             or position > target_position
             or (
                 position == target_position
-                and candidate.clickable
-                and candidate.effective_clickable
+                and (candidate.clickable or candidate.effective_clickable)
             )
         )
     )
