@@ -67,10 +67,7 @@ jobs:
           for request in "${requests[@]}"; do
             [ -f "$request" ] || continue
             python -m relay.agent_producer "$request" --repo .
-            python - "$request" <<'PY' >> "$RUNNER_TEMP/blaxcy-task-ids"
-import json, sys
-print(json.load(open(sys.argv[1], encoding="utf-8"))["task_id"])
-PY
+            python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["task_id"])' "$request" >> "$RUNNER_TEMP/blaxcy-task-ids"
           done
           ids=$(paste -sd, "$RUNNER_TEMP/blaxcy-task-ids")
           echo "task_ids=$ids" >> "$GITHUB_OUTPUT"
