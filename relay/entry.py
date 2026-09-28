@@ -35,6 +35,7 @@ from core.logging_setup import configure_logging
 from relay.executor import RelayExecutor
 from relay.lifecycle import TERMINAL_STATES, TaskLifecycle
 from relay.store import TaskStore
+from schemas.enums import PolicyMode
 
 
 def _cmd_process(args: argparse.Namespace) -> int:
