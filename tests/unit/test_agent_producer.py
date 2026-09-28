@@ -44,7 +44,7 @@ def test_agent_request_uses_the_normal_task_guards() -> None:
     unsafe["plan"] = [
         {"step_id": "s1", "tool": "click", "target": "Send", "element_id": "pre-resolved"}
     ]
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         build_signed_envelope(unsafe, authenticator=auth, now=time.time())
 
 

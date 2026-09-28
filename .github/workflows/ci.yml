@@ -98,7 +98,7 @@ jobs:
       - name: Clean uninstall
         run: |
           /tmp/blaxcy-install/bin/pip uninstall -y blaxcy
-          if /tmp/blaxcy-install/bin/python -c "import main" 2>/dev/null; then
+          if (cd /tmp && /tmp/blaxcy-install/bin/python -c "import main" 2>/dev/null); then
             echo "blaxcy still importable after uninstall" >&2
             exit 1
           fi
