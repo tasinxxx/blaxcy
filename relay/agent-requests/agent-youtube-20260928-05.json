@@ -1,9 +1,0 @@
-{
-  "schema_version": 1,
-  "task_id": "agent-youtube-20260928-05",
-  "plan": [
-    {"step_id":"s1","tool":"hotkey","args":{"combo":"ctrl+l"}},
-    {"step_id":"s2","tool":"type_text","args":{"target":"address bar","text":"https://www.youtube.com"}},
-    {"step_id":"s3","tool":"press_key","args":{"key":"Return"}}
-  ]
-}
