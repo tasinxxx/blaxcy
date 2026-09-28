@@ -245,7 +245,7 @@ class TaskEnvelopeDocument(BaseModel):
 
     def submission_bytes(self) -> str:
         """The canonical envelope bytes (what gets committed to the repository)."""
-        return canonical_task_document(self.model_dump(mode="json"))
+        return canonical_task_document(self.model_dump(mode="json", exclude_none=True))
 
 
 def _validation_errors(exc: Exception) -> list[dict[str, Any]]:
