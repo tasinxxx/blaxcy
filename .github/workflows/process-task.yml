@@ -86,13 +86,13 @@ jobs:
           # The relay CLI (relay/entry.py): claims pending tasks exclusively,
           # validates and verifies each envelope, and executes through the
           # Phase 2A LocalBridge. It never injects input itself; a Body that is
-          # not running (or OBSERVE) makes tasks halt or fail closed, never
-          # act unattended.
+          # not running, or if a safety guard/stop is active, makes tasks halt
+          # or fail closed. Approved relay tasks run in time-boxed AUTONOMOUS mode.
           TASK_ARGS=""
           if [ -n "${{ github.event.inputs.task_id || github.event.client_payload.task_id || '' }}" ]; then
             TASK_ARGS="--task-id ${{ github.event.inputs.task_id || github.event.client_payload.task_id }}"
           fi
-          python -m relay.entry --repo . process --mode ASSIST $TASK_ARGS
+          python -m relay.entry --repo . process --mode AUTONOMOUS $TASK_ARGS
 
       - name: Commit results back to the relay repository
         run: |
