@@ -54,33 +54,26 @@ jobs:
             echo "has_requests=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Check for pending signed relay tasks
-        id: pending_tasks
-        shell: bash
-        run: |
-          set -eu
-          shopt -s nullglob
-          states=(relay/tasks/*/state.json)
-          found=0
-          for state in "${states[@]}"; do
-            grep -q '"state": "PENDING"' "$state" && found=1 && break
-          done
-          echo "has_tasks=$([ "$found" -eq 1 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-
       - name: Sign pending Agent requests
         if: steps.pending.outputs.has_requests == 'true'
+        id: sign
         env:
           BLAXCY_BRIDGE_TOKEN: ${{ secrets.BLAXCY_BRIDGE_TOKEN }}
         run: |
           set -eu
-          found=0
-          for request in relay/agent-requests/*.json; do
+          shopt -s nullglob
+          requests=(relay/agent-requests/*.json)
+          : > "$RUNNER_TEMP/blaxcy-task-ids"
+          for request in "${requests[@]}"; do
             [ -f "$request" ] || continue
-            found=1
             python -m relay.agent_producer "$request" --repo .
+            python - "$request" <<'PY' >> "$RUNNER_TEMP/blaxcy-task-ids"
+import json, sys
+print(json.load(open(sys.argv[1], encoding="utf-8"))["task_id"])
+PY
           done
-          [ "$found" -eq 1 ]
-
+          ids=$(paste -sd, "$RUNNER_TEMP/blaxcy-task-ids")
+          echo "task_ids=$ids" >> "$GITHUB_OUTPUT"
       - name: Commit signed relay tasks
         if: steps.pending.outputs.has_requests == 'true'
         run: |
@@ -94,7 +87,13 @@ jobs:
           git push
 
       - name: Dispatch the self-hosted desktop processor
-        if: steps.pending.outputs.has_requests == 'true' || steps.pending_tasks.outputs.has_tasks == 'true'
+        if: steps.pending.outputs.has_requests == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run process-task.yml --repo "${{ github.repository }}" --ref master
+        run: |
+          set -eu
+          IFS=',' read -ra ids <<< "${{ steps.sign.outputs.task_ids }}"
+          for task_id in "${ids[@]}"; do
+            [ -n "$task_id" ] || continue
+            gh workflow run process-task.yml --repo "${{ github.repository }}" --ref master -f task_id="$task_id"
+          done
