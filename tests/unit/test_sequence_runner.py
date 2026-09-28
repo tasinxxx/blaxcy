@@ -14,10 +14,11 @@ from typing import Any
 import pytest
 
 from control.recovery import RecoveryController
+from control.sequence_runner import query_for_step
 from schemas.actions import ToolName
-from schemas.enums import ChangeClass, ErrorCode, PolicyMode, VerificationState
+from schemas.enums import ChangeClass, ErrorCode, PolicyMode, UIRole, VerificationState
 from schemas.events import EventType
-from schemas.sequences import RunSequenceRequest
+from schemas.sequences import RunSequenceRequest, SequenceStep
 from tests.harness.phase8 import box_of
 from tests.harness.phase101 import (
     WORKFLOW_PLAN,
