@@ -157,7 +157,55 @@ def test_missing_typed_target_is_unverified() -> None:
     """A vanished field gives no evidence either way about the text."""
     outcome = _verifier().verify_text(after=make_state(), target=make_text_input(), text="hello")
     assert outcome.state is VerificationState.UNVERIFIED
+def test_recreated_text_field_with_same_identity_hints_can_verify() -> None:
+    """Transient AT-SPI node recreation must not erase positive typing evidence."""
+    target = make_text_input(
+        "old-field",
+        accessible_name="Search with Google or enter address",
+        atspi_path="/old",
+        owner_window_id=42,
+        bbox=DEFAULT_BOX,
+    )
+    recreated = make_text_input(
+        "new-field",
+        accessible_name="Search with Google or enter address",
+        atspi_path="/new",
+        owner_window_id=42,
+        bbox=DEFAULT_BOX,
+        text="https://www.youtube.com",
+    )
+    outcome = _verifier().verify_text(
+        after=make_state(elements=(recreated,)),
+        target=target,
+        text="https://www.youtube.com",
+    )
+    assert outcome.state is VerificationState.VERIFIED
+    assert outcome.postcondition is Postcondition.TEXT_PRESENT
 
+
+def test_recreated_text_field_without_shared_application_identity_stays_unverified() -> None:
+    """A matching label alone is not enough to attribute another field."""
+    target = make_text_input(
+        "old-field",
+        accessible_name="Search with Google or enter address",
+        atspi_path="/old",
+        owner_window_id=42,
+        bbox=DEFAULT_BOX,
+    )
+    unrelated = make_text_input(
+        "other-field",
+        accessible_name="Search with Google or enter address",
+        atspi_path="/other",
+        owner_window_id=99,
+        bbox=DEFAULT_BOX,
+        text="https://www.youtube.com",
+    )
+    outcome = _verifier().verify_text(
+        after=make_state(elements=(unrelated,)),
+        target=target,
+        text="https://www.youtube.com",
+    )
+    assert outcome.state is VerificationState.UNVERIFIED
 
 def test_no_observation_for_text_is_unverified() -> None:
     """Without an observation typing cannot be confirmed."""
