@@ -440,9 +440,16 @@ def occluders_above(
     return tuple(
         candidate
         for candidate in kept
-        if not isinstance(candidate, UIElement)
-        or (position := _window_position(candidate, stack, lowest=False)) is None
-        or position >= target_position
+        if (
+            not isinstance(candidate, UIElement)
+            or (position := _window_position(candidate, stack, lowest=False)) is None
+            or position > target_position
+            or (
+                position == target_position
+                and candidate.clickable
+                and candidate.effective_clickable
+            )
+        )
     )
 
 
