@@ -421,6 +421,23 @@ class _QtShimNode:
         return len(self.raw_text)
 
 
+def test_a_navigation_field_does_not_require_legacy_is_text() -> None:
+    """Qt's Text interface is authoritative even when Accessible.is_text() is false."""
+    backend = AtspiBackend(AccessibilitySettings())
+    backend._atspi = _FakeAtspiWithText()
+
+    class _QtNodeWithoutLegacyTextPredicate(_QtShimNode):
+        def is_text(self) -> bool:
+            return False
+
+    node = _QtNodeWithoutLegacyTextPredicate("https://example.com")
+    element, *_ = backend._observe(node, "root/0", None, None, None)
+
+    assert element is not None
+    assert element.role is UIRole.TEXT_INPUT
+    assert element.text == "https://example.com"
+
+
 def test_a_navigation_field_is_read_through_the_text_interface() -> None:
     """Section 36: read ``Atspi.Text``, not the deprecated single-argument shim.
 
