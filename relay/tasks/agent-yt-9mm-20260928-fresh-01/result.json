@@ -1,0 +1,1317 @@
+{
+  "schema_version": 1,
+  "task_id": "agent-yt-9mm-20260928-fresh-01",
+  "lifecycle": "HALTED",
+  "bridge_status": "HALTED",
+  "result": {
+    "task_id": "agent-yt-9mm-20260928-fresh-01",
+    "envelope": {
+      "ok": false,
+      "error_code": "VERIFICATION_UNVERIFIED",
+      "message": "step s7 (press_key) halted the sequence on UNVERIFIED: only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+      "data": {
+        "sequence_id": "seq-6878ca1d8c2b40b5900f423c08e4f358",
+        "halted": true,
+        "halt_reason": "step s7 (press_key) halted the sequence on UNVERIFIED: only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+        "halt_code": "VERIFICATION_UNVERIFIED",
+        "wall_clock_ms": 3451.845105000018,
+        "completed_count": 7,
+        "steps": [
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "verification": {
+                "state": "VERIFIED",
+                "postcondition": "SCREEN_CHANGED",
+                "reason": "a MEANINGFUL change followed the hotkey",
+                "evidence": {
+                  "change_class": "MEANINGFUL",
+                  "after_frame_id": 1,
+                  "active_window_changed": false
+                }
+              },
+              "timing": {
+                "observe_ms": 23.964,
+                "verify_calls": 1
+              }
+            },
+            "verification": "VERIFIED",
+            "state_version": 2,
+            "frame_id": 1,
+            "elapsed_ms": 28.6222059999659,
+            "step_id": "s1",
+            "index": 0,
+            "tool": "hotkey",
+            "action_class": "MUTATING",
+            "require_verification": false
+          },
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "changed": true,
+              "change_class": "MAJOR",
+              "regions": [
+                {
+                  "x": 0.0,
+                  "y": 25.6,
+                  "width": 1366.0,
+                  "height": 742.4,
+                  "space": "DESKTOP"
+                }
+              ],
+              "state": {
+                "frame_id": 3,
+                "state_version": 4,
+                "generation": 0,
+                "active_window_id": 67108926,
+                "active_app": "firefox-esr",
+                "element_count": 530
+              }
+            },
+            "verification": "NOT_APPLICABLE",
+            "state_version": 4,
+            "frame_id": 3,
+            "elapsed_ms": 894.4170940000049,
+            "step_id": "s2",
+            "index": 1,
+            "tool": "wait_for_change",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "verification": {
+                "state": "UNVERIFIED",
+                "postcondition": "NONE",
+                "reason": "only a ANIMATION change followed the hotkey; that does not establish a user-visible outcome",
+                "evidence": {
+                  "change_class": "ANIMATION",
+                  "after_frame_id": 4,
+                  "active_window_changed": false
+                }
+              },
+              "timing": {
+                "observe_ms": 13.606,
+                "verify_calls": 1
+              }
+            },
+            "verification": "UNVERIFIED",
+            "state_version": 5,
+            "frame_id": 4,
+            "elapsed_ms": 14.120466000008491,
+            "step_id": "s3",
+            "index": 2,
+            "tool": "hotkey",
+            "action_class": "MUTATING",
+            "require_verification": false
+          },
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "found": true,
+              "resolution": {
+                "status": "RESOLVED",
+                "reason": "resolved at stage 'role' with score 0.874",
+                "considered": 530,
+                "matched_stage": "role",
+                "ambiguity": false,
+                "best": {
+                  "element_id": "desktop[0]/23/1/23/5/1/0",
+                  "role": "TEXT_INPUT",
+                  "text": null,
+                  "accessible_name": "Search with Google or enter address",
+                  "score": 0.8744444444444445,
+                  "breakdown": {
+                    "text": 0.7111111111111111,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 316.0,
+                    "y": 86.0,
+                    "width": 823.0,
+                    "height": 28.0,
+                    "space": "DESKTOP"
+                  }
+                },
+                "candidates": [
+                  {
+                    "element_id": "desktop[0]/23/1/23/5/1/0",
+                    "role": "TEXT_INPUT",
+                    "text": null,
+                    "accessible_name": "Search with Google or enter address",
+                    "score": 0.8744444444444445,
+                    "breakdown": {
+                      "text": 0.7111111111111111,
+                      "source": 0.95,
+                      "role": 1.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 316.0,
+                      "y": 86.0,
+                      "width": 823.0,
+                      "height": 28.0,
+                      "space": "DESKTOP"
+                    }
+                  }
+                ],
+                "occlusion": {
+                  "target_id": "desktop[0]/23/1/23/5/1/0",
+                  "ratio": 0.0,
+                  "threshold": 0.5,
+                  "blocked": false,
+                  "assessed": true,
+                  "declared_occluded": false,
+                  "covering": [],
+                  "reason": "nothing covers more than 0.50 of the target"
+                },
+                "cache": {
+                  "outcome": "MISS",
+                  "reason": "no hint for this description",
+                  "hint": null
+                }
+              }
+            },
+            "verification": "NOT_APPLICABLE",
+            "state_version": 6,
+            "frame_id": 5,
+            "elapsed_ms": 19.18121900001779,
+            "step_id": "s4",
+            "index": 3,
+            "tool": "wait_for_element",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "verification": {
+                "state": "VERIFIED",
+                "postcondition": "SCREEN_CHANGED",
+                "reason": "a MEANINGFUL change followed the click",
+                "evidence": {
+                  "change_class": "MEANINGFUL",
+                  "after_frame_id": 6,
+                  "active_window_changed": false,
+                  "target_overlap": true
+                }
+              },
+              "timing": {
+                "observe_ms": 1018.895,
+                "verify_calls": 1
+              },
+              "target": {
+                "element_id": "desktop[0]/23/1/23/5/1/0",
+                "role": "TEXT_INPUT",
+                "text": null,
+                "accessible_name": "Search with Google or enter address",
+                "source": "ATSPI",
+                "confidence": 0.95,
+                "bbox": {
+                  "x": 316.0,
+                  "y": 86.0,
+                  "width": 823.0,
+                  "height": 28.0,
+                  "space": "DESKTOP"
+                },
+                "owner_window_id": null,
+                "password": false
+              },
+              "lease": {
+                "lease_id": "9e4d2deafa144c529ecd9499e4a55d81",
+                "element_id": "desktop[0]/23/1/23/5/1/0",
+                "frame_id": 5,
+                "state_version": 6,
+                "generation": 0,
+                "ttl_ms": 3000,
+                "confidence": 0.95,
+                "source": "ATSPI",
+                "monitor_id": null
+              },
+              "resolution": {
+                "status": "RESOLVED",
+                "reason": "resolved at stage 'role' with score 0.874",
+                "considered": 530,
+                "matched_stage": "role",
+                "ambiguity": false,
+                "best": {
+                  "element_id": "desktop[0]/23/1/23/5/1/0",
+                  "role": "TEXT_INPUT",
+                  "text": null,
+                  "accessible_name": "Search with Google or enter address",
+                  "score": 0.8744444444444445,
+                  "breakdown": {
+                    "text": 0.7111111111111111,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 316.0,
+                    "y": 86.0,
+                    "width": 823.0,
+                    "height": 28.0,
+                    "space": "DESKTOP"
+                  }
+                },
+                "candidates": [
+                  {
+                    "element_id": "desktop[0]/23/1/23/5/1/0",
+                    "role": "TEXT_INPUT",
+                    "text": null,
+                    "accessible_name": "Search with Google or enter address",
+                    "score": 0.8744444444444445,
+                    "breakdown": {
+                      "text": 0.7111111111111111,
+                      "source": 0.95,
+                      "role": 1.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 316.0,
+                      "y": 86.0,
+                      "width": 823.0,
+                      "height": 28.0,
+                      "space": "DESKTOP"
+                    }
+                  }
+                ],
+                "occlusion": {
+                  "target_id": "desktop[0]/23/1/23/5/1/0",
+                  "ratio": 0.0,
+                  "threshold": 0.5,
+                  "blocked": false,
+                  "assessed": true,
+                  "declared_occluded": false,
+                  "covering": [],
+                  "reason": "nothing covers more than 0.50 of the target"
+                },
+                "cache": {
+                  "outcome": "HIT",
+                  "reason": "identity hint",
+                  "hint": {
+                    "identity_path": "desktop[0]/23/1/23/5/1/0",
+                    "element_id": "desktop[0]/23/1/23/5/1/0",
+                    "role": "TEXT_INPUT",
+                    "owner_window_id": null,
+                    "frame_id": 5,
+                    "state_version": 6,
+                    "generation": 0,
+                    "patch_hash": null,
+                    "cache_window_id": 67108926,
+                    "speculative_only": false
+                  }
+                }
+              },
+              "revalidation": {
+                "ok": true,
+                "checks": {
+                  "lease_valid": true,
+                  "generation_current": true,
+                  "state_fresh": true,
+                  "state_not_older_than_lease": true,
+                  "target_present": true,
+                  "identity_consistent": true,
+                  "visible": true,
+                  "enabled": true,
+                  "has_geometry": true,
+                  "inside_desktop": true,
+                  "not_occluded": true
+                },
+                "moved_px": 0.0,
+                "occlusion": {
+                  "target_id": "desktop[0]/23/1/23/5/1/0",
+                  "ratio": 0.0,
+                  "threshold": 0.5,
+                  "blocked": false,
+                  "assessed": true,
+                  "declared_occluded": false,
+                  "covering": [],
+                  "reason": "nothing covers more than 0.50 of the target"
+                }
+              }
+            },
+            "verification": "VERIFIED",
+            "state_version": 7,
+            "frame_id": 6,
+            "elapsed_ms": 1187.7642949999654,
+            "step_id": "s5",
+            "index": 4,
+            "tool": "click",
+            "action_class": "MUTATING",
+            "require_verification": true
+          },
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "verification": {
+                "state": "VERIFIED",
+                "postcondition": "TEXT_PRESENT",
+                "reason": "the typed text is present in the target's observed content",
+                "evidence": {
+                  "element_id": "desktop[0]/23/1/23/5/1/0",
+                  "characters": 53
+                }
+              },
+              "timing": {
+                "observe_ms": 739.595,
+                "verify_calls": 1
+              },
+              "target": {
+                "element_id": "desktop[0]/23/1/23/5/1/0",
+                "role": "TEXT_INPUT",
+                "text": null,
+                "accessible_name": "Search with Google or enter address",
+                "source": "ATSPI",
+                "confidence": 0.95,
+                "bbox": {
+                  "x": 316.0,
+                  "y": 86.0,
+                  "width": 823.0,
+                  "height": 28.0,
+                  "space": "DESKTOP"
+                },
+                "owner_window_id": null,
+                "password": false
+              },
+              "lease": {
+                "lease_id": "612f3f01b70f481fa7ad39a86a004ee1",
+                "element_id": "desktop[0]/23/1/23/5/1/0",
+                "frame_id": 6,
+                "state_version": 7,
+                "generation": 0,
+                "ttl_ms": 3000,
+                "confidence": 0.95,
+                "source": "ATSPI",
+                "monitor_id": null
+              },
+              "resolution": {
+                "status": "RESOLVED",
+                "reason": "resolved at stage 'role' with score 0.874",
+                "considered": 549,
+                "matched_stage": "role",
+                "ambiguity": false,
+                "best": {
+                  "element_id": "desktop[0]/23/1/23/5/1/0",
+                  "role": "TEXT_INPUT",
+                  "text": null,
+                  "accessible_name": "Search with Google or enter address",
+                  "score": 0.8744444444444445,
+                  "breakdown": {
+                    "text": 0.7111111111111111,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 316.0,
+                    "y": 86.0,
+                    "width": 823.0,
+                    "height": 28.0,
+                    "space": "DESKTOP"
+                  }
+                },
+                "candidates": [
+                  {
+                    "element_id": "desktop[0]/23/1/23/5/1/0",
+                    "role": "TEXT_INPUT",
+                    "text": null,
+                    "accessible_name": "Search with Google or enter address",
+                    "score": 0.8744444444444445,
+                    "breakdown": {
+                      "text": 0.7111111111111111,
+                      "source": 0.95,
+                      "role": 1.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 316.0,
+                      "y": 86.0,
+                      "width": 823.0,
+                      "height": 28.0,
+                      "space": "DESKTOP"
+                    }
+                  }
+                ],
+                "occlusion": {
+                  "target_id": "desktop[0]/23/1/23/5/1/0",
+                  "ratio": 0.0,
+                  "threshold": 0.5,
+                  "blocked": false,
+                  "assessed": true,
+                  "declared_occluded": false,
+                  "covering": [],
+                  "reason": "nothing covers more than 0.50 of the target"
+                },
+                "cache": {
+                  "outcome": "HIT",
+                  "reason": "identity hint",
+                  "hint": {
+                    "identity_path": "desktop[0]/23/1/23/5/1/0",
+                    "element_id": "desktop[0]/23/1/23/5/1/0",
+                    "role": "TEXT_INPUT",
+                    "owner_window_id": null,
+                    "frame_id": 5,
+                    "state_version": 6,
+                    "generation": 0,
+                    "patch_hash": null,
+                    "cache_window_id": 67108926,
+                    "speculative_only": false
+                  }
+                }
+              },
+              "revalidation": {
+                "ok": true,
+                "checks": {
+                  "lease_valid": true,
+                  "generation_current": true,
+                  "state_fresh": true,
+                  "state_not_older_than_lease": true,
+                  "target_present": true,
+                  "identity_consistent": true,
+                  "visible": true,
+                  "enabled": true,
+                  "has_geometry": true,
+                  "inside_desktop": true,
+                  "not_occluded": true
+                },
+                "moved_px": 0.0,
+                "occlusion": {
+                  "target_id": "desktop[0]/23/1/23/5/1/0",
+                  "ratio": 0.0,
+                  "threshold": 0.5,
+                  "blocked": false,
+                  "assessed": true,
+                  "declared_occluded": false,
+                  "covering": [],
+                  "reason": "nothing covers more than 0.50 of the target"
+                }
+              }
+            },
+            "verification": "VERIFIED",
+            "state_version": 8,
+            "frame_id": 7,
+            "elapsed_ms": 1286.2638850000394,
+            "step_id": "s6",
+            "index": 5,
+            "tool": "type_text",
+            "action_class": "MUTATING",
+            "require_verification": true
+          },
+          {
+            "ok": false,
+            "error_code": "VERIFICATION_UNVERIFIED",
+            "message": "only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+            "data": {
+              "verification": {
+                "state": "UNVERIFIED",
+                "postcondition": "NONE",
+                "reason": "only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+                "evidence": {
+                  "change_class": "ANIMATION",
+                  "after_frame_id": 8,
+                  "active_window_changed": false
+                }
+              },
+              "timing": {
+                "observe_ms": 15.291,
+                "verify_calls": 1
+              },
+              "recovery": {
+                "should_attempt": false,
+                "failure_class": "VERIFICATION",
+                "actions": [],
+                "reason": "the action already injected input; it is never re-run automatically",
+                "tool_attempts_left": 2,
+                "step_attempts_left": 6
+              }
+            },
+            "verification": "UNVERIFIED",
+            "state_version": 9,
+            "frame_id": 8,
+            "elapsed_ms": 15.79040100000384,
+            "step_id": "s7",
+            "index": 6,
+            "tool": "press_key",
+            "action_class": "MUTATING",
+            "require_verification": true
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s7 (press_key) halted the sequence on UNVERIFIED: only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s8",
+            "index": 7,
+            "tool": "wait_for_element",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s7 (press_key) halted the sequence on UNVERIFIED: only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s9",
+            "index": 8,
+            "tool": "click",
+            "action_class": "MUTATING",
+            "require_verification": true
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s7 (press_key) halted the sequence on UNVERIFIED: only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s10",
+            "index": 9,
+            "tool": "wait_for_change",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s7 (press_key) halted the sequence on UNVERIFIED: only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s11",
+            "index": 10,
+            "tool": "wait_for_element",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s7 (press_key) halted the sequence on UNVERIFIED: only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s12",
+            "index": 11,
+            "tool": "click",
+            "action_class": "MUTATING",
+            "require_verification": true
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s7 (press_key) halted the sequence on UNVERIFIED: only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s13",
+            "index": 12,
+            "tool": "wait_for_change",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          }
+        ]
+      },
+      "verification": "NOT_APPLICABLE",
+      "state_version": null,
+      "frame_id": null,
+      "elapsed_ms": 3452.0994069999915
+    },
+    "result": {
+      "schema_version": 1,
+      "task_id": "agent-yt-9mm-20260928-fresh-01",
+      "status": "HALTED",
+      "sequence_id": "seq-6878ca1d8c2b40b5900f423c08e4f358",
+      "halted": true,
+      "halt_reason": "step s7 (press_key) halted the sequence on UNVERIFIED: only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+      "halt_code": "VERIFICATION_UNVERIFIED",
+      "wall_clock_ms": 3451.845105000018,
+      "completed_count": 7,
+      "steps": [
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "verification": {
+              "state": "VERIFIED",
+              "postcondition": "SCREEN_CHANGED",
+              "reason": "a MEANINGFUL change followed the hotkey",
+              "evidence": {
+                "change_class": "MEANINGFUL",
+                "after_frame_id": 1,
+                "active_window_changed": false
+              }
+            },
+            "timing": {
+              "observe_ms": 23.964,
+              "verify_calls": 1
+            }
+          },
+          "verification": "VERIFIED",
+          "state_version": 2,
+          "frame_id": 1,
+          "elapsed_ms": 28.6222059999659,
+          "step_id": "s1",
+          "index": 0,
+          "tool": "hotkey",
+          "action_class": "MUTATING",
+          "require_verification": false
+        },
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "changed": true,
+            "change_class": "MAJOR",
+            "regions": [
+              {
+                "x": 0.0,
+                "y": 25.6,
+                "width": 1366.0,
+                "height": 742.4,
+                "space": "DESKTOP"
+              }
+            ],
+            "state": {
+              "frame_id": 3,
+              "state_version": 4,
+              "generation": 0,
+              "active_window_id": 67108926,
+              "active_app": "firefox-esr",
+              "element_count": 530
+            }
+          },
+          "verification": "NOT_APPLICABLE",
+          "state_version": 4,
+          "frame_id": 3,
+          "elapsed_ms": 894.4170940000049,
+          "step_id": "s2",
+          "index": 1,
+          "tool": "wait_for_change",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "verification": {
+              "state": "UNVERIFIED",
+              "postcondition": "NONE",
+              "reason": "only a ANIMATION change followed the hotkey; that does not establish a user-visible outcome",
+              "evidence": {
+                "change_class": "ANIMATION",
+                "after_frame_id": 4,
+                "active_window_changed": false
+              }
+            },
+            "timing": {
+              "observe_ms": 13.606,
+              "verify_calls": 1
+            }
+          },
+          "verification": "UNVERIFIED",
+          "state_version": 5,
+          "frame_id": 4,
+          "elapsed_ms": 14.120466000008491,
+          "step_id": "s3",
+          "index": 2,
+          "tool": "hotkey",
+          "action_class": "MUTATING",
+          "require_verification": false
+        },
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "found": true,
+            "resolution": {
+              "status": "RESOLVED",
+              "reason": "resolved at stage 'role' with score 0.874",
+              "considered": 530,
+              "matched_stage": "role",
+              "ambiguity": false,
+              "best": {
+                "element_id": "desktop[0]/23/1/23/5/1/0",
+                "role": "TEXT_INPUT",
+                "text": null,
+                "accessible_name": "Search with Google or enter address",
+                "score": 0.8744444444444445,
+                "breakdown": {
+                  "text": 0.7111111111111111,
+                  "source": 0.95,
+                  "role": 1.0,
+                  "context": 1.0,
+                  "geometry": 1.0
+                },
+                "source": "ATSPI",
+                "bbox": {
+                  "x": 316.0,
+                  "y": 86.0,
+                  "width": 823.0,
+                  "height": 28.0,
+                  "space": "DESKTOP"
+                }
+              },
+              "candidates": [
+                {
+                  "element_id": "desktop[0]/23/1/23/5/1/0",
+                  "role": "TEXT_INPUT",
+                  "text": null,
+                  "accessible_name": "Search with Google or enter address",
+                  "score": 0.8744444444444445,
+                  "breakdown": {
+                    "text": 0.7111111111111111,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 316.0,
+                    "y": 86.0,
+                    "width": 823.0,
+                    "height": 28.0,
+                    "space": "DESKTOP"
+                  }
+                }
+              ],
+              "occlusion": {
+                "target_id": "desktop[0]/23/1/23/5/1/0",
+                "ratio": 0.0,
+                "threshold": 0.5,
+                "blocked": false,
+                "assessed": true,
+                "declared_occluded": false,
+                "covering": [],
+                "reason": "nothing covers more than 0.50 of the target"
+              },
+              "cache": {
+                "outcome": "MISS",
+                "reason": "no hint for this description",
+                "hint": null
+              }
+            }
+          },
+          "verification": "NOT_APPLICABLE",
+          "state_version": 6,
+          "frame_id": 5,
+          "elapsed_ms": 19.18121900001779,
+          "step_id": "s4",
+          "index": 3,
+          "tool": "wait_for_element",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "verification": {
+              "state": "VERIFIED",
+              "postcondition": "SCREEN_CHANGED",
+              "reason": "a MEANINGFUL change followed the click",
+              "evidence": {
+                "change_class": "MEANINGFUL",
+                "after_frame_id": 6,
+                "active_window_changed": false,
+                "target_overlap": true
+              }
+            },
+            "timing": {
+              "observe_ms": 1018.895,
+              "verify_calls": 1
+            },
+            "target": {
+              "element_id": "desktop[0]/23/1/23/5/1/0",
+              "role": "TEXT_INPUT",
+              "text": null,
+              "accessible_name": "Search with Google or enter address",
+              "source": "ATSPI",
+              "confidence": 0.95,
+              "bbox": {
+                "x": 316.0,
+                "y": 86.0,
+                "width": 823.0,
+                "height": 28.0,
+                "space": "DESKTOP"
+              },
+              "owner_window_id": null,
+              "password": false
+            },
+            "lease": {
+              "lease_id": "9e4d2deafa144c529ecd9499e4a55d81",
+              "element_id": "desktop[0]/23/1/23/5/1/0",
+              "frame_id": 5,
+              "state_version": 6,
+              "generation": 0,
+              "ttl_ms": 3000,
+              "confidence": 0.95,
+              "source": "ATSPI",
+              "monitor_id": null
+            },
+            "resolution": {
+              "status": "RESOLVED",
+              "reason": "resolved at stage 'role' with score 0.874",
+              "considered": 530,
+              "matched_stage": "role",
+              "ambiguity": false,
+              "best": {
+                "element_id": "desktop[0]/23/1/23/5/1/0",
+                "role": "TEXT_INPUT",
+                "text": null,
+                "accessible_name": "Search with Google or enter address",
+                "score": 0.8744444444444445,
+                "breakdown": {
+                  "text": 0.7111111111111111,
+                  "source": 0.95,
+                  "role": 1.0,
+                  "context": 1.0,
+                  "geometry": 1.0
+                },
+                "source": "ATSPI",
+                "bbox": {
+                  "x": 316.0,
+                  "y": 86.0,
+                  "width": 823.0,
+                  "height": 28.0,
+                  "space": "DESKTOP"
+                }
+              },
+              "candidates": [
+                {
+                  "element_id": "desktop[0]/23/1/23/5/1/0",
+                  "role": "TEXT_INPUT",
+                  "text": null,
+                  "accessible_name": "Search with Google or enter address",
+                  "score": 0.8744444444444445,
+                  "breakdown": {
+                    "text": 0.7111111111111111,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 316.0,
+                    "y": 86.0,
+                    "width": 823.0,
+                    "height": 28.0,
+                    "space": "DESKTOP"
+                  }
+                }
+              ],
+              "occlusion": {
+                "target_id": "desktop[0]/23/1/23/5/1/0",
+                "ratio": 0.0,
+                "threshold": 0.5,
+                "blocked": false,
+                "assessed": true,
+                "declared_occluded": false,
+                "covering": [],
+                "reason": "nothing covers more than 0.50 of the target"
+              },
+              "cache": {
+                "outcome": "HIT",
+                "reason": "identity hint",
+                "hint": {
+                  "identity_path": "desktop[0]/23/1/23/5/1/0",
+                  "element_id": "desktop[0]/23/1/23/5/1/0",
+                  "role": "TEXT_INPUT",
+                  "owner_window_id": null,
+                  "frame_id": 5,
+                  "state_version": 6,
+                  "generation": 0,
+                  "patch_hash": null,
+                  "cache_window_id": 67108926,
+                  "speculative_only": false
+                }
+              }
+            },
+            "revalidation": {
+              "ok": true,
+              "checks": {
+                "lease_valid": true,
+                "generation_current": true,
+                "state_fresh": true,
+                "state_not_older_than_lease": true,
+                "target_present": true,
+                "identity_consistent": true,
+                "visible": true,
+                "enabled": true,
+                "has_geometry": true,
+                "inside_desktop": true,
+                "not_occluded": true
+              },
+              "moved_px": 0.0,
+              "occlusion": {
+                "target_id": "desktop[0]/23/1/23/5/1/0",
+                "ratio": 0.0,
+                "threshold": 0.5,
+                "blocked": false,
+                "assessed": true,
+                "declared_occluded": false,
+                "covering": [],
+                "reason": "nothing covers more than 0.50 of the target"
+              }
+            }
+          },
+          "verification": "VERIFIED",
+          "state_version": 7,
+          "frame_id": 6,
+          "elapsed_ms": 1187.7642949999654,
+          "step_id": "s5",
+          "index": 4,
+          "tool": "click",
+          "action_class": "MUTATING",
+          "require_verification": true
+        },
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "verification": {
+              "state": "VERIFIED",
+              "postcondition": "TEXT_PRESENT",
+              "reason": "the typed text is present in the target's observed content",
+              "evidence": {
+                "element_id": "desktop[0]/23/1/23/5/1/0",
+                "characters": 53
+              }
+            },
+            "timing": {
+              "observe_ms": 739.595,
+              "verify_calls": 1
+            },
+            "target": {
+              "element_id": "desktop[0]/23/1/23/5/1/0",
+              "role": "TEXT_INPUT",
+              "text": null,
+              "accessible_name": "Search with Google or enter address",
+              "source": "ATSPI",
+              "confidence": 0.95,
+              "bbox": {
+                "x": 316.0,
+                "y": 86.0,
+                "width": 823.0,
+                "height": 28.0,
+                "space": "DESKTOP"
+              },
+              "owner_window_id": null,
+              "password": false
+            },
+            "lease": {
+              "lease_id": "612f3f01b70f481fa7ad39a86a004ee1",
+              "element_id": "desktop[0]/23/1/23/5/1/0",
+              "frame_id": 6,
+              "state_version": 7,
+              "generation": 0,
+              "ttl_ms": 3000,
+              "confidence": 0.95,
+              "source": "ATSPI",
+              "monitor_id": null
+            },
+            "resolution": {
+              "status": "RESOLVED",
+              "reason": "resolved at stage 'role' with score 0.874",
+              "considered": 549,
+              "matched_stage": "role",
+              "ambiguity": false,
+              "best": {
+                "element_id": "desktop[0]/23/1/23/5/1/0",
+                "role": "TEXT_INPUT",
+                "text": null,
+                "accessible_name": "Search with Google or enter address",
+                "score": 0.8744444444444445,
+                "breakdown": {
+                  "text": 0.7111111111111111,
+                  "source": 0.95,
+                  "role": 1.0,
+                  "context": 1.0,
+                  "geometry": 1.0
+                },
+                "source": "ATSPI",
+                "bbox": {
+                  "x": 316.0,
+                  "y": 86.0,
+                  "width": 823.0,
+                  "height": 28.0,
+                  "space": "DESKTOP"
+                }
+              },
+              "candidates": [
+                {
+                  "element_id": "desktop[0]/23/1/23/5/1/0",
+                  "role": "TEXT_INPUT",
+                  "text": null,
+                  "accessible_name": "Search with Google or enter address",
+                  "score": 0.8744444444444445,
+                  "breakdown": {
+                    "text": 0.7111111111111111,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 316.0,
+                    "y": 86.0,
+                    "width": 823.0,
+                    "height": 28.0,
+                    "space": "DESKTOP"
+                  }
+                }
+              ],
+              "occlusion": {
+                "target_id": "desktop[0]/23/1/23/5/1/0",
+                "ratio": 0.0,
+                "threshold": 0.5,
+                "blocked": false,
+                "assessed": true,
+                "declared_occluded": false,
+                "covering": [],
+                "reason": "nothing covers more than 0.50 of the target"
+              },
+              "cache": {
+                "outcome": "HIT",
+                "reason": "identity hint",
+                "hint": {
+                  "identity_path": "desktop[0]/23/1/23/5/1/0",
+                  "element_id": "desktop[0]/23/1/23/5/1/0",
+                  "role": "TEXT_INPUT",
+                  "owner_window_id": null,
+                  "frame_id": 5,
+                  "state_version": 6,
+                  "generation": 0,
+                  "patch_hash": null,
+                  "cache_window_id": 67108926,
+                  "speculative_only": false
+                }
+              }
+            },
+            "revalidation": {
+              "ok": true,
+              "checks": {
+                "lease_valid": true,
+                "generation_current": true,
+                "state_fresh": true,
+                "state_not_older_than_lease": true,
+                "target_present": true,
+                "identity_consistent": true,
+                "visible": true,
+                "enabled": true,
+                "has_geometry": true,
+                "inside_desktop": true,
+                "not_occluded": true
+              },
+              "moved_px": 0.0,
+              "occlusion": {
+                "target_id": "desktop[0]/23/1/23/5/1/0",
+                "ratio": 0.0,
+                "threshold": 0.5,
+                "blocked": false,
+                "assessed": true,
+                "declared_occluded": false,
+                "covering": [],
+                "reason": "nothing covers more than 0.50 of the target"
+              }
+            }
+          },
+          "verification": "VERIFIED",
+          "state_version": 8,
+          "frame_id": 7,
+          "elapsed_ms": 1286.2638850000394,
+          "step_id": "s6",
+          "index": 5,
+          "tool": "type_text",
+          "action_class": "MUTATING",
+          "require_verification": true
+        },
+        {
+          "ok": false,
+          "error_code": "VERIFICATION_UNVERIFIED",
+          "message": "only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+          "data": {
+            "verification": {
+              "state": "UNVERIFIED",
+              "postcondition": "NONE",
+              "reason": "only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+              "evidence": {
+                "change_class": "ANIMATION",
+                "after_frame_id": 8,
+                "active_window_changed": false
+              }
+            },
+            "timing": {
+              "observe_ms": 15.291,
+              "verify_calls": 1
+            },
+            "recovery": {
+              "should_attempt": false,
+              "failure_class": "VERIFICATION",
+              "actions": [],
+              "reason": "the action already injected input; it is never re-run automatically",
+              "tool_attempts_left": 2,
+              "step_attempts_left": 6
+            }
+          },
+          "verification": "UNVERIFIED",
+          "state_version": 9,
+          "frame_id": 8,
+          "elapsed_ms": 15.79040100000384,
+          "step_id": "s7",
+          "index": 6,
+          "tool": "press_key",
+          "action_class": "MUTATING",
+          "require_verification": true
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s7 (press_key) halted the sequence on UNVERIFIED: only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s8",
+          "index": 7,
+          "tool": "wait_for_element",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s7 (press_key) halted the sequence on UNVERIFIED: only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s9",
+          "index": 8,
+          "tool": "click",
+          "action_class": "MUTATING",
+          "require_verification": true
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s7 (press_key) halted the sequence on UNVERIFIED: only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s10",
+          "index": 9,
+          "tool": "wait_for_change",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s7 (press_key) halted the sequence on UNVERIFIED: only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s11",
+          "index": 10,
+          "tool": "wait_for_element",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s7 (press_key) halted the sequence on UNVERIFIED: only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s12",
+          "index": 11,
+          "tool": "click",
+          "action_class": "MUTATING",
+          "require_verification": true
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s7 (press_key) halted the sequence on UNVERIFIED: only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s13",
+          "index": 12,
+          "tool": "wait_for_change",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        }
+      ],
+      "rejection_reason": null,
+      "rejection_details": null,
+      "timeout_elapsed_ms": null,
+      "timeout_stop_latched": null
+    }
+  }
+}
