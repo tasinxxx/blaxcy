@@ -51,14 +51,7 @@ jobs:
         with:
           # The BLAXCY checkout below needs the relay history too; a full clone
           # keeps the task records' history honest (provenance, requirement 3).
-          fetch-depth: 0
-
-      - name: Check out BLAXCY (pinned to the relay's declared commit)
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ vars.BLAXCY_REPO || github.repository }}
-          ref: ${{ vars.BLAXCY_REF || 'master' }}
-          path: blaxcy
+          fetch-depth: 1
 
       - name: Use the operator's Python
         run: |
@@ -69,12 +62,6 @@ jobs:
           # environment as a side effect of a task would be an execution path.
           . "$HOME/blaxcy/.venv/bin/activate"
           python -c "import bridge, relay; print('relay cli ready')"
-
-      - name: Sync the relay repository (pull before processing)
-        run: |
-          set -eu
-          git -C . pull --ff-only
-          git -C blaxcy pull --ff-only || echo "blaxcy checkout is read-only; continuing"
 
       - name: Process tasks through the LocalBridge
         env:
