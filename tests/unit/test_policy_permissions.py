@@ -119,6 +119,33 @@ def test_run_sequence_needs_an_explicit_gate_class() -> None:
 
 # -- Guards inside the engine (sections 31, 42, 55, 58) -----------------------
 
+def test_terminal_submission_still_requires_confirmation_without_authorization() -> None:
+    """Sensitive terminal submission stays gated for ordinary callers."""
+    engine = _engine(mode=PolicyMode.AUTONOMOUS)
+    decision = engine.decide(
+        tool=ToolName.PRESS_KEY,
+        mode=PolicyMode.AUTONOMOUS,
+        terminal_submit=True,
+        terminal_command="sudo echo ok",
+        confirmed=False,
+    )
+    assert decision.requires_confirmation is True
+    assert decision.code is ErrorCode.CONFIRMATION_REQUIRED
+
+
+def test_terminal_submission_accepts_explicit_task_authorization() -> None:
+    """Trusted relay authorization may satisfy the submission gate."""
+    engine = _engine(mode=PolicyMode.AUTONOMOUS)
+    decision = engine.decide(
+        tool=ToolName.PRESS_KEY,
+        mode=PolicyMode.AUTONOMOUS,
+        terminal_submit=True,
+        terminal_command="sudo echo ok",
+        confirmed=True,
+    )
+    assert decision.allowed is True
+
+
 def test_blocked_application_is_refused_in_every_mode() -> None:
     """Section 58 blocks regardless of mode, including AUTONOMOUS."""
     engine = _engine(mode=PolicyMode.AUTONOMOUS, blocked_applications=("keepassxc",))
