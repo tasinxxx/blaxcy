@@ -1,5 +1,21 @@
 {
   "task_id": "agent-yt-9mm-20260928-start-05",
-  "state": "PENDING",
-  "history": []
+  "state": "HALTED",
+  "history": [
+    {
+      "from": "PENDING",
+      "to": "RUNNING",
+      "at": 1790583725.9019983,
+      "note": "claimed"
+    },
+    {
+      "from": "RUNNING",
+      "to": "HALTED",
+      "at": 1790583735.7366395,
+      "note": "bridge outcome",
+      "detail": {
+        "bridge_status": "HALTED"
+      }
+    }
+  ]
 }
