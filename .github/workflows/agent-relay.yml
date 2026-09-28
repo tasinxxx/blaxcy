@@ -10,8 +10,6 @@ name: BLAXCY agent relay producer
 on:
   push:
     branches: [master]
-    paths:
-      - "relay/agent-requests/**"
 
 permissions:
   contents: write
@@ -23,6 +21,7 @@ concurrency:
 
 jobs:
   produce:
+    if: ${{ hashFiles('relay/agent-requests/*.json') != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
