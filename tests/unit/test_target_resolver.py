@@ -555,6 +555,24 @@ def test_occluders_below_the_target_are_dropped() -> None:
     assert "overlay" in ids, "an overlay in the target's own window really can cover it"
 
 
+def test_same_window_non_actionable_container_is_not_treated_as_an_overlay() -> None:
+    """A browser/layout container in the target window cannot prove it covers its child."""
+    stack = _stack("Desktop", "Firefox")
+    target = _windowed("address", "Firefox", text="Search Address Bar")
+    container = _windowed(
+        "content-pane",
+        "Firefox",
+        text=None,
+        clickable=False,
+        effective_clickable=False,
+        bbox=_SCREEN,
+    )
+
+    kept = occluders_above(target, [container], stack)
+
+    assert kept == ()
+
+
 def test_an_occluder_above_the_target_is_kept_and_still_blocks() -> None:
     """A window genuinely in front must keep blocking, or this rule would be a bypass."""
     stack = _stack("Desktop", "Target Window", "Dialog On Top")
