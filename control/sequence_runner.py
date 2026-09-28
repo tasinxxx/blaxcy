@@ -719,12 +719,26 @@ def step_arguments(step: SequenceStep) -> dict[str, Any]:
     return arguments
 
 
+_TARGET_ROLE_ALIASES: dict[str, UIRole] = {
+    "address bar": UIRole.TEXT_INPUT,
+    "location bar": UIRole.TEXT_INPUT,
+    "url bar": UIRole.TEXT_INPUT,
+    "search bar": UIRole.TEXT_INPUT,
+    "search box": UIRole.TEXT_INPUT,
+    "search field": UIRole.TEXT_INPUT,
+    "text field": UIRole.TEXT_INPUT,
+    "text input": UIRole.TEXT_INPUT,
+}
+
+
 def query_for_step(step: SequenceStep) -> ElementQuery | None:
-    """The target description of a step, or ``None`` when it has no target."""
+    """Build a target query, inferring a safe semantic role for common aliases."""
     if step.tool in _TARGETLESS_TOOLS or step.target is None:
         return None
-    return ElementQuery(text=step.target, role_hint=step.role)
-
+    role = step.role
+    if role is None:
+        role = _TARGET_ROLE_ALIASES.get(" ".join(step.target.split()).casefold())
+    return ElementQuery(text=step.target, role_hint=role)
 
 def _as_identity_hint(hint: Any) -> Any:
     """Convert a speculation into the cache's ``IdentityHint`` shape.
