@@ -88,8 +88,8 @@ semantic_match_floor = 70
 # Brain round-trips, never a policy/resolve/lease/revalidate/execute/verify step.
 # `enabled = false` refuses `run_sequence` outright; OBSERVE mode also refuses it.
 enabled = true
-max_sequence_steps = 12
-max_sequence_wall_clock_seconds = 60.0
+max_sequence_steps = 48
+max_sequence_wall_clock_seconds = 300.0
 # Scheduling (section 33.1) and read-side prefetch (section 33.2) layers, both
 # proven safe by the section 33.1/33.2/75 tests. Turning either off can only
 # remove capability, never remove a check.
