@@ -56,11 +56,17 @@ def _signed_document(
     return document, auth.sign_request(document, nonce=nonce, timestamp=now), now
 
 
-def _task_payload(plan: list[dict[str, object]] | None = None, task_id: str = "task-1") -> dict[str, object]:
+def _task_payload(
+    plan: list[dict[str, object]] | None = None,
+    task_id: str = "task-1",
+    *,
+    operator_approved: bool = False,
+) -> dict[str, object]:
     return {
         "schema_version": TASK_SCHEMA_VERSION,
         "task_id": task_id,
         "plan": plan if plan is not None else [dict(step) for step in WORKFLOW_PLAN],
+        "operator_approved": operator_approved,
     }
 
 
@@ -104,6 +110,30 @@ class _BridgeEnv:
 
 
 # -- Successful dispatch (requirement 4/15) ---------------------------------------
+
+def test_explicit_task_authorization_reaches_dispatcher() -> None:
+    class _CapturingDispatcher:
+        sequence_runner = object()
+
+        def __init__(self) -> None:
+            self.confirmed: list[bool] = []
+
+        def dispatch(self, call: object, **kwargs: object) -> object:
+            self.confirmed.append(bool(kwargs["confirmed"]))
+            from schemas.actions import ToolEnvelope
+
+            return ToolEnvelope(ok=True, data={"halted": False, "steps": [], "sequence_id": "s1"})
+
+    auth = BridgeAuthenticator(token=TEST_TOKEN)
+    dispatcher = _CapturingDispatcher()
+    bridge = LocalBridge(dispatcher, authenticator=auth, settings=Settings(), timeout_seconds=1.0)  # type: ignore[arg-type]
+    response = bridge.submit(
+        *_signed_document(_task_payload(plan=[{"step_id": "s1", "tool": "get_capabilities"}], operator_approved=True), auth)
+    )
+    assert response.result.status is TaskStatus.COMPLETED
+    assert dispatcher.confirmed == [True]
+
+
 
 
 def test_a_valid_task_executes_through_the_real_dispatcher() -> None:
