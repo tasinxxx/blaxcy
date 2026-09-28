@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from bridge.auth import BridgeAuthenticator
+from bridge.task_protocol import TaskValidationError
 from relay.agent_producer import build_signed_envelope, process_request
 from relay.envelope import TaskEnvelopeDocument
 from relay.lifecycle import TaskLifecycle
