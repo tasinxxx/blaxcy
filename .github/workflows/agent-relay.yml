@@ -27,7 +27,7 @@ jobs:
   produce:
     # The signing commit removes the request file, which matches the path
     # filter again. Skip that self-generated push before runner setup.
-    if: ${{ github.event.head_commit.message != 'relay: sign Agent task request' }}
+    if: "${{ github.event.head_commit.message != 'relay: sign Agent task request' }}"
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
