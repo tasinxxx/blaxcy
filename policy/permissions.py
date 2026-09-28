@@ -191,6 +191,7 @@ class PermissionEngine:
             terminal_command=terminal_command,
             terminal_submit=terminal_submit,
             action_class=resolved_class,
+            confirmed=confirmed,
         )
         if terminal is not None:
             return terminal
@@ -261,6 +262,7 @@ class PermissionEngine:
         terminal_command: str | None,
         terminal_submit: bool,
         action_class: ActionClass,
+        confirmed: bool,
     ) -> PolicyDecision | None:
         """Apply section 54 when the action touches a terminal, else ``None``."""
         if terminal_command is None and not terminal_submit:
