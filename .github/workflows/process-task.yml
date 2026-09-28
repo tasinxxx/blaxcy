@@ -92,7 +92,7 @@ jobs:
           if [ -n "${{ github.event.inputs.task_id || github.event.client_payload.task_id || '' }}" ]; then
             TASK_ARGS="--task-id ${{ github.event.inputs.task_id || github.event.client_payload.task_id }}"
           fi
-          python -m relay.entry --repo . process $TASK_ARGS
+          python -m relay.entry --repo . process --mode ASSIST $TASK_ARGS
 
       - name: Commit results back to the relay repository
         run: |
