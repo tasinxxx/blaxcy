@@ -1,0 +1,335 @@
+{
+  "schema_version": 1,
+  "task_id": "agent-yt-9mm-20260928-restart-01",
+  "lifecycle": "HALTED",
+  "bridge_status": "HALTED",
+  "result": {
+    "task_id": "agent-yt-9mm-20260928-restart-01",
+    "envelope": {
+      "ok": false,
+      "error_code": "FOCUS_MISMATCH",
+      "message": "step s3 failed with FOCUS_MISMATCH: element 'desktop[0]/25/0/23/5/4/0' is not the focused element",
+      "data": {
+        "sequence_id": "seq-59064879759b4b939e85a5baccd1697c",
+        "halted": true,
+        "halt_reason": "step s3 failed with FOCUS_MISMATCH: element 'desktop[0]/25/0/23/5/4/0' is not the focused element",
+        "halt_code": "FOCUS_MISMATCH",
+        "wall_clock_ms": 1076.2095620011678,
+        "completed_count": 3,
+        "steps": [
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "verification": {
+                "state": "VERIFIED",
+                "postcondition": "SCREEN_CHANGED",
+                "reason": "a MEANINGFUL change followed the hotkey",
+                "evidence": {
+                  "change_class": "MEANINGFUL",
+                  "after_frame_id": 1,
+                  "active_window_changed": false
+                }
+              },
+              "timing": {
+                "observe_ms": 22.062,
+                "verify_calls": 1
+              }
+            },
+            "verification": "VERIFIED",
+            "state_version": 2,
+            "frame_id": 1,
+            "elapsed_ms": 25.70465200005856,
+            "step_id": "s1",
+            "index": 0,
+            "tool": "hotkey",
+            "action_class": "MUTATING",
+            "require_verification": false
+          },
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "verification": {
+                "state": "UNVERIFIED",
+                "postcondition": "NONE",
+                "reason": "only a NONE change followed the hotkey; that does not establish a user-visible outcome",
+                "evidence": {
+                  "change_class": "NONE",
+                  "after_frame_id": 2,
+                  "active_window_changed": false
+                }
+              },
+              "timing": {
+                "observe_ms": 16.487,
+                "verify_calls": 1
+              }
+            },
+            "verification": "UNVERIFIED",
+            "state_version": 3,
+            "frame_id": 2,
+            "elapsed_ms": 17.031830000632908,
+            "step_id": "s2",
+            "index": 1,
+            "tool": "hotkey",
+            "action_class": "MUTATING",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "FOCUS_MISMATCH",
+            "message": "element 'desktop[0]/25/0/23/5/4/0' is not the focused element",
+            "data": {
+              "expected_element_id": "desktop[0]/25/0/23/5/4/0",
+              "recovery": {
+                "should_attempt": false,
+                "failure_class": "UNKNOWN",
+                "actions": [],
+                "reason": "the action already injected input; it is never re-run automatically",
+                "tool_attempts_left": 2,
+                "step_attempts_left": 6
+              }
+            },
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 1030.810638998446,
+            "step_id": "s3",
+            "index": 2,
+            "tool": "type_text",
+            "action_class": "MUTATING",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s3 failed with FOCUS_MISMATCH: element 'desktop[0]/25/0/23/5/4/0' is not the focused element",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s4",
+            "index": 3,
+            "tool": "press_key",
+            "action_class": "MUTATING",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s3 failed with FOCUS_MISMATCH: element 'desktop[0]/25/0/23/5/4/0' is not the focused element",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s5",
+            "index": 4,
+            "tool": "wait_for_element",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s3 failed with FOCUS_MISMATCH: element 'desktop[0]/25/0/23/5/4/0' is not the focused element",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s6",
+            "index": 5,
+            "tool": "click",
+            "action_class": "MUTATING",
+            "require_verification": true
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s3 failed with FOCUS_MISMATCH: element 'desktop[0]/25/0/23/5/4/0' is not the focused element",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s7",
+            "index": 6,
+            "tool": "wait_for_change",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          }
+        ]
+      },
+      "verification": "NOT_APPLICABLE",
+      "state_version": null,
+      "frame_id": null,
+      "elapsed_ms": 1076.3760330009973
+    },
+    "result": {
+      "schema_version": 1,
+      "task_id": "agent-yt-9mm-20260928-restart-01",
+      "status": "HALTED",
+      "sequence_id": "seq-59064879759b4b939e85a5baccd1697c",
+      "halted": true,
+      "halt_reason": "step s3 failed with FOCUS_MISMATCH: element 'desktop[0]/25/0/23/5/4/0' is not the focused element",
+      "halt_code": "FOCUS_MISMATCH",
+      "wall_clock_ms": 1076.2095620011678,
+      "completed_count": 3,
+      "steps": [
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "verification": {
+              "state": "VERIFIED",
+              "postcondition": "SCREEN_CHANGED",
+              "reason": "a MEANINGFUL change followed the hotkey",
+              "evidence": {
+                "change_class": "MEANINGFUL",
+                "after_frame_id": 1,
+                "active_window_changed": false
+              }
+            },
+            "timing": {
+              "observe_ms": 22.062,
+              "verify_calls": 1
+            }
+          },
+          "verification": "VERIFIED",
+          "state_version": 2,
+          "frame_id": 1,
+          "elapsed_ms": 25.70465200005856,
+          "step_id": "s1",
+          "index": 0,
+          "tool": "hotkey",
+          "action_class": "MUTATING",
+          "require_verification": false
+        },
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "verification": {
+              "state": "UNVERIFIED",
+              "postcondition": "NONE",
+              "reason": "only a NONE change followed the hotkey; that does not establish a user-visible outcome",
+              "evidence": {
+                "change_class": "NONE",
+                "after_frame_id": 2,
+                "active_window_changed": false
+              }
+            },
+            "timing": {
+              "observe_ms": 16.487,
+              "verify_calls": 1
+            }
+          },
+          "verification": "UNVERIFIED",
+          "state_version": 3,
+          "frame_id": 2,
+          "elapsed_ms": 17.031830000632908,
+          "step_id": "s2",
+          "index": 1,
+          "tool": "hotkey",
+          "action_class": "MUTATING",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "FOCUS_MISMATCH",
+          "message": "element 'desktop[0]/25/0/23/5/4/0' is not the focused element",
+          "data": {
+            "expected_element_id": "desktop[0]/25/0/23/5/4/0",
+            "recovery": {
+              "should_attempt": false,
+              "failure_class": "UNKNOWN",
+              "actions": [],
+              "reason": "the action already injected input; it is never re-run automatically",
+              "tool_attempts_left": 2,
+              "step_attempts_left": 6
+            }
+          },
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 1030.810638998446,
+          "step_id": "s3",
+          "index": 2,
+          "tool": "type_text",
+          "action_class": "MUTATING",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s3 failed with FOCUS_MISMATCH: element 'desktop[0]/25/0/23/5/4/0' is not the focused element",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s4",
+          "index": 3,
+          "tool": "press_key",
+          "action_class": "MUTATING",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s3 failed with FOCUS_MISMATCH: element 'desktop[0]/25/0/23/5/4/0' is not the focused element",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s5",
+          "index": 4,
+          "tool": "wait_for_element",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s3 failed with FOCUS_MISMATCH: element 'desktop[0]/25/0/23/5/4/0' is not the focused element",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s6",
+          "index": 5,
+          "tool": "click",
+          "action_class": "MUTATING",
+          "require_verification": true
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s3 failed with FOCUS_MISMATCH: element 'desktop[0]/25/0/23/5/4/0' is not the focused element",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s7",
+          "index": 6,
+          "tool": "wait_for_change",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        }
+      ],
+      "rejection_reason": null,
+      "rejection_details": null,
+      "timeout_elapsed_ms": null,
+      "timeout_stop_latched": null
+    }
+  }
+}

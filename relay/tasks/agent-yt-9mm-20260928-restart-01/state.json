@@ -1,5 +1,21 @@
 {
   "task_id": "agent-yt-9mm-20260928-restart-01",
-  "state": "PENDING",
-  "history": []
+  "state": "HALTED",
+  "history": [
+    {
+      "from": "PENDING",
+      "to": "RUNNING",
+      "at": 1790583796.5876582,
+      "note": "claimed"
+    },
+    {
+      "from": "RUNNING",
+      "to": "HALTED",
+      "at": 1790583797.6659334,
+      "note": "bridge outcome",
+      "detail": {
+        "bridge_status": "HALTED"
+      }
+    }
+  ]
 }
