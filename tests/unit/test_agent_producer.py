@@ -44,7 +44,7 @@ def test_agent_request_uses_the_normal_task_guards() -> None:
     unsafe["plan"] = [
         {"step_id": "s1", "tool": "click", "target": "Send", "element_id": "pre-resolved"}
     ]
-    with pytest.raises(ValueError):
+    with pytest.raises(TaskValidationError, match="PRE_RESOLVED_TASK_FIELD"):
         build_signed_envelope(unsafe, authenticator=auth, now=time.time())
 
 
