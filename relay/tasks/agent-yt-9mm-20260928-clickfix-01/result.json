@@ -1,0 +1,499 @@
+{
+  "schema_version": 1,
+  "task_id": "agent-yt-9mm-20260928-clickfix-01",
+  "lifecycle": "HALTED",
+  "bridge_status": "HALTED",
+  "result": {
+    "task_id": "agent-yt-9mm-20260928-clickfix-01",
+    "envelope": {
+      "ok": false,
+      "error_code": "TARGET_AMBIGUOUS",
+      "message": "step s1 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+      "data": {
+        "sequence_id": "seq-a9c94ba33d2643b78c28f46669d0e0f7",
+        "halted": true,
+        "halt_reason": "step s1 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+        "halt_code": "TARGET_AMBIGUOUS",
+        "wall_clock_ms": 22.45500300000458,
+        "completed_count": 1,
+        "steps": [
+          {
+            "ok": false,
+            "error_code": "TARGET_AMBIGUOUS",
+            "message": "top two candidates are within 0.080 (gap 0.000)",
+            "data": {
+              "found": false,
+              "resolution": {
+                "status": "AMBIGUOUS",
+                "reason": "top two candidates are within 0.080 (gap 0.000)",
+                "considered": 474,
+                "matched_stage": "role",
+                "ambiguity": true,
+                "best": null,
+                "candidates": [
+                  {
+                    "element_id": "desktop[0]/23/1/26/0/0/0/1/1/0/0/0",
+                    "role": "LINK",
+                    "text": "Home",
+                    "accessible_name": "Home",
+                    "score": 0.59,
+                    "breakdown": {
+                      "text": 0.0,
+                      "source": 0.95,
+                      "role": 1.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 8.0,
+                      "y": 160.0,
+                      "width": 95.0,
+                      "height": 36.0,
+                      "space": "DESKTOP"
+                    }
+                  },
+                  {
+                    "element_id": "desktop[0]/23/1/26/0/0/0/1/1/1/0/0",
+                    "role": "LINK",
+                    "text": "New chat Control Shift O",
+                    "accessible_name": "New chat Control Shift O",
+                    "score": 0.59,
+                    "breakdown": {
+                      "text": 0.0,
+                      "source": 0.95,
+                      "role": 1.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 6.0,
+                      "y": 212.0,
+                      "width": 248.0,
+                      "height": 36.0,
+                      "space": "DESKTOP"
+                    }
+                  },
+                  {
+                    "element_id": "desktop[0]/23/1/26/0/0/0/1/1/10",
+                    "role": "LINK",
+                    "text": "New chat",
+                    "accessible_name": "New chat",
+                    "score": 0.59,
+                    "breakdown": {
+                      "text": 0.0,
+                      "source": 0.95,
+                      "role": 1.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 192.0,
+                      "y": 510.0,
+                      "width": 34.0,
+                      "height": 36.0,
+                      "space": "DESKTOP"
+                    }
+                  },
+                  {
+                    "element_id": "desktop[0]/23/1/26/0/0/0/1/1/12/0/0/0",
+                    "role": "LINK",
+                    "text": "Tool Connect Guide",
+                    "accessible_name": "Tool Connect Guide",
+                    "score": 0.59,
+                    "breakdown": {
+                      "text": 0.0,
+                      "source": 0.95,
+                      "role": 1.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 6.0,
+                      "y": 544.0,
+                      "width": 248.0,
+                      "height": 36.0,
+                      "space": "DESKTOP"
+                    }
+                  },
+                  {
+                    "element_id": "desktop[0]/23/1/26/0/0/0/1/1/12/0/1/0",
+                    "role": "LINK",
+                    "text": "Set Up Memory Repository",
+                    "accessible_name": "Set Up Memory Repository",
+                    "score": 0.59,
+                    "breakdown": {
+                      "text": 0.0,
+                      "source": 0.95,
+                      "role": 1.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 6.0,
+                      "y": 580.0,
+                      "width": 248.0,
+                      "height": 36.0,
+                      "space": "DESKTOP"
+                    }
+                  }
+                ],
+                "occlusion": {
+                  "target_id": "desktop[0]/23/1/26/0/0/0/1/1/0/0/0",
+                  "ratio": 0.0,
+                  "threshold": 0.5,
+                  "blocked": false,
+                  "assessed": true,
+                  "declared_occluded": false,
+                  "covering": [],
+                  "reason": "nothing covers more than 0.50 of the target"
+                },
+                "cache": {
+                  "outcome": "MISS",
+                  "reason": "no hint for this description",
+                  "hint": null
+                }
+              }
+            },
+            "verification": "NOT_APPLICABLE",
+            "state_version": 2,
+            "frame_id": 1,
+            "elapsed_ms": 20.996281999941857,
+            "step_id": "s1",
+            "index": 0,
+            "tool": "wait_for_element",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s1 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s2",
+            "index": 1,
+            "tool": "click",
+            "action_class": "MUTATING",
+            "require_verification": true
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s1 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s3",
+            "index": 2,
+            "tool": "wait_for_change",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s1 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s4",
+            "index": 3,
+            "tool": "wait_for_element",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s1 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s5",
+            "index": 4,
+            "tool": "click",
+            "action_class": "MUTATING",
+            "require_verification": true
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s1 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s6",
+            "index": 5,
+            "tool": "wait_for_change",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          }
+        ]
+      },
+      "verification": "NOT_APPLICABLE",
+      "state_version": null,
+      "frame_id": null,
+      "elapsed_ms": 22.65844900000502
+    },
+    "result": {
+      "schema_version": 1,
+      "task_id": "agent-yt-9mm-20260928-clickfix-01",
+      "status": "HALTED",
+      "sequence_id": "seq-a9c94ba33d2643b78c28f46669d0e0f7",
+      "halted": true,
+      "halt_reason": "step s1 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+      "halt_code": "TARGET_AMBIGUOUS",
+      "wall_clock_ms": 22.45500300000458,
+      "completed_count": 1,
+      "steps": [
+        {
+          "ok": false,
+          "error_code": "TARGET_AMBIGUOUS",
+          "message": "top two candidates are within 0.080 (gap 0.000)",
+          "data": {
+            "found": false,
+            "resolution": {
+              "status": "AMBIGUOUS",
+              "reason": "top two candidates are within 0.080 (gap 0.000)",
+              "considered": 474,
+              "matched_stage": "role",
+              "ambiguity": true,
+              "best": null,
+              "candidates": [
+                {
+                  "element_id": "desktop[0]/23/1/26/0/0/0/1/1/0/0/0",
+                  "role": "LINK",
+                  "text": "Home",
+                  "accessible_name": "Home",
+                  "score": 0.59,
+                  "breakdown": {
+                    "text": 0.0,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 8.0,
+                    "y": 160.0,
+                    "width": 95.0,
+                    "height": 36.0,
+                    "space": "DESKTOP"
+                  }
+                },
+                {
+                  "element_id": "desktop[0]/23/1/26/0/0/0/1/1/1/0/0",
+                  "role": "LINK",
+                  "text": "New chat Control Shift O",
+                  "accessible_name": "New chat Control Shift O",
+                  "score": 0.59,
+                  "breakdown": {
+                    "text": 0.0,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 6.0,
+                    "y": 212.0,
+                    "width": 248.0,
+                    "height": 36.0,
+                    "space": "DESKTOP"
+                  }
+                },
+                {
+                  "element_id": "desktop[0]/23/1/26/0/0/0/1/1/10",
+                  "role": "LINK",
+                  "text": "New chat",
+                  "accessible_name": "New chat",
+                  "score": 0.59,
+                  "breakdown": {
+                    "text": 0.0,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 192.0,
+                    "y": 510.0,
+                    "width": 34.0,
+                    "height": 36.0,
+                    "space": "DESKTOP"
+                  }
+                },
+                {
+                  "element_id": "desktop[0]/23/1/26/0/0/0/1/1/12/0/0/0",
+                  "role": "LINK",
+                  "text": "Tool Connect Guide",
+                  "accessible_name": "Tool Connect Guide",
+                  "score": 0.59,
+                  "breakdown": {
+                    "text": 0.0,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 6.0,
+                    "y": 544.0,
+                    "width": 248.0,
+                    "height": 36.0,
+                    "space": "DESKTOP"
+                  }
+                },
+                {
+                  "element_id": "desktop[0]/23/1/26/0/0/0/1/1/12/0/1/0",
+                  "role": "LINK",
+                  "text": "Set Up Memory Repository",
+                  "accessible_name": "Set Up Memory Repository",
+                  "score": 0.59,
+                  "breakdown": {
+                    "text": 0.0,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 6.0,
+                    "y": 580.0,
+                    "width": 248.0,
+                    "height": 36.0,
+                    "space": "DESKTOP"
+                  }
+                }
+              ],
+              "occlusion": {
+                "target_id": "desktop[0]/23/1/26/0/0/0/1/1/0/0/0",
+                "ratio": 0.0,
+                "threshold": 0.5,
+                "blocked": false,
+                "assessed": true,
+                "declared_occluded": false,
+                "covering": [],
+                "reason": "nothing covers more than 0.50 of the target"
+              },
+              "cache": {
+                "outcome": "MISS",
+                "reason": "no hint for this description",
+                "hint": null
+              }
+            }
+          },
+          "verification": "NOT_APPLICABLE",
+          "state_version": 2,
+          "frame_id": 1,
+          "elapsed_ms": 20.996281999941857,
+          "step_id": "s1",
+          "index": 0,
+          "tool": "wait_for_element",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s1 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s2",
+          "index": 1,
+          "tool": "click",
+          "action_class": "MUTATING",
+          "require_verification": true
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s1 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s3",
+          "index": 2,
+          "tool": "wait_for_change",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s1 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s4",
+          "index": 3,
+          "tool": "wait_for_element",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s1 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s5",
+          "index": 4,
+          "tool": "click",
+          "action_class": "MUTATING",
+          "require_verification": true
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s1 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s6",
+          "index": 5,
+          "tool": "wait_for_change",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        }
+      ],
+      "rejection_reason": null,
+      "rejection_details": null,
+      "timeout_elapsed_ms": null,
+      "timeout_stop_latched": null
+    }
+  }
+}
