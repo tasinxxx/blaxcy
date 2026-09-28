@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "task_id": "agent-screen-state-20260928-start-01",
+  "operator_approved": true,
+  "plan": [
+    {
+      "step_id": "s1",
+      "tool": "get_screen_state",
+      "args": {}
+    }
+  ]
+}
