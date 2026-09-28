@@ -39,7 +39,7 @@ method_timeout_ms = 250
 startup_timeout_ms = 1000
 max_depth = 12
 max_nodes = 1200
-deadline_ms = 250
+deadline_ms = 1000
 cache_ttl_seconds = 2.0
 blacklist_after_failures = 3
 
