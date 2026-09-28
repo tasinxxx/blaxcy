@@ -57,6 +57,7 @@ def _cmd_process(args: argparse.Namespace) -> int:
 
         app = BlaxcyApplication(settings)
         app.start()
+        app.perceive()
         try:
             app.set_mode(args.mode, reason="operator-approved relay execution")
             bridge = LocalBridge(
