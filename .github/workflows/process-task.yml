@@ -30,7 +30,7 @@ on:
     types: [blaxcy-task]
 
 permissions:
-  contents: read # read the relay repository; results are committed by the runner's local git, not by this token
+  contents: write # the self-hosted runner commits task state/results back to this relay repository
 
 concurrency:
   # One desktop, one relay run at a time. Overlapping runs would race the
