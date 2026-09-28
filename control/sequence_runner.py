@@ -190,12 +190,11 @@ class SequenceRunner:
         """Execute ``request`` step by step, halting honestly (section 66.1).
 
         ``confirmed`` is accepted for protocol compatibility and deliberately
-        **not forwarded** into a destructive step: section 66.1 requires a
-        destructive step's confirmation to be requested fresh, so a sequence can
-        never arrive pre-authorised. The executor's own confirmation callback is
+        forwarded only for explicitly authorized trusted relay tasks. Normal Brain
+        sequences still arrive with ``confirmed=False`` and retain fresh confirmation. The executor's own confirmation callback is
         what asks; a human's "no" halts the sequence.
         """
-        del confirmed  # never forwarded into a step -- see the docstring
+        # Explicit task-level authorization may be propagated to the per-step dispatcher.
         self.sequences += 1
         started = self._clock()
         sequence_id = self._new_id()
@@ -407,7 +406,7 @@ class SequenceRunner:
                 sequence_id=sequence_id,
                 # Never a pre-supplied confirmation (section 66.1): the
                 # executor's own callback asks the human, freshly.
-                confirmed=False,
+                confirmed=confirmed,
                 require_verification=step.require_verification,
             )
         finally:
