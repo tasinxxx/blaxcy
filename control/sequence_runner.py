@@ -239,6 +239,7 @@ class SequenceRunner:
                     task_id=task_id,
                     request=request,
                     halt_on=halt_on,
+                    confirmed=confirmed,
                     elapsed_total=self._clock() - started,
                 )
                 results.append(step_result)
@@ -347,6 +348,7 @@ class SequenceRunner:
         task_id: str | None,
         request: RunSequenceRequest,
         halt_on: frozenset[HaltCondition],
+        confirmed: bool,
         elapsed_total: float,
     ) -> tuple[SequenceStepResult, tuple[ErrorCode, str] | None]:
         """Run one step and decide whether it halts the sequence.
