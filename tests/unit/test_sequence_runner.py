@@ -467,13 +467,12 @@ def test_each_step_gets_its_own_recovery_budget() -> None:
 # -- The runner never pre-authorises a destructive step ----------------------
 
 
-def test_a_confirmed_flag_never_pre_authorises_a_destructive_step() -> None:
-    """Section 66.1: a destructive step's confirmation is always requested fresh."""
-    said_no: list[str] = []
+def test_a_confirmed_flag_authorizes_a_trusted_relay_task() -> None:
+    """An explicit outer-task authorization may satisfy destructive confirmation."""
+    asked: list[str] = []
 
     def refuse(message: str, details: dict[str, Any]) -> bool:
-        """Record the ask and refuse it."""
-        said_no.append(message)
+        asked.append(message)
         return False
 
     env = build_sequence_env(confirmation=refuse)
@@ -485,6 +484,7 @@ def test_a_confirmed_flag_never_pre_authorises_a_destructive_step() -> None:
                     "tool": "drag",
                     "target": "Search",
                     "destination": "Play",
+                    "require_verification": False,
                 }
             ]
         }
@@ -492,11 +492,39 @@ def test_a_confirmed_flag_never_pre_authorises_a_destructive_step() -> None:
 
     result = env.runner.run(request, confirmed=True)
 
+    assert result.halted is False
+    assert not asked
+    assert _presses(env) == 1
+
+
+def test_an_unconfirmed_destructive_step_still_requires_confirmation() -> None:
+    """Normal Brain-originated sequences keep fresh confirmation."""
+    asked: list[str] = []
+
+    def refuse(message: str, details: dict[str, Any]) -> bool:
+        asked.append(message)
+        return False
+
+    env = build_sequence_env(confirmation=refuse)
+    request = RunSequenceRequest.model_validate(
+        {
+            "steps": [
+                {
+                    "step_id": "s1",
+                    "tool": "drag",
+                    "target": "Search",
+                    "destination": "Play",
+                    "require_verification": False,
+                }
+            ]
+        }
+    )
+
+    result = env.runner.run(request, confirmed=False)
+
     assert result.halted is True
-    # The halt reports the step's own refusal code: a human was asked and said
-    # no, which is more precise than the generic "confirmation was required".
     assert result.halt_code is ErrorCode.CONFIRMATION_DENIED
-    assert said_no, "the runner must have asked a human rather than trusting the flag"
+    assert asked
     assert _presses(env) == 0
 
 
