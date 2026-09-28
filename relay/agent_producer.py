@@ -22,7 +22,7 @@ from bridge.task_protocol import Task
 from relay.envelope import RELAY_ENVELOPE_VERSION, TaskEnvelopeDocument
 from relay.store import TaskStore
 
-DEFAULT_TTL_SECONDS = 900.0
+DEFAULT_TTL_SECONDS = 3600.0
 REQUEST_ROOT = Path("relay/agent-requests")
 
 
