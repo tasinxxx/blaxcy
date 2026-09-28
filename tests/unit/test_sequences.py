@@ -69,10 +69,10 @@ def test_step_rejects_run_sequence_nesting() -> None:
         _step(tool=ToolName.RUN_SEQUENCE)
 
 
-def test_step_to_dict_preserves_explicit_verification_override() -> None:
-    """Relay serialization must not discard a per-step verification override."""
+def test_step_to_dict_keeps_verification_metadata_out_of_tool_arguments() -> None:
+    """Verification is dispatcher metadata, not a standalone tool argument."""
     step = _step(require_verification=False)
-    assert step.to_dict()["require_verification"] is False
+    assert "require_verification" not in step.to_dict()
 
 
 def test_step_default_verification_by_class() -> None:
