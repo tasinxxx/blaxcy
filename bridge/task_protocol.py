@@ -49,12 +49,12 @@ TASK_SCHEMA_VERSION: int = 1
 #: Maximum serialized size of one raw task document, before parsing. A task is
 #: a plan, not a bulk transfer; the ceiling exists so an oversized payload is a
 #: clean rejection rather than a memory event on the receiving side.
-MAX_TASK_PAYLOAD_BYTES: int = 64 * 1024
+MAX_TASK_PAYLOAD_BYTES: int = 256 * 1024
 
 #: Maximum steps per task plan. The bridge inherits the sequence runner's own
 #: runtime cap too (``[sequence] max_sequence_steps``); this is the earlier,
 #: cheaper parse-time bound so an absurd plan is refused before validation.
-MAX_TASK_STEPS: int = 12
+MAX_TASK_STEPS: int = 48
 
 #: Key fragments that mark a payload as carrying credential material. Matched
 #: case-insensitively against every key anywhere in the raw task document.
