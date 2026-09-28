@@ -1,35 +1,15 @@
 """The local BLAXCY bridge (Phase 2A).
 
-A thin, local-only boundary that accepts one validated, signed high-level task
-and executes it through the existing :class:`~ai.tool_protocol.ToolDispatcher`.
-No network listener, no MCP, no new execution path — every safety property is
-inherited from the core the bridge composes.
-
-Modules:
-
-* :mod:`bridge.task_protocol` — the strict, versioned ``Task``/``TaskResult``
-  schemas and the raw-payload guards (size, unknown keys, credential-shaped
-  keys, pre-resolved keys).
-* :mod:`bridge.auth` — HMAC-SHA256 request signing for the local
-  bridge→runner boundary; token from ``BLAXCY_BRIDGE_TOKEN``, never hard-coded.
-* :mod:`bridge.runner` — :class:`LocalBridge`, the Body-side entry point.
+The package initializer exposes the public bridge API without importing the
+desktop execution stack eagerly. Lightweight producers (for example the GitHub
+relay signer) can import bridge.auth/task_protocol without pulling in GUI,
+vision, NumPy, or backend dependencies. Public names that belong to the full
+bridge remain available through lazy attribute loading.
 """
 
 from __future__ import annotations
 
-from bridge.auth import BridgeAuth, BridgeAuthenticator, BridgeAuthError, canonical_task_document
-from bridge.runner import DEFAULT_TASK_TIMEOUT_SECONDS, BlaxcyBridgeDispatchError, LocalBridge
-from bridge.task_protocol import (
-    MAX_TASK_PAYLOAD_BYTES,
-    MAX_TASK_STEPS,
-    TASK_SCHEMA_VERSION,
-    Task,
-    TaskEnvelope,
-    TaskResult,
-    TaskStatus,
-    TaskTimeoutError,
-    TaskValidationError,
-)
+from typing import Any
 
 __all__ = [
     "DEFAULT_TASK_TIMEOUT_SECONDS",
@@ -49,3 +29,39 @@ __all__ = [
     "TaskValidationError",
     "canonical_task_document",
 ]
+
+_AUTH_NAMES = {
+    "BridgeAuth",
+    "BridgeAuthError",
+    "BridgeAuthenticator",
+    "canonical_task_document",
+}
+_RUNNER_NAMES = {
+    "DEFAULT_TASK_TIMEOUT_SECONDS",
+    "BlaxcyBridgeDispatchError",
+    "LocalBridge",
+}
+_TASK_NAMES = {
+    "MAX_TASK_PAYLOAD_BYTES",
+    "MAX_TASK_STEPS",
+    "TASK_SCHEMA_VERSION",
+    "Task",
+    "TaskEnvelope",
+    "TaskResult",
+    "TaskStatus",
+    "TaskTimeoutError",
+    "TaskValidationError",
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in _AUTH_NAMES:
+        from bridge import auth
+        return getattr(auth, name)
+    if name in _RUNNER_NAMES:
+        from bridge import runner
+        return getattr(runner, name)
+    if name in _TASK_NAMES:
+        from bridge import task_protocol
+        return getattr(task_protocol, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
