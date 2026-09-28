@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "task_id": "agent-yt-9mm-20260928-01",
+  "plan": [
+    {
+      "step_id": "s1",
+      "tool": "hotkey",
+      "args": {
+        "combo": "ctrl+t"
+      }
+    },
+    {
+      "step_id": "s2",
+      "tool": "type_text",
+      "target": "address bar",
+      "args": {
+        "text": "https://www.youtube.com/results?search_query=9mm+song"
+      }
+    },
+    {
+      "step_id": "s3",
+      "tool": "press_key",
+      "args": {
+        "key": "Return"
+      }
+    },
+    {
+      "step_id": "s4",
+      "tool": "wait_for_element",
+      "target": "9mm",
+      "role": "LINK"
+    },
+    {
+      "step_id": "s5",
+      "tool": "click",
+      "target": "9mm",
+      "role": "LINK"
+    },
+    {
+      "step_id": "s6",
+      "tool": "wait_for_change",
+      "args": {
+        "timeout_ms": 8000
+      }
+    }
+  ]
+}
