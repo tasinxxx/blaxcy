@@ -1,7 +1,0 @@
-{
-  "schema_version": 1,
-  "task_id": "agent-capabilities-20260928-01",
-  "plan": [
-    {"step_id":"s1","tool":"get_capabilities","args":{}}
-  ]
-}
