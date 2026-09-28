@@ -203,6 +203,7 @@ class LocalBridge:
             envelope = self._dispatch_with_timeout(
                 ToolCall(name="run_sequence", arguments=arguments),
                 task_id=task.task_id,
+                confirmed=task.operator_approved,
             )
         except TaskTimeoutError as exc:
             with self._lock:
@@ -220,7 +221,9 @@ class LocalBridge:
 
     # -- Execution ----------------------------------------------------------------
 
-    def _dispatch_with_timeout(self, call: ToolCall, *, task_id: str) -> ToolEnvelope:
+    def _dispatch_with_timeout(
+        self, call: ToolCall, *, task_id: str, confirmed: bool = False
+    ) -> ToolEnvelope:
         """Dispatch with a wall-clock bound, stopping BLAXCY on expiry.
 
         The sequence runner enforces its own §66.1 wall-clock limit for normal
@@ -241,7 +244,7 @@ class LocalBridge:
         def worker() -> None:
             try:
                 outcome["envelope"] = self._dispatcher.dispatch(
-                    call, task_id=task_id, confirmed=False
+                    call, task_id=task_id, confirmed=confirmed
                 )
             except BaseException as exc:
                 outcome["exception"] = exc
