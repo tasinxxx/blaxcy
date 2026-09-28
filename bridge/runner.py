@@ -18,11 +18,12 @@ Every safety property of the bridge is inherited, not re-implemented:
   plan) and can express nothing else: no raw coordinates, no pre-resolved ids,
   no leases, no shell, no Python, no arbitrary tool arguments. The task schema
   and the sequence schema reject all of these at parse time (requirement 9).
-* **Confirmations stay human.** The bridge dispatches with ``confirmed=False``
-  always. When a step needs a human, the sequence halts with
-  ``CONFIRMATION_REQUIRED`` and the bridge reports ``HALTED`` — the operator's
-  confirmation UI, not the producer, decides (§66.1 forbids a pre-authorised
-  destructive step, and the runner never forwards confirmations anyway).
+* **Explicit task authorization is preserved.** A trusted task may carry
+  ``operator_approved=True``. That approval is forwarded to the existing
+  policy gate for the lifetime of that task; it does not bypass blocked
+  applications, credential protection, terminal submission rules, emergency
+  stop, takeover, stale/ambiguous targets, verification, or other safety
+  halts. Unapproved tasks continue with ``confirmed=False``.
 * **Stops outrank everything.** An emergency stop or takeover mid-task is
   reported as a halt with its own code. On the bridge's own wall-clock timeout
   — the one case where *the bridge* must take the desktop back — it triggers
