@@ -76,7 +76,7 @@ _PASSWORD_KEY_FRAGMENTS: tuple[str, ...] = (
 #: ignoring it would mean the task runs with semantics the producer did not
 #: intend.
 _ALLOWED_TASK_KEYS: frozenset[str] = frozenset(
-    {"schema_version", "task_id", "plan", "created_at_ms"}
+    {"schema_version", "task_id", "plan", "created_at_ms", "operator_approved"}
 )
 
 
