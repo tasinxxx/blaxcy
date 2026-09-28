@@ -278,7 +278,7 @@ class PermissionEngine:
                     mode=mode,
                     details={"risk": submission.assessment.risk.value} if submission.assessment else {},
                 )
-            if submission.requires_confirmation:
+            if submission.requires_confirmation and not confirmed:
                 return PolicyDecision.needs_confirmation(
                     action_class=action_class,
                     mode=mode,
