@@ -157,6 +157,8 @@ def test_missing_typed_target_is_unverified() -> None:
     """A vanished field gives no evidence either way about the text."""
     outcome = _verifier().verify_text(after=make_state(), target=make_text_input(), text="hello")
     assert outcome.state is VerificationState.UNVERIFIED
+
+
 def test_recreated_text_field_with_same_identity_hints_can_verify() -> None:
     """Transient AT-SPI node recreation must not erase positive typing evidence."""
     target = make_text_input(
