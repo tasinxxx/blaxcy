@@ -1291,12 +1291,9 @@ def _read_text_content(atspi: Any, node: Any) -> str:
     silently produced nothing at all. The interface method is therefore tried
     first, and the node's own method is kept as a fallback for test doubles.
     """
-    try:
-        if not node.is_text():
-            return ""
-    except Exception:
-        return ""
-
+    # Some Qt AT-SPI nodes expose the Text interface without the legacy
+    # Accessible.is_text() predicate returning true. Treat that predicate as
+    # advisory only; the interface calls below are the authoritative probe.
     count = -1
     try:
         count = int(node.get_character_count())
