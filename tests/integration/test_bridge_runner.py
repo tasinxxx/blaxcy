@@ -127,8 +127,18 @@ def test_explicit_task_authorization_reaches_dispatcher() -> None:
     auth = BridgeAuthenticator(token=TEST_TOKEN)
     dispatcher = _CapturingDispatcher()
     bridge = LocalBridge(dispatcher, authenticator=auth, settings=Settings(), timeout_seconds=1.0)  # type: ignore[arg-type]
+    document, signature, timestamp = _signed_document(
+        _task_payload(
+            plan=[{"step_id": "s1", "tool": "get_capabilities"}],
+            operator_approved=True,
+        ),
+        auth,
+    )
     response = bridge.submit(
-        *_signed_document(_task_payload(plan=[{"step_id": "s1", "tool": "get_capabilities"}], operator_approved=True), auth)
+        document,
+        signature=signature,
+        nonce="n1",
+        timestamp=timestamp,
     )
     assert response.result.status is TaskStatus.COMPLETED
     assert dispatcher.confirmed == [True]
