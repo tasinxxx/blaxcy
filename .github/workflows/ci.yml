@@ -41,6 +41,7 @@ jobs:
             dbus-x11 \
             xvfb \
             libegl1 \
+            libxcb-cursor0 \
             x11-utils \
             xdotool \
             tesseract-ocr
