@@ -63,7 +63,7 @@ _log = get_logger(__name__)
 #: its own §66.1 cap (default 60 s); this is the bridge's outer bound, and it
 #: exists for the case the runner's cap cannot cover: a dispatch that never
 #: returns at all (a hung backend) must not hang the producer too.
-DEFAULT_TASK_TIMEOUT_SECONDS: float = 120.0
+DEFAULT_TASK_TIMEOUT_SECONDS: float = 360.0
 
 
 class LocalBridge:
