@@ -57,6 +57,7 @@ def _cmd_process(args: argparse.Namespace) -> int:
         app = BlaxcyApplication(settings)
         app.start()
         try:
+            app.set_mode(args.mode, reason="operator-approved relay execution")
             bridge = LocalBridge(
                 app.dispatcher,
                 authenticator=auth,
@@ -129,6 +130,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     process = sub.add_parser("process", help="claim and execute pending tasks through the LocalBridge")
     process.add_argument("--task-id", default=None, help="process only this task id")
+    process.add_argument(
+        "--mode",
+        type=PolicyMode,
+        choices=tuple(PolicyMode),
+        default=PolicyMode.OBSERVE,
+        help="explicit execution mode for this relay run (default: OBSERVE)",
+    )
     process.add_argument(
         "--wiring",
         default="inprocess",
