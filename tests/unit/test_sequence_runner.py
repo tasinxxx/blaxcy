@@ -56,6 +56,18 @@ def _presses(env: SequenceEnv) -> int:
 # -- The happy path -----------------------------------------------------------
 
 
+def test_query_for_step_infers_text_input_role_for_address_bar() -> None:
+    step = SequenceStep(
+        step_id="s1",
+        tool="type_text",
+        target="address bar",
+        args={"text": "https://example.com"},
+    )
+    query = query_for_step(step)
+    assert query is not None
+    assert query.role_hint is UIRole.TEXT_INPUT
+
+
 def test_a_five_step_plan_runs_in_one_round_trip_with_every_step_verified() -> None:
     """The section 74 workflow: one submission, five fully verified steps."""
     env = _ready()
