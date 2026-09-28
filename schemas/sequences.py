@@ -166,8 +166,6 @@ class SequenceStep(BaseModel):
             payload["target"] = self.target
         if self.role is not None:
             payload["role"] = self.role.value
-        if self.require_verification is not None:
-            payload["require_verification"] = self.require_verification
         payload.update(self.args)
         return payload
 
