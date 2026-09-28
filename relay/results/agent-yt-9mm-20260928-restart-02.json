@@ -1,0 +1,989 @@
+{
+  "schema_version": 1,
+  "task_id": "agent-yt-9mm-20260928-restart-02",
+  "lifecycle": "HALTED",
+  "bridge_status": "HALTED",
+  "result": {
+    "task_id": "agent-yt-9mm-20260928-restart-02",
+    "envelope": {
+      "ok": false,
+      "error_code": "TARGET_AMBIGUOUS",
+      "message": "step s5 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+      "data": {
+        "sequence_id": "seq-b619b6725def459184782902a7600a46",
+        "halted": true,
+        "halt_reason": "step s5 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+        "halt_code": "TARGET_AMBIGUOUS",
+        "wall_clock_ms": 2692.2124970005825,
+        "completed_count": 5,
+        "steps": [
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "verification": {
+                "state": "VERIFIED",
+                "postcondition": "SCREEN_CHANGED",
+                "reason": "a MEANINGFUL change followed the hotkey",
+                "evidence": {
+                  "change_class": "MEANINGFUL",
+                  "after_frame_id": 1,
+                  "active_window_changed": false
+                }
+              },
+              "timing": {
+                "observe_ms": 22.653,
+                "verify_calls": 1
+              }
+            },
+            "verification": "VERIFIED",
+            "state_version": 2,
+            "frame_id": 1,
+            "elapsed_ms": 26.75103100045817,
+            "step_id": "s1",
+            "index": 0,
+            "tool": "hotkey",
+            "action_class": "MUTATING",
+            "require_verification": false
+          },
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "verification": {
+                "state": "UNVERIFIED",
+                "postcondition": "NONE",
+                "reason": "only a NONE change followed the hotkey; that does not establish a user-visible outcome",
+                "evidence": {
+                  "change_class": "NONE",
+                  "after_frame_id": 2,
+                  "active_window_changed": false
+                }
+              },
+              "timing": {
+                "observe_ms": 22.155,
+                "verify_calls": 1
+              }
+            },
+            "verification": "UNVERIFIED",
+            "state_version": 3,
+            "frame_id": 2,
+            "elapsed_ms": 22.771563999413047,
+            "step_id": "s2",
+            "index": 1,
+            "tool": "hotkey",
+            "action_class": "MUTATING",
+            "require_verification": false
+          },
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "verification": {
+                "state": "VERIFIED",
+                "postcondition": "TEXT_PRESENT",
+                "reason": "the typed text is present in the target's observed content",
+                "evidence": {
+                  "element_id": "desktop[0]/25/0/23/5/1/0",
+                  "characters": 53
+                }
+              },
+              "timing": {
+                "observe_ms": 1014.786,
+                "verify_calls": 1
+              },
+              "target": {
+                "element_id": "desktop[0]/25/0/23/5/4/0",
+                "role": "TEXT_INPUT",
+                "text": "chatgpt.com/c/6ab8bdb3-be5c-83ee-b3ab-1387e829c001",
+                "accessible_name": "Search with Google or enter address",
+                "source": "ATSPI",
+                "confidence": 0.95,
+                "bbox": {
+                  "x": 351.0,
+                  "y": 86.0,
+                  "width": 760.0,
+                  "height": 28.0,
+                  "space": "DESKTOP"
+                },
+                "owner_window_id": null,
+                "password": false
+              },
+              "lease": {
+                "lease_id": "54dcb33e5c15490c8e93ba61dc21fc01",
+                "element_id": "desktop[0]/25/0/23/5/4/0",
+                "frame_id": 2,
+                "state_version": 3,
+                "generation": 0,
+                "ttl_ms": 3000,
+                "confidence": 0.95,
+                "source": "ATSPI",
+                "monitor_id": null
+              },
+              "resolution": {
+                "status": "RESOLVED",
+                "reason": "resolved at stage 'role' with score 0.874",
+                "considered": 586,
+                "matched_stage": "role",
+                "ambiguity": false,
+                "best": {
+                  "element_id": "desktop[0]/25/0/23/5/4/0",
+                  "role": "TEXT_INPUT",
+                  "text": "chatgpt.com/c/6ab8bdb3-be5c-83ee-b3ab-1387e829c001",
+                  "accessible_name": "Search with Google or enter address",
+                  "score": 0.8744444444444445,
+                  "breakdown": {
+                    "text": 0.7111111111111111,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 351.0,
+                    "y": 86.0,
+                    "width": 760.0,
+                    "height": 28.0,
+                    "space": "DESKTOP"
+                  }
+                },
+                "candidates": [
+                  {
+                    "element_id": "desktop[0]/25/0/23/5/4/0",
+                    "role": "TEXT_INPUT",
+                    "text": "chatgpt.com/c/6ab8bdb3-be5c-83ee-b3ab-1387e829c001",
+                    "accessible_name": "Search with Google or enter address",
+                    "score": 0.8744444444444445,
+                    "breakdown": {
+                      "text": 0.7111111111111111,
+                      "source": 0.95,
+                      "role": 1.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 351.0,
+                      "y": 86.0,
+                      "width": 760.0,
+                      "height": 28.0,
+                      "space": "DESKTOP"
+                    }
+                  }
+                ],
+                "occlusion": {
+                  "target_id": "desktop[0]/25/0/23/5/4/0",
+                  "ratio": 0.0,
+                  "threshold": 0.5,
+                  "blocked": false,
+                  "assessed": true,
+                  "declared_occluded": false,
+                  "covering": [],
+                  "reason": "nothing covers more than 0.50 of the target"
+                },
+                "cache": {
+                  "outcome": "MISS",
+                  "reason": "no hint for this description",
+                  "hint": null
+                }
+              },
+              "revalidation": {
+                "ok": true,
+                "checks": {
+                  "lease_valid": true,
+                  "generation_current": true,
+                  "state_fresh": true,
+                  "state_not_older_than_lease": true,
+                  "target_present": true,
+                  "identity_consistent": true,
+                  "visible": true,
+                  "enabled": true,
+                  "has_geometry": true,
+                  "inside_desktop": true,
+                  "not_occluded": true
+                },
+                "moved_px": 0.0,
+                "occlusion": {
+                  "target_id": "desktop[0]/25/0/23/5/4/0",
+                  "ratio": 0.0,
+                  "threshold": 0.5,
+                  "blocked": false,
+                  "assessed": true,
+                  "declared_occluded": false,
+                  "covering": [],
+                  "reason": "nothing covers more than 0.50 of the target"
+                }
+              }
+            },
+            "verification": "VERIFIED",
+            "state_version": 5,
+            "frame_id": 4,
+            "elapsed_ms": 2584.472630000164,
+            "step_id": "s3",
+            "index": 2,
+            "tool": "type_text",
+            "action_class": "MUTATING",
+            "require_verification": false
+          },
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "verification": {
+                "state": "UNVERIFIED",
+                "postcondition": "NONE",
+                "reason": "only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+                "evidence": {
+                  "change_class": "ANIMATION",
+                  "after_frame_id": 5,
+                  "active_window_changed": false
+                }
+              },
+              "timing": {
+                "observe_ms": 17.662,
+                "verify_calls": 1
+              }
+            },
+            "verification": "UNVERIFIED",
+            "state_version": 6,
+            "frame_id": 5,
+            "elapsed_ms": 17.960904000574374,
+            "step_id": "s4",
+            "index": 3,
+            "tool": "press_key",
+            "action_class": "MUTATING",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "TARGET_AMBIGUOUS",
+            "message": "top two candidates are within 0.080 (gap 0.000)",
+            "data": {
+              "found": false,
+              "resolution": {
+                "status": "AMBIGUOUS",
+                "reason": "top two candidates are within 0.080 (gap 0.000)",
+                "considered": 666,
+                "matched_stage": "substring_text",
+                "ambiguity": true,
+                "best": null,
+                "candidates": [
+                  {
+                    "element_id": "desktop[0]/25/0/23/5/1/2/0",
+                    "role": "MENU_ITEM",
+                    "text": "9mm song - YouTube \u2014 youtube.com/results?search_query=9mm+song",
+                    "accessible_name": "9mm song - YouTube \u2014 youtube.com/results?search_query=9mm+song",
+                    "score": 0.66,
+                    "breakdown": {
+                      "text": 0.55,
+                      "source": 0.95,
+                      "role": 0.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 263.0,
+                      "y": 127.0,
+                      "width": 876.0,
+                      "height": 34.0,
+                      "space": "DESKTOP"
+                    }
+                  },
+                  {
+                    "element_id": "desktop[0]/25/0/23/5/1/2/2",
+                    "role": "MENU_ITEM",
+                    "text": "(29) 9mm songhttps://www.youtube.com/results?search_query=9mm song - YouTube \u2014 youtube.com/results?search_query=9mm+songhttps://www.youtube.com/results?search_query=9mm+song",
+                    "accessible_name": "(29) 9mm songhttps://www.youtube.com/results?search_query=9mm song - YouTube \u2014 youtube.com/results?search_query=9mm+songhttps://www.youtube.com/results?search_query=9mm+song",
+                    "score": 0.66,
+                    "breakdown": {
+                      "text": 0.55,
+                      "source": 0.95,
+                      "role": 0.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 263.0,
+                      "y": 229.0,
+                      "width": 876.0,
+                      "height": 33.0,
+                      "space": "DESKTOP"
+                    }
+                  },
+                  {
+                    "element_id": "desktop[0]/25/0/23/5/1/2/2/2",
+                    "role": "TEXT_FRAGMENT",
+                    "text": "(29) 9mm songhttps://www.youtube.com/results?search_query=9mm song - YouTube",
+                    "accessible_name": "(29) 9mm songhttps://www.youtube.com/results?search_query=9mm song - YouTube",
+                    "score": 0.66,
+                    "breakdown": {
+                      "text": 0.55,
+                      "source": 0.95,
+                      "role": 0.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 307.0,
+                      "y": 235.0,
+                      "width": 491.0,
+                      "height": 21.0,
+                      "space": "DESKTOP"
+                    }
+                  },
+                  {
+                    "element_id": "desktop[0]/25/0/26/0/0/0/1/1/0/0/0",
+                    "role": "LINK",
+                    "text": "Home",
+                    "accessible_name": "Home",
+                    "score": 0.59,
+                    "breakdown": {
+                      "text": 0.0,
+                      "source": 0.95,
+                      "role": 1.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 8.0,
+                      "y": 160.0,
+                      "width": 95.0,
+                      "height": 36.0,
+                      "space": "DESKTOP"
+                    }
+                  },
+                  {
+                    "element_id": "desktop[0]/25/0/26/0/0/0/1/1/1/0/0",
+                    "role": "LINK",
+                    "text": "New chat Control Shift O",
+                    "accessible_name": "New chat Control Shift O",
+                    "score": 0.59,
+                    "breakdown": {
+                      "text": 0.0,
+                      "source": 0.95,
+                      "role": 1.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 6.0,
+                      "y": 212.0,
+                      "width": 248.0,
+                      "height": 36.0,
+                      "space": "DESKTOP"
+                    }
+                  }
+                ],
+                "occlusion": {
+                  "target_id": "desktop[0]/25/0/23/5/1/2/0",
+                  "ratio": 1.0,
+                  "threshold": 0.5,
+                  "blocked": true,
+                  "assessed": true,
+                  "declared_occluded": false,
+                  "covering": [
+                    "desktop[0]/25/0/23/5/3",
+                    "desktop[0]/25/0/24"
+                  ],
+                  "reason": "covered 1.00 > threshold 0.50"
+                },
+                "cache": {
+                  "outcome": "MISS",
+                  "reason": "no hint for this description",
+                  "hint": null
+                }
+              }
+            },
+            "verification": "NOT_APPLICABLE",
+            "state_version": 7,
+            "frame_id": 6,
+            "elapsed_ms": 35.99261400086107,
+            "step_id": "s5",
+            "index": 4,
+            "tool": "wait_for_element",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s5 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s6",
+            "index": 5,
+            "tool": "click",
+            "action_class": "MUTATING",
+            "require_verification": true
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s5 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s7",
+            "index": 6,
+            "tool": "wait_for_change",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s5 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s8",
+            "index": 7,
+            "tool": "wait_for_element",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s5 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s9",
+            "index": 8,
+            "tool": "click",
+            "action_class": "MUTATING",
+            "require_verification": true
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s5 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s10",
+            "index": 9,
+            "tool": "wait_for_change",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          }
+        ]
+      },
+      "verification": "NOT_APPLICABLE",
+      "state_version": null,
+      "frame_id": null,
+      "elapsed_ms": 2692.4261820004176
+    },
+    "result": {
+      "schema_version": 1,
+      "task_id": "agent-yt-9mm-20260928-restart-02",
+      "status": "HALTED",
+      "sequence_id": "seq-b619b6725def459184782902a7600a46",
+      "halted": true,
+      "halt_reason": "step s5 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+      "halt_code": "TARGET_AMBIGUOUS",
+      "wall_clock_ms": 2692.2124970005825,
+      "completed_count": 5,
+      "steps": [
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "verification": {
+              "state": "VERIFIED",
+              "postcondition": "SCREEN_CHANGED",
+              "reason": "a MEANINGFUL change followed the hotkey",
+              "evidence": {
+                "change_class": "MEANINGFUL",
+                "after_frame_id": 1,
+                "active_window_changed": false
+              }
+            },
+            "timing": {
+              "observe_ms": 22.653,
+              "verify_calls": 1
+            }
+          },
+          "verification": "VERIFIED",
+          "state_version": 2,
+          "frame_id": 1,
+          "elapsed_ms": 26.75103100045817,
+          "step_id": "s1",
+          "index": 0,
+          "tool": "hotkey",
+          "action_class": "MUTATING",
+          "require_verification": false
+        },
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "verification": {
+              "state": "UNVERIFIED",
+              "postcondition": "NONE",
+              "reason": "only a NONE change followed the hotkey; that does not establish a user-visible outcome",
+              "evidence": {
+                "change_class": "NONE",
+                "after_frame_id": 2,
+                "active_window_changed": false
+              }
+            },
+            "timing": {
+              "observe_ms": 22.155,
+              "verify_calls": 1
+            }
+          },
+          "verification": "UNVERIFIED",
+          "state_version": 3,
+          "frame_id": 2,
+          "elapsed_ms": 22.771563999413047,
+          "step_id": "s2",
+          "index": 1,
+          "tool": "hotkey",
+          "action_class": "MUTATING",
+          "require_verification": false
+        },
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "verification": {
+              "state": "VERIFIED",
+              "postcondition": "TEXT_PRESENT",
+              "reason": "the typed text is present in the target's observed content",
+              "evidence": {
+                "element_id": "desktop[0]/25/0/23/5/1/0",
+                "characters": 53
+              }
+            },
+            "timing": {
+              "observe_ms": 1014.786,
+              "verify_calls": 1
+            },
+            "target": {
+              "element_id": "desktop[0]/25/0/23/5/4/0",
+              "role": "TEXT_INPUT",
+              "text": "chatgpt.com/c/6ab8bdb3-be5c-83ee-b3ab-1387e829c001",
+              "accessible_name": "Search with Google or enter address",
+              "source": "ATSPI",
+              "confidence": 0.95,
+              "bbox": {
+                "x": 351.0,
+                "y": 86.0,
+                "width": 760.0,
+                "height": 28.0,
+                "space": "DESKTOP"
+              },
+              "owner_window_id": null,
+              "password": false
+            },
+            "lease": {
+              "lease_id": "54dcb33e5c15490c8e93ba61dc21fc01",
+              "element_id": "desktop[0]/25/0/23/5/4/0",
+              "frame_id": 2,
+              "state_version": 3,
+              "generation": 0,
+              "ttl_ms": 3000,
+              "confidence": 0.95,
+              "source": "ATSPI",
+              "monitor_id": null
+            },
+            "resolution": {
+              "status": "RESOLVED",
+              "reason": "resolved at stage 'role' with score 0.874",
+              "considered": 586,
+              "matched_stage": "role",
+              "ambiguity": false,
+              "best": {
+                "element_id": "desktop[0]/25/0/23/5/4/0",
+                "role": "TEXT_INPUT",
+                "text": "chatgpt.com/c/6ab8bdb3-be5c-83ee-b3ab-1387e829c001",
+                "accessible_name": "Search with Google or enter address",
+                "score": 0.8744444444444445,
+                "breakdown": {
+                  "text": 0.7111111111111111,
+                  "source": 0.95,
+                  "role": 1.0,
+                  "context": 1.0,
+                  "geometry": 1.0
+                },
+                "source": "ATSPI",
+                "bbox": {
+                  "x": 351.0,
+                  "y": 86.0,
+                  "width": 760.0,
+                  "height": 28.0,
+                  "space": "DESKTOP"
+                }
+              },
+              "candidates": [
+                {
+                  "element_id": "desktop[0]/25/0/23/5/4/0",
+                  "role": "TEXT_INPUT",
+                  "text": "chatgpt.com/c/6ab8bdb3-be5c-83ee-b3ab-1387e829c001",
+                  "accessible_name": "Search with Google or enter address",
+                  "score": 0.8744444444444445,
+                  "breakdown": {
+                    "text": 0.7111111111111111,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 351.0,
+                    "y": 86.0,
+                    "width": 760.0,
+                    "height": 28.0,
+                    "space": "DESKTOP"
+                  }
+                }
+              ],
+              "occlusion": {
+                "target_id": "desktop[0]/25/0/23/5/4/0",
+                "ratio": 0.0,
+                "threshold": 0.5,
+                "blocked": false,
+                "assessed": true,
+                "declared_occluded": false,
+                "covering": [],
+                "reason": "nothing covers more than 0.50 of the target"
+              },
+              "cache": {
+                "outcome": "MISS",
+                "reason": "no hint for this description",
+                "hint": null
+              }
+            },
+            "revalidation": {
+              "ok": true,
+              "checks": {
+                "lease_valid": true,
+                "generation_current": true,
+                "state_fresh": true,
+                "state_not_older_than_lease": true,
+                "target_present": true,
+                "identity_consistent": true,
+                "visible": true,
+                "enabled": true,
+                "has_geometry": true,
+                "inside_desktop": true,
+                "not_occluded": true
+              },
+              "moved_px": 0.0,
+              "occlusion": {
+                "target_id": "desktop[0]/25/0/23/5/4/0",
+                "ratio": 0.0,
+                "threshold": 0.5,
+                "blocked": false,
+                "assessed": true,
+                "declared_occluded": false,
+                "covering": [],
+                "reason": "nothing covers more than 0.50 of the target"
+              }
+            }
+          },
+          "verification": "VERIFIED",
+          "state_version": 5,
+          "frame_id": 4,
+          "elapsed_ms": 2584.472630000164,
+          "step_id": "s3",
+          "index": 2,
+          "tool": "type_text",
+          "action_class": "MUTATING",
+          "require_verification": false
+        },
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "verification": {
+              "state": "UNVERIFIED",
+              "postcondition": "NONE",
+              "reason": "only a ANIMATION change followed the press_key; that does not establish a user-visible outcome",
+              "evidence": {
+                "change_class": "ANIMATION",
+                "after_frame_id": 5,
+                "active_window_changed": false
+              }
+            },
+            "timing": {
+              "observe_ms": 17.662,
+              "verify_calls": 1
+            }
+          },
+          "verification": "UNVERIFIED",
+          "state_version": 6,
+          "frame_id": 5,
+          "elapsed_ms": 17.960904000574374,
+          "step_id": "s4",
+          "index": 3,
+          "tool": "press_key",
+          "action_class": "MUTATING",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "TARGET_AMBIGUOUS",
+          "message": "top two candidates are within 0.080 (gap 0.000)",
+          "data": {
+            "found": false,
+            "resolution": {
+              "status": "AMBIGUOUS",
+              "reason": "top two candidates are within 0.080 (gap 0.000)",
+              "considered": 666,
+              "matched_stage": "substring_text",
+              "ambiguity": true,
+              "best": null,
+              "candidates": [
+                {
+                  "element_id": "desktop[0]/25/0/23/5/1/2/0",
+                  "role": "MENU_ITEM",
+                  "text": "9mm song - YouTube \u2014 youtube.com/results?search_query=9mm+song",
+                  "accessible_name": "9mm song - YouTube \u2014 youtube.com/results?search_query=9mm+song",
+                  "score": 0.66,
+                  "breakdown": {
+                    "text": 0.55,
+                    "source": 0.95,
+                    "role": 0.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 263.0,
+                    "y": 127.0,
+                    "width": 876.0,
+                    "height": 34.0,
+                    "space": "DESKTOP"
+                  }
+                },
+                {
+                  "element_id": "desktop[0]/25/0/23/5/1/2/2",
+                  "role": "MENU_ITEM",
+                  "text": "(29) 9mm songhttps://www.youtube.com/results?search_query=9mm song - YouTube \u2014 youtube.com/results?search_query=9mm+songhttps://www.youtube.com/results?search_query=9mm+song",
+                  "accessible_name": "(29) 9mm songhttps://www.youtube.com/results?search_query=9mm song - YouTube \u2014 youtube.com/results?search_query=9mm+songhttps://www.youtube.com/results?search_query=9mm+song",
+                  "score": 0.66,
+                  "breakdown": {
+                    "text": 0.55,
+                    "source": 0.95,
+                    "role": 0.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 263.0,
+                    "y": 229.0,
+                    "width": 876.0,
+                    "height": 33.0,
+                    "space": "DESKTOP"
+                  }
+                },
+                {
+                  "element_id": "desktop[0]/25/0/23/5/1/2/2/2",
+                  "role": "TEXT_FRAGMENT",
+                  "text": "(29) 9mm songhttps://www.youtube.com/results?search_query=9mm song - YouTube",
+                  "accessible_name": "(29) 9mm songhttps://www.youtube.com/results?search_query=9mm song - YouTube",
+                  "score": 0.66,
+                  "breakdown": {
+                    "text": 0.55,
+                    "source": 0.95,
+                    "role": 0.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 307.0,
+                    "y": 235.0,
+                    "width": 491.0,
+                    "height": 21.0,
+                    "space": "DESKTOP"
+                  }
+                },
+                {
+                  "element_id": "desktop[0]/25/0/26/0/0/0/1/1/0/0/0",
+                  "role": "LINK",
+                  "text": "Home",
+                  "accessible_name": "Home",
+                  "score": 0.59,
+                  "breakdown": {
+                    "text": 0.0,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 8.0,
+                    "y": 160.0,
+                    "width": 95.0,
+                    "height": 36.0,
+                    "space": "DESKTOP"
+                  }
+                },
+                {
+                  "element_id": "desktop[0]/25/0/26/0/0/0/1/1/1/0/0",
+                  "role": "LINK",
+                  "text": "New chat Control Shift O",
+                  "accessible_name": "New chat Control Shift O",
+                  "score": 0.59,
+                  "breakdown": {
+                    "text": 0.0,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 6.0,
+                    "y": 212.0,
+                    "width": 248.0,
+                    "height": 36.0,
+                    "space": "DESKTOP"
+                  }
+                }
+              ],
+              "occlusion": {
+                "target_id": "desktop[0]/25/0/23/5/1/2/0",
+                "ratio": 1.0,
+                "threshold": 0.5,
+                "blocked": true,
+                "assessed": true,
+                "declared_occluded": false,
+                "covering": [
+                  "desktop[0]/25/0/23/5/3",
+                  "desktop[0]/25/0/24"
+                ],
+                "reason": "covered 1.00 > threshold 0.50"
+              },
+              "cache": {
+                "outcome": "MISS",
+                "reason": "no hint for this description",
+                "hint": null
+              }
+            }
+          },
+          "verification": "NOT_APPLICABLE",
+          "state_version": 7,
+          "frame_id": 6,
+          "elapsed_ms": 35.99261400086107,
+          "step_id": "s5",
+          "index": 4,
+          "tool": "wait_for_element",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s5 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s6",
+          "index": 5,
+          "tool": "click",
+          "action_class": "MUTATING",
+          "require_verification": true
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s5 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s7",
+          "index": 6,
+          "tool": "wait_for_change",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s5 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s8",
+          "index": 7,
+          "tool": "wait_for_element",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s5 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s9",
+          "index": 8,
+          "tool": "click",
+          "action_class": "MUTATING",
+          "require_verification": true
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s5 (wait_for_element) halted the sequence on AMBIGUOUS: top two candidates are within 0.080 (gap 0.000)",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s10",
+          "index": 9,
+          "tool": "wait_for_change",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        }
+      ],
+      "rejection_reason": null,
+      "rejection_details": null,
+      "timeout_elapsed_ms": null,
+      "timeout_stop_latched": null
+    }
+  }
+}
