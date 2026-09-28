@@ -79,15 +79,48 @@ class VerificationOutcome:
 
 
 def _find_element(state: ScreenState | None, element: UIElement) -> UIElement | None:
-    """Find ``element`` in ``state`` by identity first, then by element id."""
+    """Find an element by identity, id, then stable text-entry identity hints.
+
+    Accessibility providers can briefly recreate a text-entry node while its
+    visible control remains the same. For text verification, the fallback requires
+    the same role, accessible name, overlapping geometry, and matching ownership
+    when ownership is available, so another field cannot be credited by label alone.
+    """
     if state is None:
         return None
     identity = element.identity
     for candidate in state.elements:
         if candidate.identity == identity:
             return candidate
-    return state.element_by_id(element.element_id)
+    by_id = state.element_by_id(element.element_id)
+    if by_id is not None:
+        return by_id
+    if not element.is_text_entry or not element.accessible_name or element.bbox is None:
+        return None
+    name = _normalize_text(element.accessible_name)
+    for candidate in state.elements:
+        if (
+            candidate.role is element.role
+            and candidate.is_text_entry
+            and candidate.accessible_name
+            and _normalize_text(candidate.accessible_name) == name
+            and candidate.bbox is not None
+            and candidate.bbox.intersects(element.bbox)
+            and _same_application_identity(candidate, element)
+        ):
+            return candidate
+    return None
 
+
+def _same_application_identity(candidate: UIElement, target: UIElement) -> bool:
+    """Require matching ownership when either observation provides it."""
+    if candidate.owner_window_id is not None and target.owner_window_id is not None:
+        return candidate.owner_window_id == target.owner_window_id
+    if candidate.owner_app is not None and target.owner_app is not None:
+        return candidate.owner_app.casefold() == target.owner_app.casefold()
+    return candidate.owner_window_id is None and target.owner_window_id is None and (
+        candidate.owner_app is None and target.owner_app is None
+    )
 
 def _normalize_text(value: str) -> str:
     """Case-folded, whitespace-collapsed text for a containment check."""
