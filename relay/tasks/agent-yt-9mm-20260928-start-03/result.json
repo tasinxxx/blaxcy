@@ -1,0 +1,547 @@
+{
+  "schema_version": 1,
+  "task_id": "agent-yt-9mm-20260928-start-03",
+  "lifecycle": "HALTED",
+  "bridge_status": "HALTED",
+  "result": {
+    "task_id": "agent-yt-9mm-20260928-start-03",
+    "envelope": {
+      "ok": false,
+      "error_code": "CONFIRMATION_REQUIRED",
+      "message": "step s3 (press_key) halted the sequence on CONFIRMATION_REQUIRED: terminal submission requires explicit confirmation",
+      "data": {
+        "sequence_id": "seq-8c10602b2d4b42f296732176f8987bee",
+        "halted": true,
+        "halt_reason": "step s3 (press_key) halted the sequence on CONFIRMATION_REQUIRED: terminal submission requires explicit confirmation",
+        "halt_code": "CONFIRMATION_REQUIRED",
+        "wall_clock_ms": 4272.691655000017,
+        "completed_count": 3,
+        "steps": [
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "verification": {
+                "state": "VERIFIED",
+                "postcondition": "SCREEN_CHANGED",
+                "reason": "a MAJOR change followed the hotkey",
+                "evidence": {
+                  "change_class": "MAJOR",
+                  "after_frame_id": 1,
+                  "active_window_changed": false
+                }
+              },
+              "timing": {
+                "observe_ms": 25.14,
+                "verify_calls": 1
+              }
+            },
+            "verification": "VERIFIED",
+            "state_version": 2,
+            "frame_id": 1,
+            "elapsed_ms": 31.497008001679205,
+            "step_id": "s1",
+            "index": 0,
+            "tool": "hotkey",
+            "action_class": "MUTATING",
+            "require_verification": false
+          },
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "verification": {
+                "state": "UNVERIFIED",
+                "postcondition": "NONE",
+                "reason": "the typed-into element is no longer observable, so its content cannot be confirmed",
+                "evidence": {
+                  "element_id": "desktop[0]/25/0/23/5/4/0"
+                }
+              },
+              "timing": {
+                "observe_ms": 1329.409,
+                "verify_calls": 2
+              },
+              "target": {
+                "element_id": "desktop[0]/25/0/23/5/4/0",
+                "role": "TEXT_INPUT",
+                "text": "www.instagram.com/?flo=true",
+                "accessible_name": "Search with Google or enter address",
+                "source": "ATSPI",
+                "confidence": 0.95,
+                "bbox": {
+                  "x": 351.0,
+                  "y": 86.0,
+                  "width": 760.0,
+                  "height": 28.0,
+                  "space": "DESKTOP"
+                },
+                "owner_window_id": null,
+                "password": false
+              },
+              "lease": {
+                "lease_id": "318bc4e96e40441897e1cbbbb68cc52a",
+                "element_id": "desktop[0]/25/0/23/5/4/0",
+                "frame_id": 1,
+                "state_version": 2,
+                "generation": 0,
+                "ttl_ms": 3000,
+                "confidence": 0.95,
+                "source": "ATSPI",
+                "monitor_id": null
+              },
+              "resolution": {
+                "status": "RESOLVED",
+                "reason": "resolved at stage 'role' with score 0.874",
+                "considered": 334,
+                "matched_stage": "role",
+                "ambiguity": false,
+                "best": {
+                  "element_id": "desktop[0]/25/0/23/5/4/0",
+                  "role": "TEXT_INPUT",
+                  "text": "www.instagram.com/?flo=true",
+                  "accessible_name": "Search with Google or enter address",
+                  "score": 0.8744444444444445,
+                  "breakdown": {
+                    "text": 0.7111111111111111,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 351.0,
+                    "y": 86.0,
+                    "width": 760.0,
+                    "height": 28.0,
+                    "space": "DESKTOP"
+                  }
+                },
+                "candidates": [
+                  {
+                    "element_id": "desktop[0]/25/0/23/5/4/0",
+                    "role": "TEXT_INPUT",
+                    "text": "www.instagram.com/?flo=true",
+                    "accessible_name": "Search with Google or enter address",
+                    "score": 0.8744444444444445,
+                    "breakdown": {
+                      "text": 0.7111111111111111,
+                      "source": 0.95,
+                      "role": 1.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 351.0,
+                      "y": 86.0,
+                      "width": 760.0,
+                      "height": 28.0,
+                      "space": "DESKTOP"
+                    }
+                  }
+                ],
+                "occlusion": {
+                  "target_id": "desktop[0]/25/0/23/5/4/0",
+                  "ratio": 0.0,
+                  "threshold": 0.5,
+                  "blocked": false,
+                  "assessed": true,
+                  "declared_occluded": false,
+                  "covering": [],
+                  "reason": "nothing covers more than 0.50 of the target"
+                },
+                "cache": {
+                  "outcome": "MISS",
+                  "reason": "no hint for this description",
+                  "hint": null
+                }
+              },
+              "revalidation": {
+                "ok": true,
+                "checks": {
+                  "lease_valid": true,
+                  "generation_current": true,
+                  "state_fresh": true,
+                  "state_not_older_than_lease": true,
+                  "target_present": true,
+                  "identity_consistent": true,
+                  "visible": true,
+                  "enabled": true,
+                  "has_geometry": true,
+                  "inside_desktop": true,
+                  "not_occluded": true
+                },
+                "moved_px": 0.0,
+                "occlusion": {
+                  "target_id": "desktop[0]/25/0/23/5/4/0",
+                  "ratio": 0.0,
+                  "threshold": 0.5,
+                  "blocked": false,
+                  "assessed": true,
+                  "declared_occluded": false,
+                  "covering": [],
+                  "reason": "nothing covers more than 0.50 of the target"
+                }
+              }
+            },
+            "verification": "UNVERIFIED",
+            "state_version": 5,
+            "frame_id": 4,
+            "elapsed_ms": 4238.427198000863,
+            "step_id": "s2",
+            "index": 1,
+            "tool": "type_text",
+            "action_class": "MUTATING",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "CONFIRMATION_REQUIRED",
+            "message": "terminal submission requires explicit confirmation",
+            "data": {
+              "tool": "press_key",
+              "recovery": {
+                "should_attempt": false,
+                "failure_class": "SAFETY",
+                "actions": [],
+                "reason": "a safety refusal is a decision, not an accident (section 61)",
+                "tool_attempts_left": 2,
+                "step_attempts_left": 6
+              }
+            },
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.10232299973722547,
+            "step_id": "s3",
+            "index": 2,
+            "tool": "press_key",
+            "action_class": "MUTATING",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s3 (press_key) halted the sequence on CONFIRMATION_REQUIRED: terminal submission requires explicit confirmation",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s4",
+            "index": 3,
+            "tool": "wait_for_element",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s3 (press_key) halted the sequence on CONFIRMATION_REQUIRED: terminal submission requires explicit confirmation",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s5",
+            "index": 4,
+            "tool": "click",
+            "action_class": "MUTATING",
+            "require_verification": true
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s3 (press_key) halted the sequence on CONFIRMATION_REQUIRED: terminal submission requires explicit confirmation",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s6",
+            "index": 5,
+            "tool": "wait_for_change",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          }
+        ]
+      },
+      "verification": "NOT_APPLICABLE",
+      "state_version": null,
+      "frame_id": null,
+      "elapsed_ms": 4272.892148999745
+    },
+    "result": {
+      "schema_version": 1,
+      "task_id": "agent-yt-9mm-20260928-start-03",
+      "status": "HALTED",
+      "sequence_id": "seq-8c10602b2d4b42f296732176f8987bee",
+      "halted": true,
+      "halt_reason": "step s3 (press_key) halted the sequence on CONFIRMATION_REQUIRED: terminal submission requires explicit confirmation",
+      "halt_code": "CONFIRMATION_REQUIRED",
+      "wall_clock_ms": 4272.691655000017,
+      "completed_count": 3,
+      "steps": [
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "verification": {
+              "state": "VERIFIED",
+              "postcondition": "SCREEN_CHANGED",
+              "reason": "a MAJOR change followed the hotkey",
+              "evidence": {
+                "change_class": "MAJOR",
+                "after_frame_id": 1,
+                "active_window_changed": false
+              }
+            },
+            "timing": {
+              "observe_ms": 25.14,
+              "verify_calls": 1
+            }
+          },
+          "verification": "VERIFIED",
+          "state_version": 2,
+          "frame_id": 1,
+          "elapsed_ms": 31.497008001679205,
+          "step_id": "s1",
+          "index": 0,
+          "tool": "hotkey",
+          "action_class": "MUTATING",
+          "require_verification": false
+        },
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "verification": {
+              "state": "UNVERIFIED",
+              "postcondition": "NONE",
+              "reason": "the typed-into element is no longer observable, so its content cannot be confirmed",
+              "evidence": {
+                "element_id": "desktop[0]/25/0/23/5/4/0"
+              }
+            },
+            "timing": {
+              "observe_ms": 1329.409,
+              "verify_calls": 2
+            },
+            "target": {
+              "element_id": "desktop[0]/25/0/23/5/4/0",
+              "role": "TEXT_INPUT",
+              "text": "www.instagram.com/?flo=true",
+              "accessible_name": "Search with Google or enter address",
+              "source": "ATSPI",
+              "confidence": 0.95,
+              "bbox": {
+                "x": 351.0,
+                "y": 86.0,
+                "width": 760.0,
+                "height": 28.0,
+                "space": "DESKTOP"
+              },
+              "owner_window_id": null,
+              "password": false
+            },
+            "lease": {
+              "lease_id": "318bc4e96e40441897e1cbbbb68cc52a",
+              "element_id": "desktop[0]/25/0/23/5/4/0",
+              "frame_id": 1,
+              "state_version": 2,
+              "generation": 0,
+              "ttl_ms": 3000,
+              "confidence": 0.95,
+              "source": "ATSPI",
+              "monitor_id": null
+            },
+            "resolution": {
+              "status": "RESOLVED",
+              "reason": "resolved at stage 'role' with score 0.874",
+              "considered": 334,
+              "matched_stage": "role",
+              "ambiguity": false,
+              "best": {
+                "element_id": "desktop[0]/25/0/23/5/4/0",
+                "role": "TEXT_INPUT",
+                "text": "www.instagram.com/?flo=true",
+                "accessible_name": "Search with Google or enter address",
+                "score": 0.8744444444444445,
+                "breakdown": {
+                  "text": 0.7111111111111111,
+                  "source": 0.95,
+                  "role": 1.0,
+                  "context": 1.0,
+                  "geometry": 1.0
+                },
+                "source": "ATSPI",
+                "bbox": {
+                  "x": 351.0,
+                  "y": 86.0,
+                  "width": 760.0,
+                  "height": 28.0,
+                  "space": "DESKTOP"
+                }
+              },
+              "candidates": [
+                {
+                  "element_id": "desktop[0]/25/0/23/5/4/0",
+                  "role": "TEXT_INPUT",
+                  "text": "www.instagram.com/?flo=true",
+                  "accessible_name": "Search with Google or enter address",
+                  "score": 0.8744444444444445,
+                  "breakdown": {
+                    "text": 0.7111111111111111,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 351.0,
+                    "y": 86.0,
+                    "width": 760.0,
+                    "height": 28.0,
+                    "space": "DESKTOP"
+                  }
+                }
+              ],
+              "occlusion": {
+                "target_id": "desktop[0]/25/0/23/5/4/0",
+                "ratio": 0.0,
+                "threshold": 0.5,
+                "blocked": false,
+                "assessed": true,
+                "declared_occluded": false,
+                "covering": [],
+                "reason": "nothing covers more than 0.50 of the target"
+              },
+              "cache": {
+                "outcome": "MISS",
+                "reason": "no hint for this description",
+                "hint": null
+              }
+            },
+            "revalidation": {
+              "ok": true,
+              "checks": {
+                "lease_valid": true,
+                "generation_current": true,
+                "state_fresh": true,
+                "state_not_older_than_lease": true,
+                "target_present": true,
+                "identity_consistent": true,
+                "visible": true,
+                "enabled": true,
+                "has_geometry": true,
+                "inside_desktop": true,
+                "not_occluded": true
+              },
+              "moved_px": 0.0,
+              "occlusion": {
+                "target_id": "desktop[0]/25/0/23/5/4/0",
+                "ratio": 0.0,
+                "threshold": 0.5,
+                "blocked": false,
+                "assessed": true,
+                "declared_occluded": false,
+                "covering": [],
+                "reason": "nothing covers more than 0.50 of the target"
+              }
+            }
+          },
+          "verification": "UNVERIFIED",
+          "state_version": 5,
+          "frame_id": 4,
+          "elapsed_ms": 4238.427198000863,
+          "step_id": "s2",
+          "index": 1,
+          "tool": "type_text",
+          "action_class": "MUTATING",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "CONFIRMATION_REQUIRED",
+          "message": "terminal submission requires explicit confirmation",
+          "data": {
+            "tool": "press_key",
+            "recovery": {
+              "should_attempt": false,
+              "failure_class": "SAFETY",
+              "actions": [],
+              "reason": "a safety refusal is a decision, not an accident (section 61)",
+              "tool_attempts_left": 2,
+              "step_attempts_left": 6
+            }
+          },
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.10232299973722547,
+          "step_id": "s3",
+          "index": 2,
+          "tool": "press_key",
+          "action_class": "MUTATING",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s3 (press_key) halted the sequence on CONFIRMATION_REQUIRED: terminal submission requires explicit confirmation",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s4",
+          "index": 3,
+          "tool": "wait_for_element",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s3 (press_key) halted the sequence on CONFIRMATION_REQUIRED: terminal submission requires explicit confirmation",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s5",
+          "index": 4,
+          "tool": "click",
+          "action_class": "MUTATING",
+          "require_verification": true
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s3 (press_key) halted the sequence on CONFIRMATION_REQUIRED: terminal submission requires explicit confirmation",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s6",
+          "index": 5,
+          "tool": "wait_for_change",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        }
+      ],
+      "rejection_reason": null,
+      "rejection_details": null,
+      "timeout_elapsed_ms": null,
+      "timeout_stop_latched": null
+    }
+  }
+}
