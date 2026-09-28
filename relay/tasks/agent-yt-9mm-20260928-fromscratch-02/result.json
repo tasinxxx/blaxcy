@@ -1,0 +1,313 @@
+{
+  "schema_version": 1,
+  "task_id": "agent-yt-9mm-20260928-fromscratch-02",
+  "lifecycle": "HALTED",
+  "bridge_status": "HALTED",
+  "result": {
+    "task_id": "agent-yt-9mm-20260928-fromscratch-02",
+    "envelope": {
+      "ok": false,
+      "error_code": "TARGET_NOT_FOUND",
+      "message": "step s2 (click) halted the sequence on TARGET_NOT_FOUND: no visible element matched the requested target",
+      "data": {
+        "sequence_id": "seq-e708e69af10a40a5abc92f147e645008",
+        "halted": true,
+        "halt_reason": "step s2 (click) halted the sequence on TARGET_NOT_FOUND: no visible element matched the requested target",
+        "halt_code": "TARGET_NOT_FOUND",
+        "wall_clock_ms": 29105.925013000047,
+        "completed_count": 2,
+        "steps": [
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "found": false,
+              "timeout_ms": 12000,
+              "state": {
+                "frame_id": 62,
+                "state_version": 63,
+                "generation": 0,
+                "active_window_id": 67108926,
+                "active_app": "firefox-esr",
+                "element_count": 569
+              }
+            },
+            "verification": "NOT_APPLICABLE",
+            "state_version": 63,
+            "frame_id": 62,
+            "elapsed_ms": 12336.119271999905,
+            "step_id": "s1",
+            "index": 0,
+            "tool": "wait_for_element",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "TARGET_NOT_FOUND",
+            "message": "no visible element matched the requested target",
+            "data": {
+              "resolution": {
+                "status": "NOT_FOUND",
+                "reason": "no visible element matched the requested target",
+                "considered": 367,
+                "matched_stage": null,
+                "ambiguity": false,
+                "best": null,
+                "candidates": [],
+                "occlusion": null,
+                "cache": {
+                  "outcome": "MISS",
+                  "reason": "no hint for this description",
+                  "hint": null
+                }
+              },
+              "resolution_fallback": {
+                "attempted": true,
+                "resolved": false
+              },
+              "recovery": {
+                "should_attempt": true,
+                "failure_class": "TARGET",
+                "actions": [
+                  "re_perceive",
+                  "re_resolve",
+                  "revalidate"
+                ],
+                "reason": "bounded recovery for a TARGET failure",
+                "tool_attempts_left": 2,
+                "step_attempts_left": 6
+              },
+              "recovery_attempted": true
+            },
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 16766.236344000048,
+            "step_id": "s2",
+            "index": 1,
+            "tool": "click",
+            "action_class": "MUTATING",
+            "require_verification": true
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s2 (click) halted the sequence on TARGET_NOT_FOUND: no visible element matched the requested target",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s3",
+            "index": 2,
+            "tool": "wait_for_change",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s2 (click) halted the sequence on TARGET_NOT_FOUND: no visible element matched the requested target",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s4",
+            "index": 3,
+            "tool": "wait_for_element",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s2 (click) halted the sequence on TARGET_NOT_FOUND: no visible element matched the requested target",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s5",
+            "index": 4,
+            "tool": "click",
+            "action_class": "MUTATING",
+            "require_verification": true
+          },
+          {
+            "ok": false,
+            "error_code": "NOT_EXECUTED",
+            "message": "sequence halted: step s2 (click) halted the sequence on TARGET_NOT_FOUND: no visible element matched the requested target",
+            "data": {},
+            "verification": "NOT_APPLICABLE",
+            "state_version": null,
+            "frame_id": null,
+            "elapsed_ms": 0.0,
+            "step_id": "s6",
+            "index": 5,
+            "tool": "wait_for_change",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          }
+        ]
+      },
+      "verification": "NOT_APPLICABLE",
+      "state_version": null,
+      "frame_id": null,
+      "elapsed_ms": 29106.30111900002
+    },
+    "result": {
+      "schema_version": 1,
+      "task_id": "agent-yt-9mm-20260928-fromscratch-02",
+      "status": "HALTED",
+      "sequence_id": "seq-e708e69af10a40a5abc92f147e645008",
+      "halted": true,
+      "halt_reason": "step s2 (click) halted the sequence on TARGET_NOT_FOUND: no visible element matched the requested target",
+      "halt_code": "TARGET_NOT_FOUND",
+      "wall_clock_ms": 29105.925013000047,
+      "completed_count": 2,
+      "steps": [
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "found": false,
+            "timeout_ms": 12000,
+            "state": {
+              "frame_id": 62,
+              "state_version": 63,
+              "generation": 0,
+              "active_window_id": 67108926,
+              "active_app": "firefox-esr",
+              "element_count": 569
+            }
+          },
+          "verification": "NOT_APPLICABLE",
+          "state_version": 63,
+          "frame_id": 62,
+          "elapsed_ms": 12336.119271999905,
+          "step_id": "s1",
+          "index": 0,
+          "tool": "wait_for_element",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "TARGET_NOT_FOUND",
+          "message": "no visible element matched the requested target",
+          "data": {
+            "resolution": {
+              "status": "NOT_FOUND",
+              "reason": "no visible element matched the requested target",
+              "considered": 367,
+              "matched_stage": null,
+              "ambiguity": false,
+              "best": null,
+              "candidates": [],
+              "occlusion": null,
+              "cache": {
+                "outcome": "MISS",
+                "reason": "no hint for this description",
+                "hint": null
+              }
+            },
+            "resolution_fallback": {
+              "attempted": true,
+              "resolved": false
+            },
+            "recovery": {
+              "should_attempt": true,
+              "failure_class": "TARGET",
+              "actions": [
+                "re_perceive",
+                "re_resolve",
+                "revalidate"
+              ],
+              "reason": "bounded recovery for a TARGET failure",
+              "tool_attempts_left": 2,
+              "step_attempts_left": 6
+            },
+            "recovery_attempted": true
+          },
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 16766.236344000048,
+          "step_id": "s2",
+          "index": 1,
+          "tool": "click",
+          "action_class": "MUTATING",
+          "require_verification": true
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s2 (click) halted the sequence on TARGET_NOT_FOUND: no visible element matched the requested target",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s3",
+          "index": 2,
+          "tool": "wait_for_change",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s2 (click) halted the sequence on TARGET_NOT_FOUND: no visible element matched the requested target",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s4",
+          "index": 3,
+          "tool": "wait_for_element",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s2 (click) halted the sequence on TARGET_NOT_FOUND: no visible element matched the requested target",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s5",
+          "index": 4,
+          "tool": "click",
+          "action_class": "MUTATING",
+          "require_verification": true
+        },
+        {
+          "ok": false,
+          "error_code": "NOT_EXECUTED",
+          "message": "sequence halted: step s2 (click) halted the sequence on TARGET_NOT_FOUND: no visible element matched the requested target",
+          "data": {},
+          "verification": "NOT_APPLICABLE",
+          "state_version": null,
+          "frame_id": null,
+          "elapsed_ms": 0.0,
+          "step_id": "s6",
+          "index": 5,
+          "tool": "wait_for_change",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        }
+      ],
+      "rejection_reason": null,
+      "rejection_details": null,
+      "timeout_elapsed_ms": null,
+      "timeout_stop_latched": null
+    }
+  }
+}
