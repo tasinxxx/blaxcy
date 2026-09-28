@@ -74,7 +74,7 @@ class AccessibilitySettings(_Section):
     startup_timeout_ms: int = Field(default=1000, ge=1)
     max_depth: int = Field(default=12, ge=1)
     max_nodes: int = Field(default=1200, ge=1)
-    deadline_ms: int = Field(default=250, ge=1)
+    deadline_ms: int = Field(default=1000, ge=1)
     cache_ttl_seconds: float = Field(default=2.0, gt=0.0)
     blacklist_after_failures: int = Field(default=3, ge=1)
 
