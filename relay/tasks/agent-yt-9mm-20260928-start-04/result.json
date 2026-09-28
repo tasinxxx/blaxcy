@@ -1,0 +1,1067 @@
+{
+  "schema_version": 1,
+  "task_id": "agent-yt-9mm-20260928-start-04",
+  "lifecycle": "COMPLETED",
+  "bridge_status": "COMPLETED",
+  "result": {
+    "task_id": "agent-yt-9mm-20260928-start-04",
+    "envelope": {
+      "ok": true,
+      "error_code": null,
+      "message": null,
+      "data": {
+        "sequence_id": "seq-34e4df31bb394287b0c4ba1185ae1cf3",
+        "halted": false,
+        "halt_reason": null,
+        "halt_code": null,
+        "wall_clock_ms": 5779.3570770008955,
+        "completed_count": 6,
+        "steps": [
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "verification": {
+                "state": "VERIFIED",
+                "postcondition": "SCREEN_CHANGED",
+                "reason": "a MEANINGFUL change followed the hotkey",
+                "evidence": {
+                  "change_class": "MEANINGFUL",
+                  "after_frame_id": 1,
+                  "active_window_changed": false
+                }
+              },
+              "timing": {
+                "observe_ms": 18.315,
+                "verify_calls": 1
+              }
+            },
+            "verification": "VERIFIED",
+            "state_version": 2,
+            "frame_id": 1,
+            "elapsed_ms": 22.64923400070984,
+            "step_id": "s1",
+            "index": 0,
+            "tool": "hotkey",
+            "action_class": "MUTATING",
+            "require_verification": false
+          },
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "verification": {
+                "state": "VERIFIED",
+                "postcondition": "TEXT_PRESENT",
+                "reason": "the typed text is present in the target's observed content",
+                "evidence": {
+                  "element_id": "desktop[0]/25/0/23/5/1/0",
+                  "characters": 53
+                }
+              },
+              "timing": {
+                "observe_ms": 323.061,
+                "verify_calls": 2
+              },
+              "target": {
+                "element_id": "desktop[0]/25/0/23/5/1/0",
+                "role": "TEXT_INPUT",
+                "text": "www.youtube.com/results?search_query=9mm+song",
+                "accessible_name": "Search with Google or enter address",
+                "source": "ATSPI",
+                "confidence": 0.95,
+                "bbox": {
+                  "x": 316.0,
+                  "y": 86.0,
+                  "width": 823.0,
+                  "height": 28.0,
+                  "space": "DESKTOP"
+                },
+                "owner_window_id": null,
+                "password": false
+              },
+              "lease": {
+                "lease_id": "8ba361d5c0404e5bb6b2c31b41c81d57",
+                "element_id": "desktop[0]/25/0/23/5/1/0",
+                "frame_id": 1,
+                "state_version": 2,
+                "generation": 0,
+                "ttl_ms": 3000,
+                "confidence": 0.95,
+                "source": "ATSPI",
+                "monitor_id": null
+              },
+              "resolution": {
+                "status": "RESOLVED",
+                "reason": "resolved at stage 'role' with score 0.874",
+                "considered": 445,
+                "matched_stage": "role",
+                "ambiguity": false,
+                "best": {
+                  "element_id": "desktop[0]/25/0/23/5/1/0",
+                  "role": "TEXT_INPUT",
+                  "text": "www.youtube.com/results?search_query=9mm+song",
+                  "accessible_name": "Search with Google or enter address",
+                  "score": 0.8744444444444445,
+                  "breakdown": {
+                    "text": 0.7111111111111111,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 316.0,
+                    "y": 86.0,
+                    "width": 823.0,
+                    "height": 28.0,
+                    "space": "DESKTOP"
+                  }
+                },
+                "candidates": [
+                  {
+                    "element_id": "desktop[0]/25/0/23/5/1/0",
+                    "role": "TEXT_INPUT",
+                    "text": "www.youtube.com/results?search_query=9mm+song",
+                    "accessible_name": "Search with Google or enter address",
+                    "score": 0.8744444444444445,
+                    "breakdown": {
+                      "text": 0.7111111111111111,
+                      "source": 0.95,
+                      "role": 1.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 316.0,
+                      "y": 86.0,
+                      "width": 823.0,
+                      "height": 28.0,
+                      "space": "DESKTOP"
+                    }
+                  }
+                ],
+                "occlusion": {
+                  "target_id": "desktop[0]/25/0/23/5/1/0",
+                  "ratio": 0.0,
+                  "threshold": 0.5,
+                  "blocked": false,
+                  "assessed": true,
+                  "declared_occluded": false,
+                  "covering": [],
+                  "reason": "nothing covers more than 0.50 of the target"
+                },
+                "cache": {
+                  "outcome": "MISS",
+                  "reason": "no hint for this description",
+                  "hint": null
+                }
+              },
+              "revalidation": {
+                "ok": true,
+                "checks": {
+                  "lease_valid": true,
+                  "generation_current": true,
+                  "state_fresh": true,
+                  "state_not_older_than_lease": true,
+                  "target_present": true,
+                  "identity_consistent": true,
+                  "visible": true,
+                  "enabled": true,
+                  "has_geometry": true,
+                  "inside_desktop": true,
+                  "not_occluded": true
+                },
+                "moved_px": 0.0,
+                "occlusion": {
+                  "target_id": "desktop[0]/25/0/23/5/1/0",
+                  "ratio": 0.0,
+                  "threshold": 0.5,
+                  "blocked": false,
+                  "assessed": true,
+                  "declared_occluded": false,
+                  "covering": [],
+                  "reason": "nothing covers more than 0.50 of the target"
+                }
+              }
+            },
+            "verification": "VERIFIED",
+            "state_version": 5,
+            "frame_id": 4,
+            "elapsed_ms": 2902.8510999996797,
+            "step_id": "s2",
+            "index": 1,
+            "tool": "type_text",
+            "action_class": "MUTATING",
+            "require_verification": false
+          },
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "verification": {
+                "state": "VERIFIED",
+                "postcondition": "SCREEN_CHANGED",
+                "reason": "a MAJOR change followed the press_key",
+                "evidence": {
+                  "change_class": "MAJOR",
+                  "after_frame_id": 5,
+                  "active_window_changed": false
+                }
+              },
+              "timing": {
+                "observe_ms": 181.311,
+                "verify_calls": 1
+              }
+            },
+            "verification": "VERIFIED",
+            "state_version": 6,
+            "frame_id": 5,
+            "elapsed_ms": 181.70070499945723,
+            "step_id": "s3",
+            "index": 2,
+            "tool": "press_key",
+            "action_class": "MUTATING",
+            "require_verification": false
+          },
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "found": true,
+              "resolution": {
+                "status": "RESOLVED",
+                "reason": "resolved at stage 'substring_text' with score 0.660",
+                "considered": 400,
+                "matched_stage": "substring_text",
+                "ambiguity": false,
+                "best": {
+                  "element_id": "desktop[0]/25/0/23/5/1/0",
+                  "role": "TEXT_INPUT",
+                  "text": "http://www.youtube.com/results?search_query=9mm+songhttps://www.youtube.com/results?search_query=9mm+song",
+                  "accessible_name": "Search with Google or enter address",
+                  "score": 0.66,
+                  "breakdown": {
+                    "text": 0.55,
+                    "source": 0.95,
+                    "role": 0.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 316.0,
+                    "y": 86.0,
+                    "width": 823.0,
+                    "height": 28.0,
+                    "space": "DESKTOP"
+                  }
+                },
+                "candidates": [
+                  {
+                    "element_id": "desktop[0]/25/0/23/5/1/0",
+                    "role": "TEXT_INPUT",
+                    "text": "http://www.youtube.com/results?search_query=9mm+songhttps://www.youtube.com/results?search_query=9mm+song",
+                    "accessible_name": "Search with Google or enter address",
+                    "score": 0.66,
+                    "breakdown": {
+                      "text": 0.55,
+                      "source": 0.95,
+                      "role": 0.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 316.0,
+                      "y": 86.0,
+                      "width": 823.0,
+                      "height": 28.0,
+                      "space": "DESKTOP"
+                    }
+                  }
+                ],
+                "occlusion": {
+                  "target_id": "desktop[0]/25/0/23/5/1/0",
+                  "ratio": 0.0,
+                  "threshold": 0.5,
+                  "blocked": false,
+                  "assessed": true,
+                  "declared_occluded": false,
+                  "covering": [],
+                  "reason": "nothing covers more than 0.50 of the target"
+                },
+                "cache": {
+                  "outcome": "MISS",
+                  "reason": "no hint for this description",
+                  "hint": null
+                }
+              }
+            },
+            "verification": "NOT_APPLICABLE",
+            "state_version": 7,
+            "frame_id": 6,
+            "elapsed_ms": 1026.602460000504,
+            "step_id": "s4",
+            "index": 3,
+            "tool": "wait_for_element",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          },
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "verification": {
+                "state": "VERIFIED",
+                "postcondition": "SCREEN_CHANGED",
+                "reason": "a MAJOR change followed the click",
+                "evidence": {
+                  "change_class": "MAJOR",
+                  "after_frame_id": 7,
+                  "active_window_changed": false,
+                  "target_overlap": true
+                }
+              },
+              "timing": {
+                "observe_ms": 1322.821,
+                "verify_calls": 1
+              },
+              "target": {
+                "element_id": "desktop[0]/25/0/23/5/1/0",
+                "role": "TEXT_INPUT",
+                "text": "http://www.youtube.com/results?search_query=9mm+songhttps://www.youtube.com/results?search_query=9mm+song",
+                "accessible_name": "Search with Google or enter address",
+                "source": "ATSPI",
+                "confidence": 0.95,
+                "bbox": {
+                  "x": 316.0,
+                  "y": 86.0,
+                  "width": 823.0,
+                  "height": 28.0,
+                  "space": "DESKTOP"
+                },
+                "owner_window_id": null,
+                "password": false
+              },
+              "lease": {
+                "lease_id": "3b5bbea780064586aed476305b1f94c8",
+                "element_id": "desktop[0]/25/0/23/5/1/0",
+                "frame_id": 6,
+                "state_version": 7,
+                "generation": 0,
+                "ttl_ms": 3000,
+                "confidence": 0.95,
+                "source": "ATSPI",
+                "monitor_id": null
+              },
+              "resolution": {
+                "status": "RESOLVED",
+                "reason": "resolved at stage 'substring_text' with score 0.660",
+                "considered": 400,
+                "matched_stage": "substring_text",
+                "ambiguity": false,
+                "best": {
+                  "element_id": "desktop[0]/25/0/23/5/1/0",
+                  "role": "TEXT_INPUT",
+                  "text": "http://www.youtube.com/results?search_query=9mm+songhttps://www.youtube.com/results?search_query=9mm+song",
+                  "accessible_name": "Search with Google or enter address",
+                  "score": 0.66,
+                  "breakdown": {
+                    "text": 0.55,
+                    "source": 0.95,
+                    "role": 0.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 316.0,
+                    "y": 86.0,
+                    "width": 823.0,
+                    "height": 28.0,
+                    "space": "DESKTOP"
+                  }
+                },
+                "candidates": [
+                  {
+                    "element_id": "desktop[0]/25/0/23/5/1/0",
+                    "role": "TEXT_INPUT",
+                    "text": "http://www.youtube.com/results?search_query=9mm+songhttps://www.youtube.com/results?search_query=9mm+song",
+                    "accessible_name": "Search with Google or enter address",
+                    "score": 0.66,
+                    "breakdown": {
+                      "text": 0.55,
+                      "source": 0.95,
+                      "role": 0.0,
+                      "context": 1.0,
+                      "geometry": 1.0
+                    },
+                    "source": "ATSPI",
+                    "bbox": {
+                      "x": 316.0,
+                      "y": 86.0,
+                      "width": 823.0,
+                      "height": 28.0,
+                      "space": "DESKTOP"
+                    }
+                  }
+                ],
+                "occlusion": {
+                  "target_id": "desktop[0]/25/0/23/5/1/0",
+                  "ratio": 0.0,
+                  "threshold": 0.5,
+                  "blocked": false,
+                  "assessed": true,
+                  "declared_occluded": false,
+                  "covering": [],
+                  "reason": "nothing covers more than 0.50 of the target"
+                },
+                "cache": {
+                  "outcome": "HIT",
+                  "reason": "identity hint",
+                  "hint": {
+                    "identity_path": "desktop[0]/25/0/23/5/1/0",
+                    "element_id": "desktop[0]/25/0/23/5/1/0",
+                    "role": "TEXT_INPUT",
+                    "owner_window_id": null,
+                    "frame_id": 6,
+                    "state_version": 7,
+                    "generation": 0,
+                    "patch_hash": null,
+                    "cache_window_id": 23068842,
+                    "speculative_only": false
+                  }
+                }
+              },
+              "revalidation": {
+                "ok": true,
+                "checks": {
+                  "lease_valid": true,
+                  "generation_current": true,
+                  "state_fresh": true,
+                  "state_not_older_than_lease": true,
+                  "target_present": true,
+                  "identity_consistent": true,
+                  "visible": true,
+                  "enabled": true,
+                  "has_geometry": true,
+                  "inside_desktop": true,
+                  "not_occluded": true
+                },
+                "moved_px": 0.0,
+                "occlusion": {
+                  "target_id": "desktop[0]/25/0/23/5/1/0",
+                  "ratio": 0.0,
+                  "threshold": 0.5,
+                  "blocked": false,
+                  "assessed": true,
+                  "declared_occluded": false,
+                  "covering": [],
+                  "reason": "nothing covers more than 0.50 of the target"
+                }
+              }
+            },
+            "verification": "VERIFIED",
+            "state_version": 8,
+            "frame_id": 7,
+            "elapsed_ms": 1497.1820690007007,
+            "step_id": "s5",
+            "index": 4,
+            "tool": "click",
+            "action_class": "MUTATING",
+            "require_verification": true
+          },
+          {
+            "ok": true,
+            "error_code": null,
+            "message": null,
+            "data": {
+              "changed": true,
+              "change_class": "MAJOR",
+              "regions": [
+                {
+                  "x": 227.66666666666666,
+                  "y": 0.0,
+                  "width": 910.6666666666666,
+                  "height": 128.0,
+                  "space": "DESKTOP"
+                },
+                {
+                  "x": 0.0,
+                  "y": 128.0,
+                  "width": 1366.0,
+                  "height": 640.0,
+                  "space": "DESKTOP"
+                },
+                {
+                  "x": 500.8666666666667,
+                  "y": 153.6,
+                  "width": 227.66666666666666,
+                  "height": 25.6,
+                  "space": "DESKTOP"
+                }
+              ],
+              "state": {
+                "frame_id": 8,
+                "state_version": 9,
+                "generation": 0,
+                "active_window_id": 23068842,
+                "active_app": "firefox-esr",
+                "element_count": 419
+              }
+            },
+            "verification": "NOT_APPLICABLE",
+            "state_version": 9,
+            "frame_id": 8,
+            "elapsed_ms": 143.04553699912503,
+            "step_id": "s6",
+            "index": 5,
+            "tool": "wait_for_change",
+            "action_class": "READ_ONLY",
+            "require_verification": false
+          }
+        ]
+      },
+      "verification": "NOT_APPLICABLE",
+      "state_version": null,
+      "frame_id": null,
+      "elapsed_ms": 5779.5779860007315
+    },
+    "result": {
+      "schema_version": 1,
+      "task_id": "agent-yt-9mm-20260928-start-04",
+      "status": "COMPLETED",
+      "sequence_id": "seq-34e4df31bb394287b0c4ba1185ae1cf3",
+      "halted": false,
+      "halt_reason": null,
+      "halt_code": null,
+      "wall_clock_ms": 5779.3570770008955,
+      "completed_count": 6,
+      "steps": [
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "verification": {
+              "state": "VERIFIED",
+              "postcondition": "SCREEN_CHANGED",
+              "reason": "a MEANINGFUL change followed the hotkey",
+              "evidence": {
+                "change_class": "MEANINGFUL",
+                "after_frame_id": 1,
+                "active_window_changed": false
+              }
+            },
+            "timing": {
+              "observe_ms": 18.315,
+              "verify_calls": 1
+            }
+          },
+          "verification": "VERIFIED",
+          "state_version": 2,
+          "frame_id": 1,
+          "elapsed_ms": 22.64923400070984,
+          "step_id": "s1",
+          "index": 0,
+          "tool": "hotkey",
+          "action_class": "MUTATING",
+          "require_verification": false
+        },
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "verification": {
+              "state": "VERIFIED",
+              "postcondition": "TEXT_PRESENT",
+              "reason": "the typed text is present in the target's observed content",
+              "evidence": {
+                "element_id": "desktop[0]/25/0/23/5/1/0",
+                "characters": 53
+              }
+            },
+            "timing": {
+              "observe_ms": 323.061,
+              "verify_calls": 2
+            },
+            "target": {
+              "element_id": "desktop[0]/25/0/23/5/1/0",
+              "role": "TEXT_INPUT",
+              "text": "www.youtube.com/results?search_query=9mm+song",
+              "accessible_name": "Search with Google or enter address",
+              "source": "ATSPI",
+              "confidence": 0.95,
+              "bbox": {
+                "x": 316.0,
+                "y": 86.0,
+                "width": 823.0,
+                "height": 28.0,
+                "space": "DESKTOP"
+              },
+              "owner_window_id": null,
+              "password": false
+            },
+            "lease": {
+              "lease_id": "8ba361d5c0404e5bb6b2c31b41c81d57",
+              "element_id": "desktop[0]/25/0/23/5/1/0",
+              "frame_id": 1,
+              "state_version": 2,
+              "generation": 0,
+              "ttl_ms": 3000,
+              "confidence": 0.95,
+              "source": "ATSPI",
+              "monitor_id": null
+            },
+            "resolution": {
+              "status": "RESOLVED",
+              "reason": "resolved at stage 'role' with score 0.874",
+              "considered": 445,
+              "matched_stage": "role",
+              "ambiguity": false,
+              "best": {
+                "element_id": "desktop[0]/25/0/23/5/1/0",
+                "role": "TEXT_INPUT",
+                "text": "www.youtube.com/results?search_query=9mm+song",
+                "accessible_name": "Search with Google or enter address",
+                "score": 0.8744444444444445,
+                "breakdown": {
+                  "text": 0.7111111111111111,
+                  "source": 0.95,
+                  "role": 1.0,
+                  "context": 1.0,
+                  "geometry": 1.0
+                },
+                "source": "ATSPI",
+                "bbox": {
+                  "x": 316.0,
+                  "y": 86.0,
+                  "width": 823.0,
+                  "height": 28.0,
+                  "space": "DESKTOP"
+                }
+              },
+              "candidates": [
+                {
+                  "element_id": "desktop[0]/25/0/23/5/1/0",
+                  "role": "TEXT_INPUT",
+                  "text": "www.youtube.com/results?search_query=9mm+song",
+                  "accessible_name": "Search with Google or enter address",
+                  "score": 0.8744444444444445,
+                  "breakdown": {
+                    "text": 0.7111111111111111,
+                    "source": 0.95,
+                    "role": 1.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 316.0,
+                    "y": 86.0,
+                    "width": 823.0,
+                    "height": 28.0,
+                    "space": "DESKTOP"
+                  }
+                }
+              ],
+              "occlusion": {
+                "target_id": "desktop[0]/25/0/23/5/1/0",
+                "ratio": 0.0,
+                "threshold": 0.5,
+                "blocked": false,
+                "assessed": true,
+                "declared_occluded": false,
+                "covering": [],
+                "reason": "nothing covers more than 0.50 of the target"
+              },
+              "cache": {
+                "outcome": "MISS",
+                "reason": "no hint for this description",
+                "hint": null
+              }
+            },
+            "revalidation": {
+              "ok": true,
+              "checks": {
+                "lease_valid": true,
+                "generation_current": true,
+                "state_fresh": true,
+                "state_not_older_than_lease": true,
+                "target_present": true,
+                "identity_consistent": true,
+                "visible": true,
+                "enabled": true,
+                "has_geometry": true,
+                "inside_desktop": true,
+                "not_occluded": true
+              },
+              "moved_px": 0.0,
+              "occlusion": {
+                "target_id": "desktop[0]/25/0/23/5/1/0",
+                "ratio": 0.0,
+                "threshold": 0.5,
+                "blocked": false,
+                "assessed": true,
+                "declared_occluded": false,
+                "covering": [],
+                "reason": "nothing covers more than 0.50 of the target"
+              }
+            }
+          },
+          "verification": "VERIFIED",
+          "state_version": 5,
+          "frame_id": 4,
+          "elapsed_ms": 2902.8510999996797,
+          "step_id": "s2",
+          "index": 1,
+          "tool": "type_text",
+          "action_class": "MUTATING",
+          "require_verification": false
+        },
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "verification": {
+              "state": "VERIFIED",
+              "postcondition": "SCREEN_CHANGED",
+              "reason": "a MAJOR change followed the press_key",
+              "evidence": {
+                "change_class": "MAJOR",
+                "after_frame_id": 5,
+                "active_window_changed": false
+              }
+            },
+            "timing": {
+              "observe_ms": 181.311,
+              "verify_calls": 1
+            }
+          },
+          "verification": "VERIFIED",
+          "state_version": 6,
+          "frame_id": 5,
+          "elapsed_ms": 181.70070499945723,
+          "step_id": "s3",
+          "index": 2,
+          "tool": "press_key",
+          "action_class": "MUTATING",
+          "require_verification": false
+        },
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "found": true,
+            "resolution": {
+              "status": "RESOLVED",
+              "reason": "resolved at stage 'substring_text' with score 0.660",
+              "considered": 400,
+              "matched_stage": "substring_text",
+              "ambiguity": false,
+              "best": {
+                "element_id": "desktop[0]/25/0/23/5/1/0",
+                "role": "TEXT_INPUT",
+                "text": "http://www.youtube.com/results?search_query=9mm+songhttps://www.youtube.com/results?search_query=9mm+song",
+                "accessible_name": "Search with Google or enter address",
+                "score": 0.66,
+                "breakdown": {
+                  "text": 0.55,
+                  "source": 0.95,
+                  "role": 0.0,
+                  "context": 1.0,
+                  "geometry": 1.0
+                },
+                "source": "ATSPI",
+                "bbox": {
+                  "x": 316.0,
+                  "y": 86.0,
+                  "width": 823.0,
+                  "height": 28.0,
+                  "space": "DESKTOP"
+                }
+              },
+              "candidates": [
+                {
+                  "element_id": "desktop[0]/25/0/23/5/1/0",
+                  "role": "TEXT_INPUT",
+                  "text": "http://www.youtube.com/results?search_query=9mm+songhttps://www.youtube.com/results?search_query=9mm+song",
+                  "accessible_name": "Search with Google or enter address",
+                  "score": 0.66,
+                  "breakdown": {
+                    "text": 0.55,
+                    "source": 0.95,
+                    "role": 0.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 316.0,
+                    "y": 86.0,
+                    "width": 823.0,
+                    "height": 28.0,
+                    "space": "DESKTOP"
+                  }
+                }
+              ],
+              "occlusion": {
+                "target_id": "desktop[0]/25/0/23/5/1/0",
+                "ratio": 0.0,
+                "threshold": 0.5,
+                "blocked": false,
+                "assessed": true,
+                "declared_occluded": false,
+                "covering": [],
+                "reason": "nothing covers more than 0.50 of the target"
+              },
+              "cache": {
+                "outcome": "MISS",
+                "reason": "no hint for this description",
+                "hint": null
+              }
+            }
+          },
+          "verification": "NOT_APPLICABLE",
+          "state_version": 7,
+          "frame_id": 6,
+          "elapsed_ms": 1026.602460000504,
+          "step_id": "s4",
+          "index": 3,
+          "tool": "wait_for_element",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        },
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "verification": {
+              "state": "VERIFIED",
+              "postcondition": "SCREEN_CHANGED",
+              "reason": "a MAJOR change followed the click",
+              "evidence": {
+                "change_class": "MAJOR",
+                "after_frame_id": 7,
+                "active_window_changed": false,
+                "target_overlap": true
+              }
+            },
+            "timing": {
+              "observe_ms": 1322.821,
+              "verify_calls": 1
+            },
+            "target": {
+              "element_id": "desktop[0]/25/0/23/5/1/0",
+              "role": "TEXT_INPUT",
+              "text": "http://www.youtube.com/results?search_query=9mm+songhttps://www.youtube.com/results?search_query=9mm+song",
+              "accessible_name": "Search with Google or enter address",
+              "source": "ATSPI",
+              "confidence": 0.95,
+              "bbox": {
+                "x": 316.0,
+                "y": 86.0,
+                "width": 823.0,
+                "height": 28.0,
+                "space": "DESKTOP"
+              },
+              "owner_window_id": null,
+              "password": false
+            },
+            "lease": {
+              "lease_id": "3b5bbea780064586aed476305b1f94c8",
+              "element_id": "desktop[0]/25/0/23/5/1/0",
+              "frame_id": 6,
+              "state_version": 7,
+              "generation": 0,
+              "ttl_ms": 3000,
+              "confidence": 0.95,
+              "source": "ATSPI",
+              "monitor_id": null
+            },
+            "resolution": {
+              "status": "RESOLVED",
+              "reason": "resolved at stage 'substring_text' with score 0.660",
+              "considered": 400,
+              "matched_stage": "substring_text",
+              "ambiguity": false,
+              "best": {
+                "element_id": "desktop[0]/25/0/23/5/1/0",
+                "role": "TEXT_INPUT",
+                "text": "http://www.youtube.com/results?search_query=9mm+songhttps://www.youtube.com/results?search_query=9mm+song",
+                "accessible_name": "Search with Google or enter address",
+                "score": 0.66,
+                "breakdown": {
+                  "text": 0.55,
+                  "source": 0.95,
+                  "role": 0.0,
+                  "context": 1.0,
+                  "geometry": 1.0
+                },
+                "source": "ATSPI",
+                "bbox": {
+                  "x": 316.0,
+                  "y": 86.0,
+                  "width": 823.0,
+                  "height": 28.0,
+                  "space": "DESKTOP"
+                }
+              },
+              "candidates": [
+                {
+                  "element_id": "desktop[0]/25/0/23/5/1/0",
+                  "role": "TEXT_INPUT",
+                  "text": "http://www.youtube.com/results?search_query=9mm+songhttps://www.youtube.com/results?search_query=9mm+song",
+                  "accessible_name": "Search with Google or enter address",
+                  "score": 0.66,
+                  "breakdown": {
+                    "text": 0.55,
+                    "source": 0.95,
+                    "role": 0.0,
+                    "context": 1.0,
+                    "geometry": 1.0
+                  },
+                  "source": "ATSPI",
+                  "bbox": {
+                    "x": 316.0,
+                    "y": 86.0,
+                    "width": 823.0,
+                    "height": 28.0,
+                    "space": "DESKTOP"
+                  }
+                }
+              ],
+              "occlusion": {
+                "target_id": "desktop[0]/25/0/23/5/1/0",
+                "ratio": 0.0,
+                "threshold": 0.5,
+                "blocked": false,
+                "assessed": true,
+                "declared_occluded": false,
+                "covering": [],
+                "reason": "nothing covers more than 0.50 of the target"
+              },
+              "cache": {
+                "outcome": "HIT",
+                "reason": "identity hint",
+                "hint": {
+                  "identity_path": "desktop[0]/25/0/23/5/1/0",
+                  "element_id": "desktop[0]/25/0/23/5/1/0",
+                  "role": "TEXT_INPUT",
+                  "owner_window_id": null,
+                  "frame_id": 6,
+                  "state_version": 7,
+                  "generation": 0,
+                  "patch_hash": null,
+                  "cache_window_id": 23068842,
+                  "speculative_only": false
+                }
+              }
+            },
+            "revalidation": {
+              "ok": true,
+              "checks": {
+                "lease_valid": true,
+                "generation_current": true,
+                "state_fresh": true,
+                "state_not_older_than_lease": true,
+                "target_present": true,
+                "identity_consistent": true,
+                "visible": true,
+                "enabled": true,
+                "has_geometry": true,
+                "inside_desktop": true,
+                "not_occluded": true
+              },
+              "moved_px": 0.0,
+              "occlusion": {
+                "target_id": "desktop[0]/25/0/23/5/1/0",
+                "ratio": 0.0,
+                "threshold": 0.5,
+                "blocked": false,
+                "assessed": true,
+                "declared_occluded": false,
+                "covering": [],
+                "reason": "nothing covers more than 0.50 of the target"
+              }
+            }
+          },
+          "verification": "VERIFIED",
+          "state_version": 8,
+          "frame_id": 7,
+          "elapsed_ms": 1497.1820690007007,
+          "step_id": "s5",
+          "index": 4,
+          "tool": "click",
+          "action_class": "MUTATING",
+          "require_verification": true
+        },
+        {
+          "ok": true,
+          "error_code": null,
+          "message": null,
+          "data": {
+            "changed": true,
+            "change_class": "MAJOR",
+            "regions": [
+              {
+                "x": 227.66666666666666,
+                "y": 0.0,
+                "width": 910.6666666666666,
+                "height": 128.0,
+                "space": "DESKTOP"
+              },
+              {
+                "x": 0.0,
+                "y": 128.0,
+                "width": 1366.0,
+                "height": 640.0,
+                "space": "DESKTOP"
+              },
+              {
+                "x": 500.8666666666667,
+                "y": 153.6,
+                "width": 227.66666666666666,
+                "height": 25.6,
+                "space": "DESKTOP"
+              }
+            ],
+            "state": {
+              "frame_id": 8,
+              "state_version": 9,
+              "generation": 0,
+              "active_window_id": 23068842,
+              "active_app": "firefox-esr",
+              "element_count": 419
+            }
+          },
+          "verification": "NOT_APPLICABLE",
+          "state_version": 9,
+          "frame_id": 8,
+          "elapsed_ms": 143.04553699912503,
+          "step_id": "s6",
+          "index": 5,
+          "tool": "wait_for_change",
+          "action_class": "READ_ONLY",
+          "require_verification": false
+        }
+      ],
+      "rejection_reason": null,
+      "rejection_details": null,
+      "timeout_elapsed_ms": null,
+      "timeout_stop_latched": null
+    }
+  }
+}
