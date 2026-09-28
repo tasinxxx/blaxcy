@@ -54,6 +54,19 @@ jobs:
             echo "has_requests=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Check for pending signed relay tasks
+        id: pending_tasks
+        shell: bash
+        run: |
+          set -eu
+          shopt -s nullglob
+          states=(relay/tasks/*/state.json)
+          found=0
+          for state in "${states[@]}"; do
+            grep -q '"state": "PENDING"' "$state" && found=1 && break
+          done
+          echo "has_tasks=$([ "$found" -eq 1 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
       - name: Sign pending Agent requests
         if: steps.pending.outputs.has_requests == 'true'
         env:
@@ -81,7 +94,7 @@ jobs:
           git push
 
       - name: Dispatch the self-hosted desktop processor
-        if: steps.pending.outputs.has_requests == 'true'
+        if: steps.pending.outputs.has_requests == 'true' || steps.pending_tasks.outputs.has_tasks == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh workflow run process-task.yml --repo "${{ github.repository }}" --ref master
