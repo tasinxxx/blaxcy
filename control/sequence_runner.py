@@ -713,6 +713,9 @@ def step_arguments(step: SequenceStep) -> dict[str, Any]:
     arguments = step.to_dict()
     arguments.pop("step_id", None)
     arguments.pop("tool", None)
+    # Verification is sequence-runner metadata, not an argument accepted by
+    # the underlying standalone tool. The dispatcher receives it separately.
+    arguments.pop("require_verification", None)
     return arguments
 
 
